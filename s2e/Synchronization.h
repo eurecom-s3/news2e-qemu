@@ -34,82 +34,63 @@
  *
  */
 
-#ifndef S2E_PLUGINS_EXECTRACER_H
-#define S2E_PLUGINS_EXECTRACER_H
+#ifndef S2E_SYNCHRONIZATION_H
+#define S2E_SYNCHRONIZATION_H
 
-#include <s2e/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/OSMonitor.h>
-#include <s2e/S2EExecutionState.h>
-
-#include <stdio.h>
-
-#include "TraceEntries.h"
+#include <inttypes.h>
+#include <string>
 
 namespace s2e {
-namespace plugins {
 
-//Maps a module descriptor to an id, for compression purposes
-typedef std::multimap<ModuleDescriptor, uint16_t, ModuleDescriptor::ModuleByLoadBase> ExecTracerModules;
+class S2ESynchronizedObjectInternal {
+private:
+    void *m_sharedBuffer;
+    unsigned m_size;
+    unsigned m_headerSize;
+
+    S2ESynchronizedObjectInternal() {
+
+    }
+
+public:
+    S2ESynchronizedObjectInternal(unsigned size);
+    ~S2ESynchronizedObjectInternal();
+
+    void lock();
+    void release();
+    void *aquire();
+};
 
 /**
- *  This plugin manages the binary execution trace file.
- *  It makes sure that all the writes properly go through it.
- *  Each write is encapsulated in an ExecutionTraceItem before being
- *  written to the file.
+ *  This class creates a shared memory buffer on which
+ *  all S2E processes can perform read/write requests.
  */
-class ExecutionTracer : public Plugin
-{
-    S2E_PLUGIN
-
-    FILE* m_LogFile;
-    uint32_t m_CurrentIndex;
-    OSMonitor *m_Monitor;
-    ExecTracerModules m_Modules;
-
-    uint16_t getCompressedId(const ModuleDescriptor *desc);
-
-    void onTimer();
-    void createNewTraceFile();
-public:
-    ExecutionTracer(S2E* s2e): Plugin(s2e) {}
-    ~ExecutionTracer();
-    void initialize();
-
-    uint32_t writeData(
-            const S2EExecutionState *state,
-            void *data, unsigned size, ExecTraceEntryType type);
-
-    void flush();
+template <class T>
+class S2ESynchronizedObject {
 private:
+    S2ESynchronizedObjectInternal sync;
 
-    void onFork(S2EExecutionState *state,
-                const std::vector<S2EExecutionState*>& newStates,
-                const std::vector<klee::ref<klee::Expr> >& newConditions
-                );
 
-    void onProcessFork();
+public:
 
+    S2ESynchronizedObject():sync(S2ESynchronizedObjectInternal(sizeof(T))) {
+
+    }
+
+    ~S2ESynchronizedObject() {
+
+    }
+
+    T *acquire() {
+        return (T*)sync.aquire();
+    }
+
+    void release() {
+        sync.release();
+    }
 
 };
 
-#if 0
-class ExecutionTracerState: public PluginState
-{
-private:
-    unsigned m_previousItemIndex;
+}
 
-public:
-    ExecutionTracerState();
-    virtual ~ExecutionTracerState();
-    virtual ExecutionTracerState* clone() const;
-    static PluginState *factory();
-
-    friend class ExecutionTracer;
-};
 #endif
-
-} // namespace plugins
-} // namespace s2e
-
-#endif // S2E_PLUGINS_EXAMPLE_H
