@@ -34,84 +34,43 @@
  *
  */
 
-#ifndef S2E_PLUGINS_LIBCALLMON_H
-#define S2E_PLUGINS_LIBCALLMON_H
+#include "InterruptInjector.h"
+#include <s2e/S2E.h>
+#include <s2e/ConfigFile.h>
+#include <s2e/Utils.h>
 
-#include <s2e/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/S2EExecutionState.h>
-
-#include <tr1/unordered_map>
-#include <tr1/unordered_set>
-#include <string>
-
-#include "ModuleExecutionDetector.h"
-#include "FunctionMonitor.h"
-#include "OSMonitor.h"
+#include <iostream>
 
 namespace s2e {
 namespace plugins {
 
-class LibraryCallMonitor : public Plugin
+S2E_DEFINE_PLUGIN(InterruptInjector, "Inject hardware interrupts at various places in the system to cause race conditions",
+                  "InterruptInjector",
+                  "SymbolicHardware", "LibraryCallMonitor");
+
+void InterruptInjector::initialize()
 {
-    S2E_PLUGIN
-public:
-    typedef std::tr1::unordered_set<std::string> StringSet;
-    typedef std::set<std::pair<uint64_t, uint64_t> > AddressPairs;
+    m_libcallMonitor = static_cast<LibraryCallMonitor*>(s2e()->getPlugin("LibraryCallMonitor"));
+    m_symbolicHardware = static_cast<SymbolicHardware*>(s2e()->getPlugin("SymbolicHardware"));
 
-    LibraryCallMonitor(S2E* s2e): Plugin(s2e) {}
+    m_libcallMonitor->onLibraryCall.connect(
+            sigc::mem_fun(*this, &InterruptInjector::onLibraryCall));
 
-    void initialize();
+    m_hardwareId = s2e()->getConfig()->getString(getConfigKey() + ".hardwareId");
 
-    sigc::signal<void,
-                 S2EExecutionState*,
-                 FunctionMonitorState*,
-                 const ModuleDescriptor& /* The module  being called */>
-          onLibraryCall;
+    m_deviceDescriptor = m_symbolicHardware->findDevice(m_hardwareId);
+    if (!m_deviceDescriptor) {
+        s2e()->getWarningsStream() << "InterruptInjector: you must specifiy a valid hardware id." << std::endl;
+        exit(-1);
+    }
+}
 
-private:
-    OSMonitor * m_monitor;
-    ModuleExecutionDetector *m_detector;
-    FunctionMonitor *m_functionMonitor;
-    StringSet m_functionNames;
-    AddressPairs m_alreadyCalledFunctions;
-
-    //List of modules whose calls we want to track.
-    //Empty to track all modules in the system.
-    StringSet m_trackedModules;
-
-    bool m_displayOnce;
-
-    void onModuleLoad(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-    void onModuleUnload(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-    void onFunctionCall(S2EExecutionState* state, FunctionMonitorState *fns);
-};
-
-class LibraryCallMonitorState : public PluginState
+void InterruptInjector::onLibraryCall(S2EExecutionState* state,
+                                      FunctionMonitorState* fns,
+                                      const ModuleDescriptor& mod)
 {
-public:
-    typedef std::tr1::unordered_map<uint64_t, const char *> AddressToFunctionName;
-
-private:
-    AddressToFunctionName m_functions;
-
-public:
-    LibraryCallMonitorState();
-    virtual ~LibraryCallMonitorState();
-    virtual LibraryCallMonitorState* clone() const;
-    static PluginState *factory(Plugin *p, S2EExecutionState *s);
-
-    friend class LibraryCallMonitor;
-};
+    m_deviceDescriptor->setInterrupt(true);
+}
 
 } // namespace plugins
 } // namespace s2e
-
-#endif // S2E_PLUGINS_LIBCALLMON_H
