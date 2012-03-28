@@ -34,64 +34,38 @@
  *
  */
 
-#ifndef S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-#define S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
+#ifndef S2E_PLUGINS_STACKCHECKER_H
+#define S2E_PLUGINS_STACKCHECKER_H
 
-#include <s2e/S2E.h>
 #include <s2e/Plugin.h>
-#include <s2e/Utils.h>
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/S2EExecutionState.h>
-
-
-#include <s2e/Plugins/FunctionMonitor.h>
-#include <s2e/Plugins/ModuleExecutionDetector.h>
-#include <s2e/Plugins/WindowsInterceptor/WindowsMonitor.h>
-
-#include "Api.h"
+#include "StackMonitor.h"
+#include "MemoryChecker.h"
+#include "OSMonitor.h"
 
 namespace s2e {
 namespace plugins {
 
-class MemoryChecker;
-
-#define WINDRV_REGISTER_ENTRY_POINT(addr, ep) registerEntryPoint(state, &WindowsDriverExerciser::ep, addr);
-
-class WindowsDriverExerciser : public WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >
+class StackChecker : public Plugin
 {
     S2E_PLUGIN
 public:
-    enum UnloadAction {
-        KILL, SUCCEED
-    };
-
-    typedef void (WindowsDriverExerciser::*EntryPoint)(S2EExecutionState* state, FunctionMonitorState *fns);
-    WindowsDriverExerciser(S2E* s2e):WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >(s2e) {}
+    StackChecker(S2E* s2e): Plugin(s2e) {}
 
     void initialize();
 
+
 private:
-    StringSet m_modules;
-    StringSet m_loadedModules;
+    StackMonitor *m_stackMonitor;
+    MemoryChecker *m_memoryChecker;
+    OSMonitor *m_monitor;
 
-    UnloadAction m_unloadAction;
-
-    void onModuleLoad(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-    void onModuleUnload(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-
-    DECLARE_ENTRY_POINT(DriverEntryPoint, uint32_t pDriverObject, bool pushed);
-    DECLARE_ENTRY_POINT(DriverUnload);
+    void onMemoryAccess(S2EExecutionState *state, uint64_t address,
+                        unsigned size, bool isWrite, bool *result);
 };
 
-}
-}
+} // namespace plugins
+} // namespace s2e
 
-#endif
+#endif // S2E_PLUGINS_STACKCHECKER_H

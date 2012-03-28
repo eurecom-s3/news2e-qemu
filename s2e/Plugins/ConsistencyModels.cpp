@@ -34,64 +34,54 @@
  *
  */
 
-#ifndef S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-#define S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-
+#include "ConsistencyModels.h"
 #include <s2e/S2E.h>
-#include <s2e/Plugin.h>
+#include <s2e/ConfigFile.h>
 #include <s2e/Utils.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/S2EExecutionState.h>
 
-
-#include <s2e/Plugins/FunctionMonitor.h>
-#include <s2e/Plugins/ModuleExecutionDetector.h>
-#include <s2e/Plugins/WindowsInterceptor/WindowsMonitor.h>
-
-#include "Api.h"
+#include <iostream>
 
 namespace s2e {
 namespace plugins {
 
-class MemoryChecker;
+S2E_DEFINE_PLUGIN(ConsistencyModels, "Central manager for execution consistency models", "",);
 
-#define WINDRV_REGISTER_ENTRY_POINT(addr, ep) registerEntryPoint(state, &WindowsDriverExerciser::ep, addr);
-
-class WindowsDriverExerciser : public WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >
+void ConsistencyModels::initialize()
 {
-    S2E_PLUGIN
-public:
-    enum UnloadAction {
-        KILL, SUCCEED
-    };
+    ConfigFile *cfg = s2e()->getConfig();
+    bool ok = false;
 
-    typedef void (WindowsDriverExerciser::*EntryPoint)(S2EExecutionState* state, FunctionMonitorState *fns);
-    WindowsDriverExerciser(S2E* s2e):WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >(s2e) {}
+    std::string consistency = cfg->getString(getConfigKey() + ".model", "", &ok);
+    m_defaultModel = fromString(consistency);
 
-    void initialize();
-
-private:
-    StringSet m_modules;
-    StringSet m_loadedModules;
-
-    UnloadAction m_unloadAction;
-
-    void onModuleLoad(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-    void onModuleUnload(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-
-    DECLARE_ENTRY_POINT(DriverEntryPoint, uint32_t pDriverObject, bool pushed);
-    DECLARE_ENTRY_POINT(DriverUnload);
-};
-
-}
+    if (m_defaultModel == NONE) {
+        s2e()->getWarningsStream() << "ConsistencyModels: invalid consistency " << consistency << "\n";
+        exit(-1);
+    }
 }
 
-#endif
+ExecutionConsistencyModel ConsistencyModels::fromString(const std::string &model)
+{
+    ExecutionConsistencyModel ret = NONE;
+    //Check the consistency type
+    if (model == "strict") {
+        ret = STRICT;
+    }else if (model == "local") {
+        ret = LOCAL;
+    }else if (model == "overapproximate") {
+        ret = OVERAPPROX;
+    }else if  (model == "overconstrained") {
+        ret = OVERCONSTR;
+    }
+
+    return ret;
+}
+
+PluginState *ConsistencyModelsState::factory(Plugin *p, S2EExecutionState *s) {
+    ConsistencyModels *models = static_cast<ConsistencyModels*>(p);
+    return new ConsistencyModelsState(models->getDefaultModel());
+}
+
+
+} // namespace plugins
+} // namespace s2e

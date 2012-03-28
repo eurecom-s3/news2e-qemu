@@ -34,64 +34,41 @@
  *
  */
 
-#ifndef S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-#define S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
+#ifndef S2E_PLUGINS_INTERRUPT_INJECTOR_H
+#define S2E_PLUGINS_INTERRUPT_INJECTOR_H
 
-#include <s2e/S2E.h>
 #include <s2e/Plugin.h>
-#include <s2e/Utils.h>
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/S2EExecutionState.h>
 
-
-#include <s2e/Plugins/FunctionMonitor.h>
-#include <s2e/Plugins/ModuleExecutionDetector.h>
-#include <s2e/Plugins/WindowsInterceptor/WindowsMonitor.h>
-
-#include "Api.h"
+#include "LibraryCallMonitor.h"
+#include "SymbolicHardware.h"
 
 namespace s2e {
 namespace plugins {
 
-class MemoryChecker;
-
-#define WINDRV_REGISTER_ENTRY_POINT(addr, ep) registerEntryPoint(state, &WindowsDriverExerciser::ep, addr);
-
-class WindowsDriverExerciser : public WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >
+class InterruptInjector : public Plugin
 {
     S2E_PLUGIN
 public:
-    enum UnloadAction {
-        KILL, SUCCEED
-    };
-
-    typedef void (WindowsDriverExerciser::*EntryPoint)(S2EExecutionState* state, FunctionMonitorState *fns);
-    WindowsDriverExerciser(S2E* s2e):WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >(s2e) {}
+    InterruptInjector(S2E* s2e): Plugin(s2e) {}
 
     void initialize();
 
+
 private:
-    StringSet m_modules;
-    StringSet m_loadedModules;
+    LibraryCallMonitor *m_libcallMonitor;
+    SymbolicHardware *m_symbolicHardware;
 
-    UnloadAction m_unloadAction;
+    std::string m_hardwareId;
+    DeviceDescriptor *m_deviceDescriptor;
 
-    void onModuleLoad(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-    void onModuleUnload(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-
-    DECLARE_ENTRY_POINT(DriverEntryPoint, uint32_t pDriverObject, bool pushed);
-    DECLARE_ENTRY_POINT(DriverUnload);
+    void onLibraryCall(S2EExecutionState* state,
+                       FunctionMonitorState* fns,
+                       const ModuleDescriptor& mod);
 };
 
-}
-}
+} // namespace plugins
+} // namespace s2e
 
-#endif
+#endif // S2E_PLUGINS_INTERRUPT_INJECTOR_H

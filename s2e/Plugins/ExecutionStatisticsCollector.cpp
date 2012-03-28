@@ -34,64 +34,23 @@
  *
  */
 
-#ifndef S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-#define S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-
+#include "ExecutionStatisticsCollector.h"
 #include <s2e/S2E.h>
-#include <s2e/Plugin.h>
+#include <s2e/ConfigFile.h>
 #include <s2e/Utils.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/S2EExecutionState.h>
 
-
-#include <s2e/Plugins/FunctionMonitor.h>
-#include <s2e/Plugins/ModuleExecutionDetector.h>
-#include <s2e/Plugins/WindowsInterceptor/WindowsMonitor.h>
-
-#include "Api.h"
+#include <iostream>
 
 namespace s2e {
 namespace plugins {
 
-class MemoryChecker;
+S2E_DEFINE_PLUGIN(ExecutionStatisticsCollector, "Allows client plugins to store statistics in a central location",
+                  "ExecutionStatisticsCollector");
 
-#define WINDRV_REGISTER_ENTRY_POINT(addr, ep) registerEntryPoint(state, &WindowsDriverExerciser::ep, addr);
-
-class WindowsDriverExerciser : public WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >
+void ExecutionStatisticsCollector::initialize()
 {
-    S2E_PLUGIN
-public:
-    enum UnloadAction {
-        KILL, SUCCEED
-    };
-
-    typedef void (WindowsDriverExerciser::*EntryPoint)(S2EExecutionState* state, FunctionMonitorState *fns);
-    WindowsDriverExerciser(S2E* s2e):WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >(s2e) {}
-
-    void initialize();
-
-private:
-    StringSet m_modules;
-    StringSet m_loadedModules;
-
-    UnloadAction m_unloadAction;
-
-    void onModuleLoad(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-    void onModuleUnload(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-
-    DECLARE_ENTRY_POINT(DriverEntryPoint, uint32_t pDriverObject, bool pushed);
-    DECLARE_ENTRY_POINT(DriverUnload);
-};
-
-}
+    m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
 }
 
-#endif
+} // namespace plugins
+} // namespace s2e

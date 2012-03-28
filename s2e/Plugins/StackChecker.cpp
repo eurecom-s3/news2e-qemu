@@ -34,64 +34,68 @@
  *
  */
 
-#ifndef S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-#define S2E_PLUGINS_WINDOWSDRIVEREXERCISER_H
-
+#include "StackChecker.h"
 #include <s2e/S2E.h>
-#include <s2e/Plugin.h>
+#include <s2e/S2EExecutor.h>
+#include <s2e/ConfigFile.h>
 #include <s2e/Utils.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/S2EExecutionState.h>
 
-
-#include <s2e/Plugins/FunctionMonitor.h>
-#include <s2e/Plugins/ModuleExecutionDetector.h>
-#include <s2e/Plugins/WindowsInterceptor/WindowsMonitor.h>
-
-#include "Api.h"
+#include <sstream>
 
 namespace s2e {
 namespace plugins {
 
-class MemoryChecker;
+S2E_DEFINE_PLUGIN(StackChecker, "Verfies the correct stack use", "", "MemoryChecker", "StackMonitor");
 
-#define WINDRV_REGISTER_ENTRY_POINT(addr, ep) registerEntryPoint(state, &WindowsDriverExerciser::ep, addr);
-
-class WindowsDriverExerciser : public WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >
+void StackChecker::initialize()
 {
-    S2E_PLUGIN
-public:
-    enum UnloadAction {
-        KILL, SUCCEED
-    };
+    m_stackMonitor = static_cast<StackMonitor*>(s2e()->getPlugin("StackMonitor"));
+    m_memoryChecker = static_cast<MemoryChecker*>(s2e()->getPlugin("MemoryChecker"));
+    m_monitor = static_cast<OSMonitor*>(s2e()->getPlugin("Interceptor"));
 
-    typedef void (WindowsDriverExerciser::*EntryPoint)(S2EExecutionState* state, FunctionMonitorState *fns);
-    WindowsDriverExerciser(S2E* s2e):WindowsAnnotations<WindowsDriverExerciser, WindowsApiState<WindowsDriverExerciser> >(s2e) {}
-
-    void initialize();
-
-private:
-    StringSet m_modules;
-    StringSet m_loadedModules;
-
-    UnloadAction m_unloadAction;
-
-    void onModuleLoad(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-    void onModuleUnload(
-            S2EExecutionState* state,
-            const ModuleDescriptor &module
-            );
-
-
-    DECLARE_ENTRY_POINT(DriverEntryPoint, uint32_t pDriverObject, bool pushed);
-    DECLARE_ENTRY_POINT(DriverUnload);
-};
-
-}
+    m_memoryChecker->onPostCheck.connect(
+        sigc::mem_fun(*this, &StackChecker::onMemoryAccess));
 }
 
-#endif
+void StackChecker::onMemoryAccess(S2EExecutionState *state, uint64_t address,
+                                  unsigned size, bool isWrite, bool *result)
+{
+    //XXX: This is a hack until we grant param rights for each entry point.
+    uint64_t stackBase = 0, stackSize = 0;
+    m_monitor->getCurrentStack(state, &stackBase, &stackSize);
+    if (address >= stackBase && (address < stackBase + stackSize)) {
+        *result = true;
+        return;
+    }
+
+
+    StackFrameInfo info;
+    bool onTheStack = false;
+    bool res = m_stackMonitor->getFrameInfo(state, address, onTheStack, info);
+
+    *result = false;
+
+    if (!onTheStack) {
+        m_stackMonitor->dump(state);
+        return;
+    }
+
+    //We are not accessing any valid frame
+    if (!res) {
+        std::stringstream err;
+
+        err << "StackChecker: "
+                << "BUG: memory range at " << hexval(address) << " of size " << hexval(size)
+                << " is a stack location but cannot be accessed by instruction " << m_memoryChecker->getPrettyCodeLocation(state)
+                << ": invalid frame!" << std::endl;
+
+        if (m_memoryChecker->terminateOnErrors()) {
+            s2e()->getExecutor()->terminateStateEarly(*state, err.str());
+        }
+    }
+
+    *result = true;
+}
+
+} // namespace plugins
+} // namespace s2e
