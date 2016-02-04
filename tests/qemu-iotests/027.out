@@ -1,5 +1,5 @@
 QA output created by 027
-Formatting 'TEST_DIR/t.IMGFMT', fmt=IMGFMT size=134217728 
+Formatting 'TEST_DIR/t.IMGFMT', fmt=IMGFMT size=134217728
 
 == writing first cluster to populate metadata ==
 wrote 65536/65536 bytes at offset 65536
@@ -19,5 +19,5 @@ read 2048/2048 bytes at offset 0
 
 == verify zeroes after sub-cluster pattern ==
 read 2560/2560 bytes at offset 1024
-2 KiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
+2.500 KiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 *** done

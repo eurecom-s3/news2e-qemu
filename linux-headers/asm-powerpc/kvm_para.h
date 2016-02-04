@@ -75,16 +75,23 @@ struct kvm_vcpu_arch_shared {
 };
 
 #define KVM_SC_MAGIC_R0		0x4b564d21 /* "KVM!" */
-#define HC_VENDOR_KVM		(42 << 16)
-#define HC_EV_SUCCESS		0
-#define HC_EV_UNIMPLEMENTED	12
+
+#define KVM_HCALL_TOKEN(num)     _EV_HCALL_TOKEN(EV_KVM_VENDOR_ID, num)
+
+#include <asm/epapr_hcalls.h>
 
 #define KVM_FEATURE_MAGIC_PAGE	1
+
+/* Magic page flags from host to guest */
 
 #define KVM_MAGIC_FEAT_SR		(1 << 0)
 
 /* MASn, ESR, PIR, and high SPRGs */
 #define KVM_MAGIC_FEAT_MAS0_TO_SPRG7	(1 << 1)
+
+/* Magic page flags from guest to host */
+
+#define MAGIC_PAGE_FLAG_NOT_MAPPED_NX	(1 << 0)
 
 
 #endif /* __POWERPC_KVM_PARA_H__ */

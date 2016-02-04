@@ -231,8 +231,8 @@ tcp_input(struct mbuf *m, int iphlen, struct socket *inso)
     Slirp *slirp;
 
 	DEBUG_CALL("tcp_input");
-	DEBUG_ARGS((dfd, " m = %8lx  iphlen = %2d  inso = %lx\n",
-		    (long )m, iphlen, (long )inso ));
+	DEBUG_ARGS((dfd, " m = %p  iphlen = %2d  inso = %p\n",
+		    m, iphlen, inso));
 
 	/*
 	 * If called with m == 0, then we're continuing the connect
@@ -316,16 +316,6 @@ tcp_input(struct mbuf *m, int iphlen, struct socket *inso)
 	m->m_data += sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
 	m->m_len  -= sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
 
-    if (slirp->restricted) {
-        for (ex_ptr = slirp->exec_list; ex_ptr; ex_ptr = ex_ptr->ex_next) {
-            if (ex_ptr->ex_fport == ti->ti_dport &&
-                ti->ti_dst.s_addr == ex_ptr->ex_addr.s_addr) {
-                break;
-            }
-        }
-        if (!ex_ptr)
-            goto drop;
-    }
 	/*
 	 * Locate pcb for segment.
 	 */
@@ -355,6 +345,22 @@ findso:
 	 * as if it was LISTENING, and continue...
 	 */
         if (so == NULL) {
+          if (slirp->restricted) {
+            /* Any hostfwds will have an existing socket, so we only get here
+             * for non-hostfwd connections. These should be dropped, unless it
+             * happens to be a guestfwd.
+             */
+            for (ex_ptr = slirp->exec_list; ex_ptr; ex_ptr = ex_ptr->ex_next) {
+                if (ex_ptr->ex_fport == ti->ti_dport &&
+                    ti->ti_dst.s_addr == ex_ptr->ex_addr.s_addr) {
+                    break;
+                }
+            }
+            if (!ex_ptr) {
+                goto dropwithreset;
+            }
+          }
+
 	  if ((tiflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ACK)) != TH_SYN)
 	    goto dropwithreset;
 
@@ -578,7 +584,13 @@ findso:
 	    goto cont_input;
 	  }
 
-	  if((tcp_fconnect(so) == -1) && (errno != EINPROGRESS) && (errno != EWOULDBLOCK)) {
+          if ((tcp_fconnect(so) == -1) &&
+#if defined(_WIN32)
+              socket_error() != WSAEWOULDBLOCK
+#else
+              (errno != EINPROGRESS) && (errno != EWOULDBLOCK)
+#endif
+          ) {
 	    u_char code=ICMP_UNREACH_NET;
 	    DEBUG_MISC((dfd, " tcp fconnect errno = %d-%s\n",
 			errno,strerror(errno)));
@@ -911,8 +923,8 @@ trimthenstep6:
 
 		if (SEQ_LEQ(ti->ti_ack, tp->snd_una)) {
 			if (ti->ti_len == 0 && tiwin == tp->snd_wnd) {
-			  DEBUG_MISC((dfd, " dup ack  m = %lx  so = %lx\n",
-				      (long )m, (long )so));
+			  DEBUG_MISC((dfd, " dup ack  m = %p  so = %p\n",
+				      m, so));
 				/*
 				 * If we have outstanding data (other than
 				 * a window probe), this is a completely
@@ -1281,8 +1293,6 @@ drop:
 	 * Drop space held by incoming segment and return.
 	 */
 	m_free(m);
-
-	return;
 }
 
 static void
@@ -1292,7 +1302,7 @@ tcp_dooptions(struct tcpcb *tp, u_char *cp, int cnt, struct tcpiphdr *ti)
 	int opt, optlen;
 
 	DEBUG_CALL("tcp_dooptions");
-	DEBUG_ARGS((dfd, " tp = %lx  cnt=%i\n", (long)tp, cnt));
+	DEBUG_ARGS((dfd, " tp = %p  cnt=%i\n", tp, cnt));
 
 	for (; cnt > 0; cnt -= optlen, cp += optlen) {
 		opt = cp[0];
@@ -1373,7 +1383,7 @@ tcp_xmit_timer(register struct tcpcb *tp, int rtt)
 	register short delta;
 
 	DEBUG_CALL("tcp_xmit_timer");
-	DEBUG_ARG("tp = %lx", (long)tp);
+	DEBUG_ARG("tp = %p", tp);
 	DEBUG_ARG("rtt = %d", rtt);
 
 	if (tp->t_srtt != 0) {
@@ -1461,7 +1471,7 @@ tcp_mss(struct tcpcb *tp, u_int offer)
 	int mss;
 
 	DEBUG_CALL("tcp_mss");
-	DEBUG_ARG("tp = %lx", (long)tp);
+	DEBUG_ARG("tp = %p", tp);
 	DEBUG_ARG("offer = %d", offer);
 
 	mss = min(IF_MTU, IF_MRU) - sizeof(struct tcpiphdr);

@@ -31,20 +31,17 @@
 /* For tb_lock */
 #include "cpu.h"
 #include "tcg.h"
-#include "qemu-timer.h"
-#include "envlist.h"
-
-#define DEBUG_LOGFILE "/tmp/qemu.log"
+#include "qemu/timer.h"
+#include "qemu/envlist.h"
 
 int singlestep;
-#if defined(CONFIG_USE_GUEST_BASE)
 unsigned long mmap_min_addr;
 unsigned long guest_base;
 int have_guest_base;
-#endif
+unsigned long reserved_va;
 
 static const char *interp_prefix = CONFIG_QEMU_INTERP_PREFIX;
-const char *qemu_uname_release = CONFIG_UNAME_RELEASE;
+const char *qemu_uname_release;
 extern char **environ;
 enum BSDType bsd_type;
 
@@ -93,7 +90,7 @@ void fork_start(void)
 void fork_end(int child)
 {
     if (child) {
-        gdbserver_fork(thread_env);
+        gdbserver_fork(thread_cpu);
     }
 }
 
@@ -109,13 +106,9 @@ void cpu_list_unlock(void)
 /***********************************************************/
 /* CPUX86 core interface */
 
-void cpu_smm_update(CPUX86State *env)
-{
-}
-
 uint64_t cpu_get_tsc(CPUX86State *env)
 {
-    return cpu_get_real_ticks();
+    return cpu_get_host_ticks();
 }
 
 static void write_dt(void *ptr, unsigned long addr, unsigned long limit,
@@ -171,12 +164,14 @@ static void set_idt(int n, unsigned int dpl)
 
 void cpu_loop(CPUX86State *env)
 {
+    X86CPU *cpu = x86_env_get_cpu(env);
+    CPUState *cs = CPU(cpu);
     int trapnr;
     abi_ulong pc;
     //target_siginfo_t info;
 
     for(;;) {
-        trapnr = cpu_x86_exec(env);
+        trapnr = cpu_x86_exec(cs);
         switch(trapnr) {
         case 0x80:
             /* syscall from int $0x80 */
@@ -512,11 +507,12 @@ static void flush_windows(CPUSPARCState *env)
 
 void cpu_loop(CPUSPARCState *env)
 {
+    CPUState *cs = CPU(sparc_env_get_cpu(env));
     int trapnr, ret, syscall_nr;
     //target_siginfo_t info;
 
     while (1) {
-        trapnr = cpu_sparc_exec (env);
+        trapnr = cpu_sparc_exec(cs);
 
         switch (trapnr) {
 #ifndef TARGET_SPARC64
@@ -643,7 +639,7 @@ void cpu_loop(CPUSPARCState *env)
             {
                 int sig;
 
-                sig = gdb_handlesig (env, TARGET_SIGTRAP);
+                sig = gdb_handlesig(cs, TARGET_SIGTRAP);
 #if 0
                 if (sig)
                   {
@@ -660,7 +656,7 @@ void cpu_loop(CPUSPARCState *env)
         badtrap:
 #endif
             printf ("Unhandled trap: 0x%x\n", trapnr);
-            cpu_dump_state(env, stderr, fprintf, 0);
+            cpu_dump_state(cs, stderr, fprintf, 0);
             exit (1);
         }
         process_pending_signals (env);
@@ -671,8 +667,8 @@ void cpu_loop(CPUSPARCState *env)
 
 static void usage(void)
 {
-    printf("qemu-" TARGET_ARCH " version " QEMU_VERSION ", Copyright (c) 2003-2008 Fabrice Bellard\n"
-           "usage: qemu-" TARGET_ARCH " [options] program [arguments...]\n"
+    printf("qemu-" TARGET_NAME " version " QEMU_VERSION ", Copyright (c) 2003-2008 Fabrice Bellard\n"
+           "usage: qemu-" TARGET_NAME " [options] program [arguments...]\n"
            "BSD CPU emulator (compiled for %s emulation)\n"
            "\n"
            "Standard options:\n"
@@ -680,21 +676,20 @@ static void usage(void)
            "-g port           wait gdb connection to port\n"
            "-L path           set the elf interpreter prefix (default=%s)\n"
            "-s size           set the stack size in bytes (default=%ld)\n"
-           "-cpu model        select CPU (-cpu ? for list)\n"
+           "-cpu model        select CPU (-cpu help for list)\n"
            "-drop-ld-preload  drop LD_PRELOAD for target process\n"
            "-E var=value      sets/modifies targets environment variable(s)\n"
            "-U var            unsets targets environment variable(s)\n"
-#if defined(CONFIG_USE_GUEST_BASE)
            "-B address        set guest_base address to address\n"
-#endif
            "-bsd type         select emulated BSD type FreeBSD/NetBSD/OpenBSD (default)\n"
            "\n"
            "Debug options:\n"
-           "-d options   activate log (default logfile=%s)\n"
-           "-D logfile   override default logfile location\n"
-           "-p pagesize  set the host page size to 'pagesize'\n"
-           "-singlestep  always run in singlestep mode\n"
-           "-strace      log system calls\n"
+           "-d item1[,...]    enable logging of specified items\n"
+           "                  (use '-d help' for a list of log items)\n"
+           "-D logfile        write logs to 'logfile' (default stderr)\n"
+           "-p pagesize       set the host page size to 'pagesize'\n"
+           "-singlestep       always run in singlestep mode\n"
+           "-strace           log system calls\n"
            "\n"
            "Environment variables:\n"
            "QEMU_STRACE       Print system calls and arguments similar to the\n"
@@ -706,14 +701,13 @@ static void usage(void)
            "Note that if you provide several changes to single variable\n"
            "last change will stay in effect.\n"
            ,
-           TARGET_ARCH,
+           TARGET_NAME,
            interp_prefix,
-           x86_stack_size,
-           DEBUG_LOGFILE);
+           x86_stack_size);
     exit(1);
 }
 
-THREAD CPUArchState *thread_env;
+THREAD CPUState *thread_cpu;
 
 /* Assumes contents are already zeroed.  */
 void init_task_state(TaskState *ts)
@@ -732,12 +726,13 @@ int main(int argc, char **argv)
 {
     const char *filename;
     const char *cpu_model;
-    const char *log_file = DEBUG_LOGFILE;
+    const char *log_file = NULL;
     const char *log_mask = NULL;
     struct target_pt_regs regs1, *regs = &regs1;
     struct image_info info1, *info = &info1;
     TaskState ts1, *ts = &ts1;
     CPUArchState *env;
+    CPUState *cpu;
     int optind;
     const char *r;
     int gdbstub_port = 0;
@@ -824,18 +819,16 @@ int main(int argc, char **argv)
             qemu_uname_release = argv[optind++];
         } else if (!strcmp(r, "cpu")) {
             cpu_model = argv[optind++];
-            if (strcmp(cpu_model, "?") == 0) {
+            if (is_help_option(cpu_model)) {
 /* XXX: implement xxx_cpu_list for targets that still miss it */
 #if defined(cpu_list)
                     cpu_list(stdout, &fprintf);
 #endif
                 exit(1);
             }
-#if defined(CONFIG_USE_GUEST_BASE)
         } else if (!strcmp(r, "B")) {
            guest_base = strtol(argv[optind++], NULL, 0);
            have_guest_base = 1;
-#endif
         } else if (!strcmp(r, "drop-ld-preload")) {
             (void) envlist_unsetenv(envlist, "LD_PRELOAD");
         } else if (!strcmp(r, "bsd")) {
@@ -860,20 +853,16 @@ int main(int argc, char **argv)
     }
 
     /* init debug */
-    cpu_set_log_filename(log_file);
+    qemu_set_log_filename(log_file);
     if (log_mask) {
         int mask;
-        const CPULogItem *item;
 
-        mask = cpu_str_to_log_mask(log_mask);
+        mask = qemu_str_to_log_mask(log_mask);
         if (!mask) {
-            printf("Log items (comma separated):\n");
-            for (item = cpu_log_items; item->mask != 0; item++) {
-                printf("%-10s %s\n", item->name, item->help);
-            }
+            qemu_print_log_usage(stdout);
             exit(1);
         }
-        cpu_set_log(mask);
+        qemu_set_log(mask);
     }
 
     if (optind >= argc) {
@@ -908,18 +897,18 @@ int main(int argc, char **argv)
 #endif
     }
     tcg_exec_init(0);
-    cpu_exec_init_all();
     /* NOTE: we need to init the CPU at this stage to get
        qemu_host_page_size */
-    env = cpu_init(cpu_model);
-    if (!env) {
+    cpu = cpu_init(cpu_model);
+    if (!cpu) {
         fprintf(stderr, "Unable to find CPU definition\n");
         exit(1);
     }
-#if defined(TARGET_I386) || defined(TARGET_SPARC) || defined(TARGET_PPC)
-    cpu_state_reset(env);
+    env = cpu->env_ptr;
+#if defined(TARGET_SPARC) || defined(TARGET_PPC)
+    cpu_reset(cpu);
 #endif
-    thread_env = env;
+    thread_cpu = cpu;
 
     if (getenv("QEMU_STRACE")) {
         do_strace = 1;
@@ -928,7 +917,6 @@ int main(int argc, char **argv)
     target_environ = envlist_to_environ(envlist, NULL);
     envlist_free(envlist);
 
-#if defined(CONFIG_USE_GUEST_BASE)
     /*
      * Now that page sizes are configured in cpu_init() we can do
      * proper page alignment for guest_base.
@@ -955,7 +943,6 @@ int main(int argc, char **argv)
             fclose(fp);
         }
     }
-#endif /* CONFIG_USE_GUEST_BASE */
 
     if (loader_exec(filename, argv+optind, target_environ, regs, info) != 0) {
         printf("Error loading %s\n", filename);
@@ -969,9 +956,7 @@ int main(int argc, char **argv)
     free(target_environ);
 
     if (qemu_log_enabled()) {
-#if defined(CONFIG_USE_GUEST_BASE)
         qemu_log("guest_base  0x%lx\n", guest_base);
-#endif
         log_page_dump();
 
         qemu_log("start_brk   0x" TARGET_ABI_FMT_lx "\n", info->start_brk);
@@ -991,31 +976,27 @@ int main(int argc, char **argv)
     syscall_init();
     signal_init();
 
-#if defined(CONFIG_USE_GUEST_BASE)
     /* Now that we've loaded the binary, GUEST_BASE is fixed.  Delay
        generating the prologue until now so that the prologue can take
        the real value of GUEST_BASE into account.  */
     tcg_prologue_init(&tcg_ctx);
-#endif
 
     /* build Task State */
     memset(ts, 0, sizeof(TaskState));
     init_task_state(ts);
     ts->info = info;
-    env->opaque = ts;
+    cpu->opaque = ts;
 
 #if defined(TARGET_I386)
-    cpu_x86_set_cpl(env, 3);
-
     env->cr[0] = CR0_PG_MASK | CR0_WP_MASK | CR0_PE_MASK;
-    env->hflags |= HF_PE_MASK;
-    if (env->cpuid_features & CPUID_SSE) {
+    env->hflags |= HF_PE_MASK | HF_CPL_MASK;
+    if (env->features[FEAT_1_EDX] & CPUID_SSE) {
         env->cr[4] |= CR4_OSFXSR_MASK;
         env->hflags |= HF_OSFXSR_MASK;
     }
 #ifndef TARGET_ABI32
     /* enable 64 bit mode if possible */
-    if (!(env->cpuid_ext2_features & CPUID_EXT2_LM)) {
+    if (!(env->features[FEAT_8000_0001_EDX] & CPUID_EXT2_LM)) {
         fprintf(stderr, "The selected x86 CPU does not support 64 bit mode\n");
         exit(1);
     }
@@ -1138,7 +1119,7 @@ int main(int argc, char **argv)
 
     if (gdbstub_port) {
         gdbserver_start (gdbstub_port);
-        gdb_handlesig(env, 0);
+        gdb_handlesig(cpu, 0);
     }
     cpu_loop(env);
     /* never exits */

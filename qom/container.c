@@ -10,11 +10,11 @@
  * See the COPYING file in the top-level directory.
  */
 
-#include "qemu/object.h"
-#include "module.h"
+#include "qom/object.h"
+#include "qemu/module.h"
 #include <assert.h>
 
-static TypeInfo container_info = {
+static const TypeInfo container_info = {
     .name          = "container",
     .instance_size = sizeof(Object),
     .parent        = TYPE_OBJECT,
@@ -25,7 +25,7 @@ static void container_register_types(void)
     type_register_static(&container_info);
 }
 
-Object *container_get(const char *path)
+Object *container_get(Object *root, const char *path)
 {
     Object *obj, *child;
     gchar **parts;
@@ -33,7 +33,7 @@ Object *container_get(const char *path)
 
     parts = g_strsplit(path, "/", 0);
     assert(parts != NULL && parts[0] != NULL && !parts[0][0]);
-    obj = object_get_root();
+    obj = root;
 
     for (i = 1; parts[i] != NULL; i++, obj = child) {
         child = object_resolve_path_component(obj, parts[i]);
@@ -42,6 +42,8 @@ Object *container_get(const char *path)
             object_property_add_child(obj, parts[i], child, NULL);
         }
     }
+
+    g_strfreev(parts);
 
     return obj;
 }

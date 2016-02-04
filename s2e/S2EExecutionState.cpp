@@ -36,15 +36,14 @@
 extern "C" {
 #include "config.h"
 #include "qemu-common.h"
-#include "sysemu.h"
-#include "cpus.h"
-#include "helper.h"
+#include "sysemu/sysemu.h"
+#include "sysemu/cpus.h"
+//#include "helper.h"
 
 #include "tcg-llvm.h"
 #include "cpu.h"
 
-
-extern CPUArchState *env;
+#include <s2e/s2e_config.h>
 
 #if S2E_RAM_OBJECT_BITS > TARGET_PAGE_BITS
 #pragma message ( "S2E_RAM_OBJECT_BITS: " STRING(S2E_RAM_OBJECT_BITS) )
@@ -55,7 +54,6 @@ extern CPUArchState *env;
 }
 
 #include "S2EExecutionState.h"
-#include <s2e/s2e_config.h>
 #include <s2e/S2EDeviceState.h>
 #include <s2e/S2EExecutor.h>
 #include <s2e/Plugin.h>

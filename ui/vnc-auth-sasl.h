@@ -32,7 +32,8 @@
 typedef struct VncStateSASL VncStateSASL;
 typedef struct VncDisplaySASL VncDisplaySASL;
 
-#include "acl.h"
+#include "qemu/acl.h"
+#include "qemu/main-loop.h"
 
 struct VncStateSASL {
     sasl_conn_t *conn;

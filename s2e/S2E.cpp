@@ -36,9 +36,9 @@
 // XXX: qemu stuff should be included before anything from KLEE or LLVM !
 extern "C" {
 #include <qemu-common.h>
-#include <cpus.h>
-#include <main-loop.h>
-#include <sysemu.h>
+#include <sysemu/cpus.h>
+#include <qemu/main-loop.h>
+#include <sysemu/sysemu.h>
 extern CPUArchState *env;
 }
 

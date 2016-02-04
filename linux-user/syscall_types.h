@@ -77,6 +77,9 @@ STRUCT(audio_buf_info,
 STRUCT(count_info,
        TYPE_INT, TYPE_INT, TYPE_INT)
 
+STRUCT(buffmem_desc,
+       TYPE_PTRVOID, TYPE_INT)
+
 STRUCT(mixer_info,
        MK_ARRAY(TYPE_CHAR, 16), MK_ARRAY(TYPE_CHAR, 32), TYPE_INT, MK_ARRAY(TYPE_INT, 10))
 
@@ -237,3 +240,16 @@ STRUCT(fiemap,
        TYPE_INT, /* fm_mapped_extents */
        TYPE_INT, /* fm_extent_count */
        TYPE_INT) /* fm_reserved */
+
+STRUCT(blkpg_partition,
+       TYPE_LONGLONG, /* start */
+       TYPE_LONGLONG, /* length */
+       TYPE_INT, /* pno */
+       MK_ARRAY(TYPE_CHAR, BLKPG_DEVNAMELTH), /* devname */
+       MK_ARRAY(TYPE_CHAR, BLKPG_VOLNAMELTH)) /* volname */
+
+STRUCT(blkpg_ioctl_arg,
+       TYPE_INT, /* op */
+       TYPE_INT, /* flags */
+       TYPE_INT, /* datalen */
+       TYPE_PTRVOID) /* data */

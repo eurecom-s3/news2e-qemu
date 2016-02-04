@@ -35,7 +35,7 @@
 
 extern "C" {
 #include <qemu-common.h>
-#include <block.h>
+#include <block/block.h>
 #include <qapi-types.h>
 
 void vm_stop(int reason);

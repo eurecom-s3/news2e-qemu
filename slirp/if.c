@@ -6,7 +6,7 @@
  */
 
 #include <slirp.h>
-#include "qemu-timer.h"
+#include "qemu/timer.h"
 
 static void
 ifs_insque(struct mbuf *ifm, struct mbuf *ifmhead)
@@ -53,8 +53,8 @@ if_output(struct socket *so, struct mbuf *ifm)
 	int on_fastq = 1;
 
 	DEBUG_CALL("if_output");
-	DEBUG_ARG("so = %lx", (long)so);
-	DEBUG_ARG("ifm = %lx", (long)ifm);
+	DEBUG_ARG("so = %p", so);
+	DEBUG_ARG("ifm = %p", ifm);
 
 	/*
 	 * First remove the mbuf from m_usedlist,
@@ -142,7 +142,7 @@ diddit:
 
 /*
  * Send a packet
- * We choose a packet based on it's position in the output queues;
+ * We choose a packet based on its position in the output queues;
  * If there are packets on the fastq, they are sent FIFO, before
  * everything else.  Otherwise we choose the first packet from the
  * batchq and send it.  the next packet chosen will be from the session
@@ -154,7 +154,7 @@ diddit:
  */
 void if_start(Slirp *slirp)
 {
-    uint64_t now = qemu_get_clock_ns(rt_clock);
+    uint64_t now = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
     bool from_batchq, next_from_batchq;
     struct mbuf *ifm, *ifm_next, *ifqt;
 
@@ -177,11 +177,6 @@ void if_start(Slirp *slirp)
     }
 
     while (ifm_next) {
-        /* check if we can really output */
-        if (!slirp_can_output(slirp->opaque)) {
-            break;
-        }
-
         ifm = ifm_next;
         from_batchq = next_from_batchq;
 

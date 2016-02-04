@@ -1,10 +1,11 @@
--include ../../config-host.mak
+-include ../../../config-host.mak
 
-CROSS=xtensa-dc232b-elf-
+CORE=dc232b
+CROSS=xtensa-$(CORE)-elf-
 
 ifndef XT
-SIM = qemu-system-xtensa
-SIMFLAGS = -M sim -cpu dc232b -nographic -semihosting $(EXTFLAGS) -kernel
+SIM = ../../../xtensa-softmmu/qemu-system-xtensa
+SIMFLAGS = -M sim -cpu $(CORE) -nographic -semihosting $(EXTFLAGS) -kernel
 SIMDEBUG = -s -S
 else
 SIM = xt-run
@@ -12,9 +13,14 @@ SIMFLAGS = --xtensa-core=DC_B_232L --exit_with_target_code $(EXTFLAGS)
 SIMDEBUG = --gdbserve=0
 endif
 
+HOST_CC = gcc
 CC      = $(CROSS)gcc
-AS      = $(CROSS)gcc -x assembler
+AS      = $(CROSS)gcc -x assembler-with-cpp
 LD      = $(CROSS)ld
+
+XTENSA_SRC_PATH = $(SRC_PATH)/tests/tcg/xtensa
+INCLUDE_DIRS = $(XTENSA_SRC_PATH) $(SRC_PATH)/target-xtensa/core-$(CORE)
+XTENSA_INC = $(addprefix -I,$(INCLUDE_DIRS))
 
 LDFLAGS = -Tlinker.ld
 
@@ -25,7 +31,9 @@ TESTCASES += test_bi.tst
 #TESTCASES += test_boolean.tst
 TESTCASES += test_break.tst
 TESTCASES += test_bz.tst
+TESTCASES += test_cache.tst
 TESTCASES += test_clamps.tst
+TESTCASES += test_extui.tst
 TESTCASES += test_fail.tst
 TESTCASES += test_interrupt.tst
 TESTCASES += test_loop.tst
@@ -42,21 +50,26 @@ endif
 TESTCASES += test_quo.tst
 TESTCASES += test_rem.tst
 TESTCASES += test_rst0.tst
+TESTCASES += test_s32c1i.tst
 TESTCASES += test_sar.tst
 TESTCASES += test_sext.tst
 TESTCASES += test_shift.tst
+TESTCASES += test_sr.tst
 TESTCASES += test_timer.tst
 TESTCASES += test_windowed.tst
 
 all: build
 
-%.o: $(SRC_PATH)/tests/xtensa/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+linker.ld: $(XTENSA_SRC_PATH)/linker.ld.S
+	$(HOST_CC) $(XTENSA_INC) -E -P $< -o $@
 
-%.o: $(SRC_PATH)/tests/xtensa/%.S
-	$(AS) $(ASFLAGS) -c $< -o $@
+%.o: $(XTENSA_SRC_PATH)/%.c
+	$(CC) $(XTENSA_INC) $(CFLAGS) -c $< -o $@
 
-%.tst: %.o macros.inc $(CRT) Makefile
+%.o: $(XTENSA_SRC_PATH)/%.S
+	$(CC) $(XTENSA_INC) $(ASFLAGS) -c $< -o $@
+
+%.tst: %.o linker.ld $(XTENSA_SRC_PATH)/macros.inc $(CRT) Makefile
 	$(LD) $(LDFLAGS) $(NOSTDFLAGS) $(CRT) $< -o $@
 
 build: $(TESTCASES)
@@ -72,5 +85,8 @@ run-test_fail.tst: test_fail.tst
 debug-%.tst: %.tst
 	$(SIM) $(SIMDEBUG) $(SIMFLAGS) ./$<
 
+host-debug-%.tst: %.tst
+	gdb --args $(SIM) $(SIMFLAGS) ./$<
+
 clean:
-	$(RM) -fr $(TESTCASES) $(CRT)
+	$(RM) -fr $(TESTCASES) $(CRT) linker.ld

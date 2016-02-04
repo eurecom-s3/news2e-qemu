@@ -1,7 +1,9 @@
+#include "core-isa.h"
+
 .macro test_suite name
 .data
 status: .word result
-result: .space 20
+result: .space 256
 .text
 .global main
 .align 4
@@ -29,7 +31,28 @@ main:
     exit
 .endm
 
+.macro print text
+.data
+97: .ascii "\text\n"
+98:
+    .align 4
+.text
+    movi    a2, 4
+    movi    a3, 2
+    movi    a4, 97b
+    movi    a5, 98b
+    sub     a5, a5, a4
+    simcall
+.endm
+
+.macro test_init
+.endm
+
 .macro test name
+    //print test_\name
+    test_init
+test_\name:
+.global test_\name
 .endm
 
 .macro test_end

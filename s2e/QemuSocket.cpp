@@ -7,7 +7,7 @@
  */ 
 
 extern "C" {
-    #include "qemu_socket.h"
+    #include "qemu/sockets.h"
 }
 
 #include <arpa/inet.h>

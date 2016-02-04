@@ -51,35 +51,9 @@ socreate(Slirp *slirp)
     so->so_state = SS_NOFDREF;
     so->s = -1;
     so->slirp = slirp;
+    so->pollfds_idx = -1;
   }
   return(so);
-}
-
-/**
- * It may happen that a socket is still referenced in various
- * mbufs at the time it is freed. Clear all references to the
- * socket here.
- */
-static void soremovefromqueues(struct socket *so)
-{
-    if (!so->so_queued) {
-        return;
-    }
-
-    Slirp *slirp = so->slirp;
-    struct mbuf *ifm;
-
-    for (ifm = slirp->if_fastq.ifq_next; ifm != &slirp->if_fastq; ifm = ifm->ifq_next) {
-        if (ifm->ifq_so == so) {
-            ifm->ifq_so = NULL;
-        }
-    }
-
-    for (ifm = slirp->if_batchq.ifq_next; ifm != &slirp->if_batchq; ifm = ifm->ifq_next) {
-        if (ifm->ifq_so == so) {
-            ifm->ifq_so = NULL;
-        }
-    }
 }
 
 /*
@@ -106,8 +80,6 @@ sofree(struct socket *so)
   if(so->so_next && so->so_prev)
     remque(so);  /* crashes if so is not in a queue */
 
-  soremovefromqueues(so);
-
   free(so);
 }
 
@@ -119,7 +91,7 @@ size_t sopreprbuf(struct socket *so, struct iovec *iov, int *np)
 	int mss = so->so_tcpcb->t_maxseg;
 
 	DEBUG_CALL("sopreprbuf");
-	DEBUG_ARG("so = %lx", (long )so);
+	DEBUG_ARG("so = %p", so);
 
 	if (len <= 0)
 		return 0;
@@ -183,7 +155,7 @@ soread(struct socket *so)
 	struct iovec iov[2];
 
 	DEBUG_CALL("soread");
-	DEBUG_ARG("so = %lx", (long )so);
+	DEBUG_ARG("so = %p", so);
 
 	/*
 	 * No need to check if there's enough room to read.
@@ -243,7 +215,7 @@ int soreadbuf(struct socket *so, const char *buf, int size)
 	struct iovec iov[2];
 
 	DEBUG_CALL("soreadbuf");
-	DEBUG_ARG("so = %lx", (long )so);
+	DEBUG_ARG("so = %p", so);
 
 	/*
 	 * No need to check if there's enough room to read.
@@ -291,7 +263,7 @@ sorecvoob(struct socket *so)
 	struct tcpcb *tp = sototcpcb(so);
 
 	DEBUG_CALL("sorecvoob");
-	DEBUG_ARG("so = %lx", (long)so);
+	DEBUG_ARG("so = %p", so);
 
 	/*
 	 * We take a guess at how much urgent data has arrived.
@@ -321,7 +293,7 @@ sosendoob(struct socket *so)
 	int n, len;
 
 	DEBUG_CALL("sosendoob");
-	DEBUG_ARG("so = %lx", (long)so);
+	DEBUG_ARG("so = %p", so);
 	DEBUG_ARG("sb->sb_cc = %d", sb->sb_cc);
 
 	if (so->so_urgc > 2048)
@@ -379,7 +351,7 @@ sowrite(struct socket *so)
 	struct iovec iov[2];
 
 	DEBUG_CALL("sowrite");
-	DEBUG_ARG("so = %lx", (long)so);
+	DEBUG_ARG("so = %p", so);
 
 	if (so->so_urgc) {
 		sosendoob(so);
@@ -469,7 +441,7 @@ sorecvfrom(struct socket *so)
 	socklen_t addrlen = sizeof(struct sockaddr_in);
 
 	DEBUG_CALL("sorecvfrom");
-	DEBUG_ARG("so = %lx", (long)so);
+	DEBUG_ARG("so = %p", so);
 
 	if (so->so_type == IPPROTO_ICMP) {   /* This is a "ping" reply */
 	  char buff[256];
@@ -571,8 +543,8 @@ sosendto(struct socket *so, struct mbuf *m)
 	struct sockaddr_in addr;
 
 	DEBUG_CALL("sosendto");
-	DEBUG_ARG("so = %lx", (long)so);
-	DEBUG_ARG("m = %lx", (long)m);
+	DEBUG_ARG("so = %p", so);
+	DEBUG_ARG("m = %p", m);
 
         addr.sin_family = AF_INET;
 	if ((so->so_faddr.s_addr & slirp->vnetwork_mask.s_addr) ==
@@ -655,7 +627,7 @@ tcp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
 	addr.sin_port = hport;
 
 	if (((s = qemu_socket(AF_INET,SOCK_STREAM,0)) < 0) ||
-	    (setsockopt(s,SOL_SOCKET,SO_REUSEADDR,(char *)&opt,sizeof(int)) < 0) ||
+	    (socket_set_fast_reuse(s) < 0) ||
 	    (bind(s,(struct sockaddr *)&addr, sizeof(addr)) < 0) ||
 	    (listen(s,1) < 0)) {
 		int tmperrno = errno; /* Don't clobber the real reason we failed */
@@ -670,7 +642,7 @@ tcp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
 #endif
 		return NULL;
 	}
-	setsockopt(s,SOL_SOCKET,SO_OOBINLINE,(char *)&opt,sizeof(int));
+	qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(int));
 
 	getsockname(s,(struct sockaddr *)&addr,&addrlen);
 	so->so_fport = addr.sin_port;
@@ -709,9 +681,6 @@ sofcantrcvmore(struct socket *so)
 {
 	if ((so->so_state & SS_NOFDREF) == 0) {
 		shutdown(so->s,0);
-		if(global_writefds) {
-		  FD_CLR(so->s,global_writefds);
-		}
 	}
 	so->so_state &= ~(SS_ISFCONNECTING);
 	if (so->so_state & SS_FCANTSENDMORE) {
@@ -727,12 +696,6 @@ sofcantsendmore(struct socket *so)
 {
 	if ((so->so_state & SS_NOFDREF) == 0) {
             shutdown(so->s,1);           /* send FIN to fhost */
-            if (global_readfds) {
-                FD_CLR(so->s,global_readfds);
-            }
-            if (global_xfds) {
-                FD_CLR(so->s,global_xfds);
-            }
 	}
 	so->so_state &= ~(SS_ISFCONNECTING);
 	if (so->so_state & SS_FCANTRCVMORE) {

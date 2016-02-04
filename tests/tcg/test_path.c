@@ -1,13 +1,10 @@
 /* Test path override code */
-#include "../config-host.h"
-#include "../qemu-malloc.c"
-#include "../cutils.c"
-#include "../path.c"
-#include "../trace.c"
-#ifdef CONFIG_TRACE_SIMPLE
-#include "../simpletrace.c"
-#endif
-
+#include "config-host.h"
+#include "util/cutils.c"
+#include "util/hexdump.c"
+#include "util/iov.c"
+#include "util/path.c"
+#include "util/qemu-timer-common.c"
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <fcntl.h>

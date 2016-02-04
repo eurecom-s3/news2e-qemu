@@ -14,7 +14,6 @@
 #include <glib.h>
 #include <glib/gprintf.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <sys/time.h>
 #include <utime.h>
 #include <sys/uio.h>
@@ -22,9 +21,9 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include "compiler.h"
+#include "qemu/compiler.h"
 #include "virtio-9p-marshal.h"
-#include "bswap.h"
+#include "qemu/bswap.h"
 
 void v9fs_string_free(V9fsString *str)
 {

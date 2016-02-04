@@ -21,8 +21,8 @@
 #include <linux/magic.h>
 #endif
 #include "qemu-common.h"
-#include "qemu_socket.h"
-#include "qemu-xattr.h"
+#include "qemu/sockets.h"
+#include "qemu/xattr.h"
 #include "virtio-9p-marshal.h"
 #include "hw/9pfs/virtio-9p-proxy.h"
 #include "fsdev/virtio-9p-marshal.h"
@@ -49,6 +49,7 @@ static struct option helper_opts[] = {
     {"socket", required_argument, NULL, 's'},
     {"uid", required_argument, NULL, 'u'},
     {"gid", required_argument, NULL, 'g'},
+    {},
 };
 
 static bool is_daemon;
@@ -117,7 +118,7 @@ error:
 
 static int init_capabilities(void)
 {
-    /* helper needs following capbabilities only */
+    /* helper needs following capabilities only */
     cap_value_t cap_list[] = {
         CAP_CHOWN,
         CAP_DAC_OVERRIDE,
@@ -248,7 +249,7 @@ static int send_fd(int sockfd, int fd)
 static int send_status(int sockfd, struct iovec *iovec, int status)
 {
     ProxyHeader header;
-    int retval, msg_size;;
+    int retval, msg_size;
 
     if (status < 0) {
         header.type = T_ERROR;
@@ -262,6 +263,9 @@ static int send_status(int sockfd, struct iovec *iovec, int status)
      */
     msg_size = proxy_marshal(iovec, 0, "ddd", header.type,
                              header.size, status);
+    if (msg_size < 0) {
+        return msg_size;
+    }
     retval = socket_write(sockfd, iovec->iov_base, msg_size);
     if (retval < 0) {
         return retval;
@@ -381,7 +385,7 @@ static int send_response(int sock, struct iovec *iovec, int size)
     proxy_marshal(iovec, 0, "dd", header.type, header.size);
     retval = socket_write(sock, iovec->iov_base, header.size + PROXY_HDR_SZ);
     if (retval < 0) {
-        return retval;;
+        return retval;
     }
     return 0;
 }
@@ -595,7 +599,7 @@ static int do_readlink(struct iovec *iovec, struct iovec *out_iovec)
     }
     buffer = g_malloc(size);
     v9fs_string_init(&target);
-    retval = readlink(path.data, buffer, size);
+    retval = readlink(path.data, buffer, size - 1);
     if (retval > 0) {
         buffer[retval] = '\0';
         v9fs_string_sprintf(&target, "%s", buffer);
@@ -735,6 +739,12 @@ static int proxy_socket(const char *path, uid_t uid, gid_t gid)
         return -1;
     }
 
+    if (strlen(path) >= sizeof(proxy.sun_path)) {
+        do_log(LOG_CRIT, "UNIX domain socket path exceeds %zu characters\n",
+               sizeof(proxy.sun_path));
+        return -1;
+    }
+
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock < 0) {
         do_perror("socket");
@@ -749,23 +759,29 @@ static int proxy_socket(const char *path, uid_t uid, gid_t gid)
     if (bind(sock, (struct sockaddr *)&proxy,
             sizeof(struct sockaddr_un)) < 0) {
         do_perror("bind");
-        return -1;
+        goto error;
     }
     if (chown(proxy.sun_path, uid, gid) < 0) {
         do_perror("chown");
-        return -1;
+        goto error;
     }
     if (listen(sock, 1) < 0) {
         do_perror("listen");
-        return -1;
+        goto error;
     }
 
+    size = sizeof(qemu);
     client = accept(sock, (struct sockaddr *)&qemu, &size);
     if (client < 0) {
         do_perror("accept");
-        return -1;
+        goto error;
     }
+    close(sock);
     return client;
+
+error:
+    close(sock);
+    return -1;
 }
 
 static void usage(char *prog)
@@ -1039,7 +1055,7 @@ int main(int argc, char **argv)
         }
         switch (c) {
         case 'p':
-            rpath = strdup(optarg);
+            rpath = g_strdup(optarg);
             break;
         case 'n':
             is_daemon = false;
@@ -1048,7 +1064,7 @@ int main(int argc, char **argv)
             sock = atoi(optarg);
             break;
         case 's':
-            sock_name = strdup(optarg);
+            sock_name = g_strdup(optarg);
             break;
         case 'u':
             own_u = atoi(optarg);
@@ -1112,10 +1128,19 @@ int main(int argc, char **argv)
         }
     }
 
+    if (chdir("/") < 0) {
+        do_perror("chdir");
+        goto error;
+    }
+    if (chroot(rpath) < 0) {
+        do_perror("chroot");
+        goto error;
+    }
+
     get_version = false;
 #ifdef FS_IOC_GETVERSION
     /* check whether underlying FS support IOC_GETVERSION */
-    retval = statfs(rpath, &st_fs);
+    retval = statfs("/", &st_fs);
     if (!retval) {
         switch (st_fs.f_type) {
         case EXT2_SUPER_MAGIC:
@@ -1128,16 +1153,7 @@ int main(int argc, char **argv)
     }
 #endif
 
-    if (chdir("/") < 0) {
-        do_perror("chdir");
-        goto error;
-    }
-    if (chroot(rpath) < 0) {
-        do_perror("chroot");
-        goto error;
-    }
     umask(0);
-
     if (init_capabilities() < 0) {
         goto error;
     }

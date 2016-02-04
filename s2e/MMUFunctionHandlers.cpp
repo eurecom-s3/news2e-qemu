@@ -36,11 +36,9 @@
 
 extern "C" {
 #include <qemu-common.h>
-#include <cpu-all.h>
-#include <cpu.h>
-#include <exec-all.h>
+#include <exec/cpu-all.h>
+#include <exec/exec-all.h>
 #include "cpu.h"
-extern CPUArchState *env;
 }
 
 #include "S2EExecutor.h"

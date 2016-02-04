@@ -23,11 +23,11 @@
  * THE SOFTWARE.
  */
 #include "hw/hw.h"
-#include "console.h"
+#include "ui/console.h"
 #include "hw/usb.h"
 #include "hw/usb/desc.h"
-#include "qemu-timer.h"
-#include "hw/hid.h"
+#include "qemu/timer.h"
+#include "hw/input/hid.h"
 
 /* HID interface requests */
 #define GET_REPORT   0xa101
@@ -46,7 +46,13 @@ typedef struct USBHIDState {
     USBDevice dev;
     USBEndpoint *intr;
     HIDState hid;
+    uint32_t usb_version;
+    char *display;
+    uint32_t head;
 } USBHIDState;
+
+#define TYPE_USB_HID "usb-hid"
+#define USB_HID(obj) OBJECT_CHECK(USBHIDState, (obj), TYPE_USB_HID)
 
 enum {
     STR_MANUFACTURER = 1,
@@ -60,7 +66,7 @@ enum {
 };
 
 static const USBDescStrings desc_strings = {
-    [STR_MANUFACTURER]     = "QEMU " QEMU_VERSION,
+    [STR_MANUFACTURER]     = "QEMU",
     [STR_PRODUCT_MOUSE]    = "QEMU USB Mouse",
     [STR_PRODUCT_TABLET]   = "QEMU USB Tablet",
     [STR_PRODUCT_KEYBOARD] = "QEMU USB Keyboard",
@@ -101,6 +107,37 @@ static const USBDescIface desc_iface_mouse = {
     },
 };
 
+static const USBDescIface desc_iface_mouse2 = {
+    .bInterfaceNumber              = 0,
+    .bNumEndpoints                 = 1,
+    .bInterfaceClass               = USB_CLASS_HID,
+    .bInterfaceSubClass            = 0x01, /* boot */
+    .bInterfaceProtocol            = 0x02,
+    .ndesc                         = 1,
+    .descs = (USBDescOther[]) {
+        {
+            /* HID descriptor */
+            .data = (uint8_t[]) {
+                0x09,          /*  u8  bLength */
+                USB_DT_HID,    /*  u8  bDescriptorType */
+                0x01, 0x00,    /*  u16 HID_class */
+                0x00,          /*  u8  country_code */
+                0x01,          /*  u8  num_descriptors */
+                USB_DT_REPORT, /*  u8  type: Report */
+                52, 0,         /*  u16 len */
+            },
+        },
+    },
+    .eps = (USBDescEndpoint[]) {
+        {
+            .bEndpointAddress      = USB_DIR_IN | 0x01,
+            .bmAttributes          = USB_ENDPOINT_XFER_INT,
+            .wMaxPacketSize        = 4,
+            .bInterval             = 7, /* 2 ^ (8-1) * 125 usecs = 8 ms */
+        },
+    },
+};
+
 static const USBDescIface desc_iface_tablet = {
     .bInterfaceNumber              = 0,
     .bNumEndpoints                 = 1,
@@ -127,6 +164,36 @@ static const USBDescIface desc_iface_tablet = {
             .bmAttributes          = USB_ENDPOINT_XFER_INT,
             .wMaxPacketSize        = 8,
             .bInterval             = 0x0a,
+        },
+    },
+};
+
+static const USBDescIface desc_iface_tablet2 = {
+    .bInterfaceNumber              = 0,
+    .bNumEndpoints                 = 1,
+    .bInterfaceClass               = USB_CLASS_HID,
+    .bInterfaceProtocol            = 0x02,
+    .ndesc                         = 1,
+    .descs = (USBDescOther[]) {
+        {
+            /* HID descriptor */
+            .data = (uint8_t[]) {
+                0x09,          /*  u8  bLength */
+                USB_DT_HID,    /*  u8  bDescriptorType */
+                0x01, 0x00,    /*  u16 HID_class */
+                0x00,          /*  u8  country_code */
+                0x01,          /*  u8  num_descriptors */
+                USB_DT_REPORT, /*  u8  type: Report */
+                74, 0,         /*  u16 len */
+            },
+        },
+    },
+    .eps = (USBDescEndpoint[]) {
+        {
+            .bEndpointAddress      = USB_DIR_IN | 0x01,
+            .bmAttributes          = USB_ENDPOINT_XFER_INT,
+            .wMaxPacketSize        = 8,
+            .bInterval             = 4, /* 2 ^ (4-1) * 125 usecs = 1 ms */
         },
     },
 };
@@ -162,6 +229,37 @@ static const USBDescIface desc_iface_keyboard = {
     },
 };
 
+static const USBDescIface desc_iface_keyboard2 = {
+    .bInterfaceNumber              = 0,
+    .bNumEndpoints                 = 1,
+    .bInterfaceClass               = USB_CLASS_HID,
+    .bInterfaceSubClass            = 0x01, /* boot */
+    .bInterfaceProtocol            = 0x01, /* keyboard */
+    .ndesc                         = 1,
+    .descs = (USBDescOther[]) {
+        {
+            /* HID descriptor */
+            .data = (uint8_t[]) {
+                0x09,          /*  u8  bLength */
+                USB_DT_HID,    /*  u8  bDescriptorType */
+                0x11, 0x01,    /*  u16 HID_class */
+                0x00,          /*  u8  country_code */
+                0x01,          /*  u8  num_descriptors */
+                USB_DT_REPORT, /*  u8  type: Report */
+                0x3f, 0,       /*  u16 len */
+            },
+        },
+    },
+    .eps = (USBDescEndpoint[]) {
+        {
+            .bEndpointAddress      = USB_DIR_IN | 0x01,
+            .bmAttributes          = USB_ENDPOINT_XFER_INT,
+            .wMaxPacketSize        = 8,
+            .bInterval             = 7, /* 2 ^ (8-1) * 125 usecs = 8 ms */
+        },
+    },
+};
+
 static const USBDescDevice desc_device_mouse = {
     .bcdUSB                        = 0x0100,
     .bMaxPacketSize0               = 8,
@@ -171,10 +269,27 @@ static const USBDescDevice desc_device_mouse = {
             .bNumInterfaces        = 1,
             .bConfigurationValue   = 1,
             .iConfiguration        = STR_CONFIG_MOUSE,
-            .bmAttributes          = 0xa0,
+            .bmAttributes          = USB_CFG_ATT_ONE | USB_CFG_ATT_WAKEUP,
             .bMaxPower             = 50,
             .nif = 1,
             .ifs = &desc_iface_mouse,
+        },
+    },
+};
+
+static const USBDescDevice desc_device_mouse2 = {
+    .bcdUSB                        = 0x0200,
+    .bMaxPacketSize0               = 64,
+    .bNumConfigurations            = 1,
+    .confs = (USBDescConfig[]) {
+        {
+            .bNumInterfaces        = 1,
+            .bConfigurationValue   = 1,
+            .iConfiguration        = STR_CONFIG_MOUSE,
+            .bmAttributes          = USB_CFG_ATT_ONE | USB_CFG_ATT_WAKEUP,
+            .bMaxPower             = 50,
+            .nif = 1,
+            .ifs = &desc_iface_mouse2,
         },
     },
 };
@@ -188,10 +303,27 @@ static const USBDescDevice desc_device_tablet = {
             .bNumInterfaces        = 1,
             .bConfigurationValue   = 1,
             .iConfiguration        = STR_CONFIG_TABLET,
-            .bmAttributes          = 0xa0,
+            .bmAttributes          = USB_CFG_ATT_ONE | USB_CFG_ATT_WAKEUP,
             .bMaxPower             = 50,
             .nif = 1,
             .ifs = &desc_iface_tablet,
+        },
+    },
+};
+
+static const USBDescDevice desc_device_tablet2 = {
+    .bcdUSB                        = 0x0200,
+    .bMaxPacketSize0               = 64,
+    .bNumConfigurations            = 1,
+    .confs = (USBDescConfig[]) {
+        {
+            .bNumInterfaces        = 1,
+            .bConfigurationValue   = 1,
+            .iConfiguration        = STR_CONFIG_TABLET,
+            .bmAttributes          = USB_CFG_ATT_ONE | USB_CFG_ATT_WAKEUP,
+            .bMaxPower             = 50,
+            .nif = 1,
+            .ifs = &desc_iface_tablet2,
         },
     },
 };
@@ -205,12 +337,33 @@ static const USBDescDevice desc_device_keyboard = {
             .bNumInterfaces        = 1,
             .bConfigurationValue   = 1,
             .iConfiguration        = STR_CONFIG_KEYBOARD,
-            .bmAttributes          = 0xa0,
+            .bmAttributes          = USB_CFG_ATT_ONE | USB_CFG_ATT_WAKEUP,
             .bMaxPower             = 50,
             .nif = 1,
             .ifs = &desc_iface_keyboard,
         },
     },
+};
+
+static const USBDescDevice desc_device_keyboard2 = {
+    .bcdUSB                        = 0x0200,
+    .bMaxPacketSize0               = 64,
+    .bNumConfigurations            = 1,
+    .confs = (USBDescConfig[]) {
+        {
+            .bNumInterfaces        = 1,
+            .bConfigurationValue   = 1,
+            .iConfiguration        = STR_CONFIG_KEYBOARD,
+            .bmAttributes          = USB_CFG_ATT_ONE | USB_CFG_ATT_WAKEUP,
+            .bMaxPower             = 50,
+            .nif = 1,
+            .ifs = &desc_iface_keyboard2,
+        },
+    },
+};
+
+static const USBDescMSOS desc_msos_suspend = {
+    .SelectiveSuspendEnabled = true,
 };
 
 static const USBDesc desc_mouse = {
@@ -224,6 +377,22 @@ static const USBDesc desc_mouse = {
     },
     .full = &desc_device_mouse,
     .str  = desc_strings,
+    .msos = &desc_msos_suspend,
+};
+
+static const USBDesc desc_mouse2 = {
+    .id = {
+        .idVendor          = 0x0627,
+        .idProduct         = 0x0001,
+        .bcdDevice         = 0,
+        .iManufacturer     = STR_MANUFACTURER,
+        .iProduct          = STR_PRODUCT_MOUSE,
+        .iSerialNumber     = STR_SERIALNUMBER,
+    },
+    .full = &desc_device_mouse,
+    .high = &desc_device_mouse2,
+    .str  = desc_strings,
+    .msos = &desc_msos_suspend,
 };
 
 static const USBDesc desc_tablet = {
@@ -237,6 +406,22 @@ static const USBDesc desc_tablet = {
     },
     .full = &desc_device_tablet,
     .str  = desc_strings,
+    .msos = &desc_msos_suspend,
+};
+
+static const USBDesc desc_tablet2 = {
+    .id = {
+        .idVendor          = 0x0627,
+        .idProduct         = 0x0001,
+        .bcdDevice         = 0,
+        .iManufacturer     = STR_MANUFACTURER,
+        .iProduct          = STR_PRODUCT_TABLET,
+        .iSerialNumber     = STR_SERIALNUMBER,
+    },
+    .full = &desc_device_tablet,
+    .high = &desc_device_tablet2,
+    .str  = desc_strings,
+    .msos = &desc_msos_suspend,
 };
 
 static const USBDesc desc_keyboard = {
@@ -250,6 +435,22 @@ static const USBDesc desc_keyboard = {
     },
     .full = &desc_device_keyboard,
     .str  = desc_strings,
+    .msos = &desc_msos_suspend,
+};
+
+static const USBDesc desc_keyboard2 = {
+    .id = {
+        .idVendor          = 0x0627,
+        .idProduct         = 0x0001,
+        .bcdDevice         = 0,
+        .iManufacturer     = STR_MANUFACTURER,
+        .iProduct          = STR_PRODUCT_KEYBOARD,
+        .iSerialNumber     = STR_SERIALNUMBER,
+    },
+    .full = &desc_device_keyboard,
+    .high = &desc_device_keyboard2,
+    .str  = desc_strings,
+    .msos = &desc_msos_suspend,
 };
 
 static const uint8_t qemu_mouse_hid_report_descriptor[] = {
@@ -361,29 +562,28 @@ static void usb_hid_changed(HIDState *hs)
 {
     USBHIDState *us = container_of(hs, USBHIDState, hid);
 
-    usb_wakeup(us->intr);
+    usb_wakeup(us->intr, 0);
 }
 
 static void usb_hid_handle_reset(USBDevice *dev)
 {
-    USBHIDState *us = DO_UPCAST(USBHIDState, dev, dev);
+    USBHIDState *us = USB_HID(dev);
 
     hid_reset(&us->hid);
 }
 
-static int usb_hid_handle_control(USBDevice *dev, USBPacket *p,
+static void usb_hid_handle_control(USBDevice *dev, USBPacket *p,
                int request, int value, int index, int length, uint8_t *data)
 {
-    USBHIDState *us = DO_UPCAST(USBHIDState, dev, dev);
+    USBHIDState *us = USB_HID(dev);
     HIDState *hs = &us->hid;
     int ret;
 
     ret = usb_desc_handle_control(dev, p, request, value, index, length, data);
     if (ret >= 0) {
-        return ret;
+        return;
     }
 
-    ret = 0;
     switch (request) {
         /* hid specific requests */
     case InterfaceRequest | USB_REQ_GET_DESCRIPTOR:
@@ -392,15 +592,15 @@ static int usb_hid_handle_control(USBDevice *dev, USBPacket *p,
             if (hs->kind == HID_MOUSE) {
 		memcpy(data, qemu_mouse_hid_report_descriptor,
 		       sizeof(qemu_mouse_hid_report_descriptor));
-		ret = sizeof(qemu_mouse_hid_report_descriptor);
+                p->actual_length = sizeof(qemu_mouse_hid_report_descriptor);
             } else if (hs->kind == HID_TABLET) {
                 memcpy(data, qemu_tablet_hid_report_descriptor,
 		       sizeof(qemu_tablet_hid_report_descriptor));
-		ret = sizeof(qemu_tablet_hid_report_descriptor);
+                p->actual_length = sizeof(qemu_tablet_hid_report_descriptor);
             } else if (hs->kind == HID_KEYBOARD) {
                 memcpy(data, qemu_keyboard_hid_report_descriptor,
                        sizeof(qemu_keyboard_hid_report_descriptor));
-                ret = sizeof(qemu_keyboard_hid_report_descriptor);
+                p->actual_length = sizeof(qemu_keyboard_hid_report_descriptor);
             }
             break;
         default:
@@ -409,14 +609,14 @@ static int usb_hid_handle_control(USBDevice *dev, USBPacket *p,
         break;
     case GET_REPORT:
         if (hs->kind == HID_MOUSE || hs->kind == HID_TABLET) {
-            ret = hid_pointer_poll(hs, data, length);
+            p->actual_length = hid_pointer_poll(hs, data, length);
         } else if (hs->kind == HID_KEYBOARD) {
-            ret = hid_keyboard_poll(hs, data, length);
+            p->actual_length = hid_keyboard_poll(hs, data, length);
         }
         break;
     case SET_REPORT:
         if (hs->kind == HID_KEYBOARD) {
-            ret = hid_keyboard_write(hs, data, length);
+            p->actual_length = hid_keyboard_write(hs, data, length);
         } else {
             goto fail;
         }
@@ -425,61 +625,57 @@ static int usb_hid_handle_control(USBDevice *dev, USBPacket *p,
         if (hs->kind != HID_KEYBOARD && hs->kind != HID_MOUSE) {
             goto fail;
         }
-        ret = 1;
         data[0] = hs->protocol;
+        p->actual_length = 1;
         break;
     case SET_PROTOCOL:
         if (hs->kind != HID_KEYBOARD && hs->kind != HID_MOUSE) {
             goto fail;
         }
-        ret = 0;
         hs->protocol = value;
         break;
     case GET_IDLE:
-        ret = 1;
         data[0] = hs->idle;
+        p->actual_length = 1;
         break;
     case SET_IDLE:
         hs->idle = (uint8_t) (value >> 8);
-        hid_set_next_idle(hs, qemu_get_clock_ns(vm_clock));
+        hid_set_next_idle(hs);
         if (hs->kind == HID_MOUSE || hs->kind == HID_TABLET) {
             hid_pointer_activate(hs);
         }
-        ret = 0;
         break;
     default:
     fail:
-        ret = USB_RET_STALL;
+        p->status = USB_RET_STALL;
         break;
     }
-    return ret;
 }
 
-static int usb_hid_handle_data(USBDevice *dev, USBPacket *p)
+static void usb_hid_handle_data(USBDevice *dev, USBPacket *p)
 {
-    USBHIDState *us = DO_UPCAST(USBHIDState, dev, dev);
+    USBHIDState *us = USB_HID(dev);
     HIDState *hs = &us->hid;
     uint8_t buf[p->iov.size];
-    int ret = 0;
+    int len = 0;
 
     switch (p->pid) {
     case USB_TOKEN_IN:
         if (p->ep->nr == 1) {
-            int64_t curtime = qemu_get_clock_ns(vm_clock);
             if (hs->kind == HID_MOUSE || hs->kind == HID_TABLET) {
                 hid_pointer_activate(hs);
             }
-            if (!hid_has_events(hs) &&
-                (!hs->idle || hs->next_idle_clock - curtime > 0)) {
-                return USB_RET_NAK;
+            if (!hid_has_events(hs)) {
+                p->status = USB_RET_NAK;
+                return;
             }
-            hid_set_next_idle(hs, curtime);
+            hid_set_next_idle(hs);
             if (hs->kind == HID_MOUSE || hs->kind == HID_TABLET) {
-                ret = hid_pointer_poll(hs, buf, p->iov.size);
+                len = hid_pointer_poll(hs, buf, p->iov.size);
             } else if (hs->kind == HID_KEYBOARD) {
-                ret = hid_keyboard_poll(hs, buf, p->iov.size);
+                len = hid_keyboard_poll(hs, buf, p->iov.size);
             }
-            usb_packet_copy(p, buf, ret);
+            usb_packet_copy(p, buf, len);
         } else {
             goto fail;
         }
@@ -487,42 +683,64 @@ static int usb_hid_handle_data(USBDevice *dev, USBPacket *p)
     case USB_TOKEN_OUT:
     default:
     fail:
-        ret = USB_RET_STALL;
+        p->status = USB_RET_STALL;
         break;
     }
-    return ret;
 }
 
 static void usb_hid_handle_destroy(USBDevice *dev)
 {
-    USBHIDState *us = DO_UPCAST(USBHIDState, dev, dev);
+    USBHIDState *us = USB_HID(dev);
 
     hid_free(&us->hid);
 }
 
-static int usb_hid_initfn(USBDevice *dev, int kind)
+static void usb_hid_initfn(USBDevice *dev, int kind,
+                           const USBDesc *usb1, const USBDesc *usb2,
+                           Error **errp)
 {
-    USBHIDState *us = DO_UPCAST(USBHIDState, dev, dev);
+    USBHIDState *us = USB_HID(dev);
+    switch (us->usb_version) {
+    case 1:
+        dev->usb_desc = usb1;
+        break;
+    case 2:
+        dev->usb_desc = usb2;
+        break;
+    default:
+        dev->usb_desc = NULL;
+    }
+    if (!dev->usb_desc) {
+        error_setg(errp, "Invalid usb version %d for usb hid device",
+                   us->usb_version);
+        return;
+    }
 
+    if (dev->serial) {
+        usb_desc_set_string(dev, STR_SERIALNUMBER, dev->serial);
+    }
     usb_desc_init(dev);
     us->intr = usb_ep_get(dev, USB_TOKEN_IN, 1);
     hid_init(&us->hid, kind, usb_hid_changed);
-    return 0;
+    if (us->display && us->hid.s) {
+        qemu_input_handler_bind(us->hid.s, us->display, us->head, NULL);
+    }
 }
 
-static int usb_tablet_initfn(USBDevice *dev)
+static void usb_tablet_realize(USBDevice *dev, Error **errp)
 {
-    return usb_hid_initfn(dev, HID_TABLET);
+
+    usb_hid_initfn(dev, HID_TABLET, &desc_tablet, &desc_tablet2, errp);
 }
 
-static int usb_mouse_initfn(USBDevice *dev)
+static void usb_mouse_realize(USBDevice *dev, Error **errp)
 {
-    return usb_hid_initfn(dev, HID_MOUSE);
+    usb_hid_initfn(dev, HID_MOUSE, &desc_mouse, &desc_mouse2, errp);
 }
 
-static int usb_keyboard_initfn(USBDevice *dev)
+static void usb_keyboard_realize(USBDevice *dev, Error **errp)
 {
-    return usb_hid_initfn(dev, HID_KEYBOARD);
+    usb_hid_initfn(dev, HID_KEYBOARD, &desc_keyboard, &desc_keyboard2, errp);
 }
 
 static int usb_ptr_post_load(void *opaque, int version_id)
@@ -540,7 +758,7 @@ static const VMStateDescription vmstate_usb_ptr = {
     .version_id = 1,
     .minimum_version_id = 1,
     .post_load = usb_ptr_post_load,
-    .fields = (VMStateField []) {
+    .fields = (VMStateField[]) {
         VMSTATE_USB_DEVICE(dev, USBHIDState),
         VMSTATE_HID_POINTER_DEVICE(hid, USBHIDState),
         VMSTATE_END_OF_LIST()
@@ -551,7 +769,7 @@ static const VMStateDescription vmstate_usb_kbd = {
     .name = "usb-kbd",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (VMStateField []) {
+    .fields = (VMStateField[]) {
         VMSTATE_USB_DEVICE(dev, USBHIDState),
         VMSTATE_HID_KEYBOARD_DEVICE(hid, USBHIDState),
         VMSTATE_END_OF_LIST()
@@ -566,25 +784,45 @@ static void usb_hid_class_initfn(ObjectClass *klass, void *data)
     uc->handle_control = usb_hid_handle_control;
     uc->handle_data    = usb_hid_handle_data;
     uc->handle_destroy = usb_hid_handle_destroy;
+    uc->handle_attach  = usb_desc_attach;
 }
+
+static const TypeInfo usb_hid_type_info = {
+    .name = TYPE_USB_HID,
+    .parent = TYPE_USB_DEVICE,
+    .instance_size = sizeof(USBHIDState),
+    .abstract = true,
+    .class_init = usb_hid_class_initfn,
+};
+
+static Property usb_tablet_properties[] = {
+        DEFINE_PROP_UINT32("usb_version", USBHIDState, usb_version, 2),
+        DEFINE_PROP_STRING("display", USBHIDState, display),
+        DEFINE_PROP_UINT32("head", USBHIDState, head, 0),
+        DEFINE_PROP_END_OF_LIST(),
+};
 
 static void usb_tablet_class_initfn(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     USBDeviceClass *uc = USB_DEVICE_CLASS(klass);
 
-    usb_hid_class_initfn(klass, data);
-    uc->init           = usb_tablet_initfn;
+    uc->realize        = usb_tablet_realize;
     uc->product_desc   = "QEMU USB Tablet";
-    uc->usb_desc       = &desc_tablet;
     dc->vmsd = &vmstate_usb_ptr;
+    dc->props = usb_tablet_properties;
+    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
 }
 
-static TypeInfo usb_tablet_info = {
+static const TypeInfo usb_tablet_info = {
     .name          = "usb-tablet",
-    .parent        = TYPE_USB_DEVICE,
-    .instance_size = sizeof(USBHIDState),
+    .parent        = TYPE_USB_HID,
     .class_init    = usb_tablet_class_initfn,
+};
+
+static Property usb_mouse_properties[] = {
+        DEFINE_PROP_UINT32("usb_version", USBHIDState, usb_version, 2),
+        DEFINE_PROP_END_OF_LIST(),
 };
 
 static void usb_mouse_class_initfn(ObjectClass *klass, void *data)
@@ -592,18 +830,23 @@ static void usb_mouse_class_initfn(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     USBDeviceClass *uc = USB_DEVICE_CLASS(klass);
 
-    usb_hid_class_initfn(klass, data);
-    uc->init           = usb_mouse_initfn;
+    uc->realize        = usb_mouse_realize;
     uc->product_desc   = "QEMU USB Mouse";
-    uc->usb_desc       = &desc_mouse;
     dc->vmsd = &vmstate_usb_ptr;
+    dc->props = usb_mouse_properties;
+    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
 }
 
-static TypeInfo usb_mouse_info = {
+static const TypeInfo usb_mouse_info = {
     .name          = "usb-mouse",
-    .parent        = TYPE_USB_DEVICE,
-    .instance_size = sizeof(USBHIDState),
+    .parent        = TYPE_USB_HID,
     .class_init    = usb_mouse_class_initfn,
+};
+
+static Property usb_keyboard_properties[] = {
+        DEFINE_PROP_UINT32("usb_version", USBHIDState, usb_version, 2),
+        DEFINE_PROP_STRING("display", USBHIDState, display),
+        DEFINE_PROP_END_OF_LIST(),
 };
 
 static void usb_keyboard_class_initfn(ObjectClass *klass, void *data)
@@ -611,22 +854,22 @@ static void usb_keyboard_class_initfn(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     USBDeviceClass *uc = USB_DEVICE_CLASS(klass);
 
-    usb_hid_class_initfn(klass, data);
-    uc->init           = usb_keyboard_initfn;
+    uc->realize        = usb_keyboard_realize;
     uc->product_desc   = "QEMU USB Keyboard";
-    uc->usb_desc       = &desc_keyboard;
     dc->vmsd = &vmstate_usb_kbd;
+    dc->props = usb_keyboard_properties;
+    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
 }
 
-static TypeInfo usb_keyboard_info = {
+static const TypeInfo usb_keyboard_info = {
     .name          = "usb-kbd",
-    .parent        = TYPE_USB_DEVICE,
-    .instance_size = sizeof(USBHIDState),
+    .parent        = TYPE_USB_HID,
     .class_init    = usb_keyboard_class_initfn,
 };
 
 static void usb_hid_register_types(void)
 {
+    type_register_static(&usb_hid_type_info);
     type_register_static(&usb_tablet_info);
     usb_legacy_register("usb-tablet", "tablet", NULL);
     type_register_static(&usb_mouse_info);

@@ -18,52 +18,59 @@
  */
 
 #include "cpu.h"
-#include "helper.h"
-
+#include "exec/helper-proto.h"
+#include "exec/cpu_ldst.h"
 
 /* Softmmu support */
 #ifndef CONFIG_USER_ONLY
 
-uint64_t helper_ldl_phys(uint64_t p)
+uint64_t helper_ldl_phys(CPUAlphaState *env, uint64_t p)
 {
-    return (int32_t)ldl_phys(p);
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
+    return (int32_t)ldl_phys(cs->as, p);
 }
 
-uint64_t helper_ldq_phys(uint64_t p)
+uint64_t helper_ldq_phys(CPUAlphaState *env, uint64_t p)
 {
-    return ldq_phys(p);
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
+    return ldq_phys(cs->as, p);
 }
 
 uint64_t helper_ldl_l_phys(CPUAlphaState *env, uint64_t p)
 {
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
     env->lock_addr = p;
-    return env->lock_value = (int32_t)ldl_phys(p);
+    return env->lock_value = (int32_t)ldl_phys(cs->as, p);
 }
 
 uint64_t helper_ldq_l_phys(CPUAlphaState *env, uint64_t p)
 {
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
     env->lock_addr = p;
-    return env->lock_value = ldq_phys(p);
+    return env->lock_value = ldq_phys(cs->as, p);
 }
 
-void helper_stl_phys(uint64_t p, uint64_t v)
+void helper_stl_phys(CPUAlphaState *env, uint64_t p, uint64_t v)
 {
-    stl_phys(p, v);
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
+    stl_phys(cs->as, p, v);
 }
 
-void helper_stq_phys(uint64_t p, uint64_t v)
+void helper_stq_phys(CPUAlphaState *env, uint64_t p, uint64_t v)
 {
-    stq_phys(p, v);
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
+    stq_phys(cs->as, p, v);
 }
 
 uint64_t helper_stl_c_phys(CPUAlphaState *env, uint64_t p, uint64_t v)
 {
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
     uint64_t ret = 0;
 
     if (p == env->lock_addr) {
-        int32_t old = ldl_phys(p);
+        int32_t old = ldl_phys(cs->as, p);
         if (old == (int32_t)env->lock_value) {
-            stl_phys(p, v);
+            stl_phys(cs->as, p, v);
             ret = 1;
         }
     }
@@ -74,12 +81,13 @@ uint64_t helper_stl_c_phys(CPUAlphaState *env, uint64_t p, uint64_t v)
 
 uint64_t helper_stq_c_phys(CPUAlphaState *env, uint64_t p, uint64_t v)
 {
+    CPUState *cs = CPU(alpha_env_get_cpu(env));
     uint64_t ret = 0;
 
     if (p == env->lock_addr) {
-        uint64_t old = ldq_phys(p);
+        uint64_t old = ldq_phys(cs->as, p);
         if (old == env->lock_value) {
-            stq_phys(p, v);
+            stq_phys(cs->as, p, v);
             ret = 1;
         }
     }
@@ -88,13 +96,17 @@ uint64_t helper_stq_c_phys(CPUAlphaState *env, uint64_t p, uint64_t v)
     return ret;
 }
 
-static void do_unaligned_access(CPUAlphaState *env, target_ulong addr,
-                                int is_write, int is_user, void *retaddr)
+void alpha_cpu_do_unaligned_access(CPUState *cs, vaddr addr,
+                                   int is_write, int is_user, uintptr_t retaddr)
 {
+    AlphaCPU *cpu = ALPHA_CPU(cs);
+    CPUAlphaState *env = &cpu->env;
     uint64_t pc;
     uint32_t insn;
 
-    do_restore_state(env, retaddr);
+    if (retaddr) {
+        cpu_restore_state(cs, retaddr);
+    }
 
     pc = env->pc;
     insn = cpu_ldl_code(env, pc);
@@ -102,50 +114,46 @@ static void do_unaligned_access(CPUAlphaState *env, target_ulong addr,
     env->trap_arg0 = addr;
     env->trap_arg1 = insn >> 26;                /* opcode */
     env->trap_arg2 = (insn >> 21) & 31;         /* dest regno */
-    env->exception_index = EXCP_UNALIGN;
+    cs->exception_index = EXCP_UNALIGN;
     env->error_code = 0;
-    cpu_loop_exit(env);
+    cpu_loop_exit(cs);
 }
 
-void cpu_unassigned_access(CPUAlphaState *env, target_phys_addr_t addr,
-                           int is_write, int is_exec, int unused, int size)
+void alpha_cpu_unassigned_access(CPUState *cs, hwaddr addr,
+                                 bool is_write, bool is_exec, int unused,
+                                 unsigned size)
 {
+    AlphaCPU *cpu = ALPHA_CPU(cs);
+    CPUAlphaState *env = &cpu->env;
+
     env->trap_arg0 = addr;
-    env->trap_arg1 = is_write;
-    dynamic_excp(env, NULL, EXCP_MCHK, 0);
+    env->trap_arg1 = is_write ? 1 : 0;
+    cs->exception_index = EXCP_MCHK;
+    env->error_code = 0;
+
+    /* ??? We should cpu_restore_state to the faulting insn, but this hook
+       does not have access to the retaddr value from the original helper.
+       It's all moot until the QEMU PALcode grows an MCHK handler.  */
+
+    cpu_loop_exit(cs);
 }
-
-#include "softmmu_exec.h"
-
-#define MMUSUFFIX _mmu
-#define ALIGNED_ONLY
-
-#define SHIFT 0
-#include "softmmu_template.h"
-
-#define SHIFT 1
-#include "softmmu_template.h"
-
-#define SHIFT 2
-#include "softmmu_template.h"
-
-#define SHIFT 3
-#include "softmmu_template.h"
 
 /* try to fill the TLB and return an exception if error. If retaddr is
    NULL, it means that the function was called in C code (i.e. not
    from generated code or from helper.c) */
 /* XXX: fix it to restore all registers */
-void tlb_fill(CPUAlphaState *env, target_ulong addr, int is_write,
-              int mmu_idx, void *retaddr)
+void tlb_fill(CPUState *cs, target_ulong addr, int is_write,
+              int mmu_idx, uintptr_t retaddr)
 {
     int ret;
 
-    ret = cpu_alpha_handle_mmu_fault(env, addr, is_write, mmu_idx);
+    ret = alpha_cpu_handle_mmu_fault(cs, addr, is_write, mmu_idx);
     if (unlikely(ret != 0)) {
-        do_restore_state(env, retaddr);
+        if (retaddr) {
+            cpu_restore_state(cs, retaddr);
+        }
         /* Exception index and error code are already set */
-        cpu_loop_exit(env);
+        cpu_loop_exit(cs);
     }
 }
 #endif /* CONFIG_USER_ONLY */

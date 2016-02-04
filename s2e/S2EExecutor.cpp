@@ -39,13 +39,13 @@
 
 extern "C" {
 #include <qemu-common.h>
-#include <cpu-all.h>
+#include "exec/cpu-all.h"
 #include <tcg.h>
 #include <tcg-llvm.h>
-#include <exec-all.h>
-#include <ioport.h>
-#include <sysemu.h>
-#include <cpus.h>
+#include "exec/exec-all.h"
+#include "exec/ioport.h"
+#include "sysemu/sysemu.h"
+#include "sysemu/cpus.h"
 
 extern CPUArchState *env;
 void QEMU_NORETURN raise_exception(int exception_index);

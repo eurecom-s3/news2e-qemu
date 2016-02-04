@@ -9,10 +9,10 @@
  */
 
 #include "qemu-common.h"
-#include "qemu-error.h"
+#include "qemu/error-report.h"
 #include "hw/usb.h"
 #include "hw/usb/desc.h"
-#include "qemu-char.h"
+#include "sysemu/char.h"
 
 //#define DEBUG_Serial
 
@@ -103,6 +103,9 @@ typedef struct {
     CharDriverState *cs;
 } USBSerialState;
 
+#define TYPE_USB_SERIAL "usb-serial-dev"
+#define USB_SERIAL_DEV(obj) OBJECT_CHECK(USBSerialState, (obj), TYPE_USB_SERIAL)
+
 enum {
     STR_MANUFACTURER = 1,
     STR_PRODUCT_SERIAL,
@@ -111,9 +114,9 @@ enum {
 };
 
 static const USBDescStrings desc_strings = {
-    [STR_MANUFACTURER]    = "QEMU " QEMU_VERSION,
+    [STR_MANUFACTURER]    = "QEMU",
     [STR_PRODUCT_SERIAL]  = "QEMU USB SERIAL",
-    [STR_PRODUCT_BRAILLE] = "QEMU USB BRAILLE",
+    [STR_PRODUCT_BRAILLE] = "QEMU USB BAUM BRAILLE",
     [STR_SERIALNUMBER]    = "1",
 };
 
@@ -144,7 +147,7 @@ static const USBDescDevice desc_device = {
         {
             .bNumInterfaces        = 1,
             .bConfigurationValue   = 1,
-            .bmAttributes          = 0x80,
+            .bmAttributes          = USB_CFG_ATT_ONE,
             .bMaxPower             = 50,
             .nif = 1,
             .ifs = &desc_iface0,
@@ -219,7 +222,7 @@ static uint8_t usb_get_modem_lines(USBSerialState *s)
     return ret;
 }
 
-static int usb_serial_handle_control(USBDevice *dev, USBPacket *p,
+static void usb_serial_handle_control(USBDevice *dev, USBPacket *p,
                int request, int value, int index, int length, uint8_t *data)
 {
     USBSerialState *s = (USBSerialState *)dev;
@@ -228,13 +231,11 @@ static int usb_serial_handle_control(USBDevice *dev, USBPacket *p,
     DPRINTF("got control %x, value %x\n",request, value);
     ret = usb_desc_handle_control(dev, p, request, value, index, length, data);
     if (ret >= 0) {
-        return ret;
+        return;
     }
 
-    ret = 0;
     switch (request) {
     case EndpointOutRequest | USB_REQ_CLEAR_FEATURE:
-        ret = 0;
         break;
 
         /* Class specific requests.  */
@@ -323,7 +324,7 @@ static int usb_serial_handle_control(USBDevice *dev, USBPacket *p,
     case DeviceInVendor | FTDI_GET_MDM_ST:
         data[0] = usb_get_modem_lines(s) | 1;
         data[1] = 0;
-        ret = 2;
+        p->actual_length = 2;
         break;
     case DeviceOutVendor | FTDI_SET_EVENT_CHR:
         /* TODO: handle it */
@@ -338,25 +339,23 @@ static int usb_serial_handle_control(USBDevice *dev, USBPacket *p,
         break;
     case DeviceInVendor | FTDI_GET_LATENCY:
         data[0] = s->latency;
-        ret = 1;
+        p->actual_length = 1;
         break;
     default:
     fail:
         DPRINTF("got unsupported/bogus control %x, value %x\n", request, value);
-        ret = USB_RET_STALL;
+        p->status = USB_RET_STALL;
         break;
     }
-    return ret;
 }
 
-static int usb_serial_handle_data(USBDevice *dev, USBPacket *p)
+static void usb_serial_handle_data(USBDevice *dev, USBPacket *p)
 {
     USBSerialState *s = (USBSerialState *)dev;
-    int i, ret = 0;
     uint8_t devep = p->ep->nr;
     struct iovec *iov;
     uint8_t header[2];
-    int first_len, len;
+    int i, first_len, len;
 
     switch (p->pid) {
     case USB_TOKEN_OUT:
@@ -366,6 +365,7 @@ static int usb_serial_handle_data(USBDevice *dev, USBPacket *p)
             iov = p->iov.iov + i;
             qemu_chr_fe_write(s->cs, iov->iov_base, iov->iov_len);
         }
+        p->actual_length = p->iov.size;
         break;
 
     case USB_TOKEN_IN:
@@ -374,7 +374,7 @@ static int usb_serial_handle_data(USBDevice *dev, USBPacket *p)
         first_len = RECV_BUF - s->recv_ptr;
         len = p->iov.size;
         if (len <= 2) {
-            ret = USB_RET_NAK;
+            p->status = USB_RET_NAK;
             break;
         }
         header[0] = usb_get_modem_lines(s) | 1;
@@ -384,7 +384,6 @@ static int usb_serial_handle_data(USBDevice *dev, USBPacket *p)
             s->event_trigger &= ~FTDI_BI;
             header[1] = FTDI_BI;
             usb_packet_copy(p, header, 2);
-            ret = 2;
             break;
         } else {
             header[1] = 0;
@@ -393,7 +392,7 @@ static int usb_serial_handle_data(USBDevice *dev, USBPacket *p)
         if (len > s->recv_used)
             len = s->recv_used;
         if (!len) {
-            ret = USB_RET_NAK;
+            p->status = USB_RET_NAK;
             break;
         }
         if (first_len > len)
@@ -404,29 +403,23 @@ static int usb_serial_handle_data(USBDevice *dev, USBPacket *p)
             usb_packet_copy(p, s->recv_buf, len - first_len);
         s->recv_used -= len;
         s->recv_ptr = (s->recv_ptr + len) % RECV_BUF;
-        ret = len + 2;
         break;
 
     default:
         DPRINTF("Bad token\n");
     fail:
-        ret = USB_RET_STALL;
+        p->status = USB_RET_STALL;
         break;
     }
-
-    return ret;
-}
-
-static void usb_serial_handle_destroy(USBDevice *dev)
-{
-    USBSerialState *s = (USBSerialState *)dev;
-
-    qemu_chr_delete(s->cs);
 }
 
 static int usb_serial_can_read(void *opaque)
 {
     USBSerialState *s = opaque;
+
+    if (!s->dev.attached) {
+        return 0;
+    }
     return RECV_BUF - s->recv_used;
 }
 
@@ -469,27 +462,45 @@ static void usb_serial_event(void *opaque, int event)
         case CHR_EVENT_FOCUS:
             break;
         case CHR_EVENT_OPENED:
-            usb_serial_reset(s);
-            /* TODO: Reset USB port */
+            if (!s->dev.attached) {
+                usb_device_attach(&s->dev, &error_abort);
+            }
+            break;
+        case CHR_EVENT_CLOSED:
+            if (s->dev.attached) {
+                usb_device_detach(&s->dev);
+            }
             break;
     }
 }
 
-static int usb_serial_initfn(USBDevice *dev)
+static void usb_serial_realize(USBDevice *dev, Error **errp)
 {
-    USBSerialState *s = DO_UPCAST(USBSerialState, dev, dev);
+    USBSerialState *s = USB_SERIAL_DEV(dev);
+    Error *local_err = NULL;
 
+    usb_desc_create_serial(dev);
     usb_desc_init(dev);
+    dev->auto_attach = 0;
 
     if (!s->cs) {
-        error_report("Property chardev is required");
-        return -1;
+        error_setg(errp, "Property chardev is required");
+        return;
+    }
+
+    usb_check_attach(dev, &local_err);
+    if (local_err) {
+        error_propagate(errp, local_err);
+        return;
     }
 
     qemu_chr_add_handlers(s->cs, usb_serial_can_read, usb_serial_read,
                           usb_serial_event, s);
     usb_serial_handle_reset(dev);
-    return 0;
+
+    if (s->cs->be_open && !dev->attached) {
+        usb_device_attach(dev, &error_abort);
+    }
 }
 
 static USBDevice *usb_serial_init(USBBus *bus, const char *filename)
@@ -536,16 +547,11 @@ static USBDevice *usb_serial_init(USBBus *bus, const char *filename)
         return NULL;
 
     dev = usb_create(bus, "usb-serial");
-    if (!dev) {
-        return NULL;
-    }
     qdev_prop_set_chr(&dev->qdev, "chardev", cdrv);
     if (vendorid)
         qdev_prop_set_uint16(&dev->qdev, "vendorid", vendorid);
     if (productid)
         qdev_prop_set_uint16(&dev->qdev, "productid", productid);
-    qdev_init_nofail(&dev->qdev);
-
     return dev;
 }
 
@@ -560,8 +566,6 @@ static USBDevice *usb_braille_init(USBBus *bus, const char *unused)
 
     dev = usb_create(bus, "usb-braille");
     qdev_prop_set_chr(&dev->qdev, "chardev", cdrv);
-    qdev_init_nofail(&dev->qdev);
-
     return dev;
 }
 
@@ -575,26 +579,40 @@ static Property serial_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
+static void usb_serial_dev_class_init(ObjectClass *klass, void *data)
+{
+    DeviceClass *dc = DEVICE_CLASS(klass);
+    USBDeviceClass *uc = USB_DEVICE_CLASS(klass);
+
+    uc->realize        = usb_serial_realize;
+    uc->handle_reset   = usb_serial_handle_reset;
+    uc->handle_control = usb_serial_handle_control;
+    uc->handle_data    = usb_serial_handle_data;
+    dc->vmsd = &vmstate_usb_serial;
+    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+}
+
+static const TypeInfo usb_serial_dev_type_info = {
+    .name = TYPE_USB_SERIAL,
+    .parent = TYPE_USB_DEVICE,
+    .instance_size = sizeof(USBSerialState),
+    .abstract = true,
+    .class_init = usb_serial_dev_class_init,
+};
+
 static void usb_serial_class_initfn(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     USBDeviceClass *uc = USB_DEVICE_CLASS(klass);
 
-    uc->init = usb_serial_initfn;
     uc->product_desc   = "QEMU USB Serial";
     uc->usb_desc       = &desc_serial;
-    uc->handle_reset   = usb_serial_handle_reset;
-    uc->handle_control = usb_serial_handle_control;
-    uc->handle_data    = usb_serial_handle_data;
-    uc->handle_destroy = usb_serial_handle_destroy;
-    dc->vmsd = &vmstate_usb_serial;
     dc->props = serial_properties;
 }
 
-static TypeInfo serial_info = {
+static const TypeInfo serial_info = {
     .name          = "usb-serial",
-    .parent        = TYPE_USB_DEVICE,
-    .instance_size = sizeof(USBSerialState),
+    .parent        = TYPE_USB_SERIAL,
     .class_init    = usb_serial_class_initfn,
 };
 
@@ -608,26 +626,20 @@ static void usb_braille_class_initfn(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     USBDeviceClass *uc = USB_DEVICE_CLASS(klass);
 
-    uc->init           = usb_serial_initfn;
     uc->product_desc   = "QEMU USB Braille";
     uc->usb_desc       = &desc_braille;
-    uc->handle_reset   = usb_serial_handle_reset;
-    uc->handle_control = usb_serial_handle_control;
-    uc->handle_data    = usb_serial_handle_data;
-    uc->handle_destroy = usb_serial_handle_destroy;
-    dc->vmsd = &vmstate_usb_serial;
     dc->props = braille_properties;
 }
 
-static TypeInfo braille_info = {
+static const TypeInfo braille_info = {
     .name          = "usb-braille",
-    .parent        = TYPE_USB_DEVICE,
-    .instance_size = sizeof(USBSerialState),
+    .parent        = TYPE_USB_SERIAL,
     .class_init    = usb_braille_class_initfn,
 };
 
 static void usb_serial_register_types(void)
 {
+    type_register_static(&usb_serial_dev_type_info);
     type_register_static(&serial_info);
     usb_legacy_register("usb-serial", "serial", usb_serial_init);
     type_register_static(&braille_info);

@@ -47,10 +47,14 @@ extern "C" {
 /*****************************/
 /* Functions for QEMU c code */
 
+#if defined(__cplusplus)
+class TCGLLVMContext;
+#else
+typedef struct TCGLLVMContext TCGLLVMContext;
+#endif
 struct TranslationBlock;
-struct TCGLLVMContext;
 
-extern struct TCGLLVMContext* tcg_llvm_ctx;
+extern TCGLLVMContext* tcg_llvm_ctx;
 
 struct TCGLLVMRuntime {
     // NOTE: The order of these are fixed !
@@ -73,17 +77,17 @@ struct TCGLLVMRuntime {
 
 extern struct TCGLLVMRuntime tcg_llvm_runtime;
 
-struct TCGLLVMContext* tcg_llvm_initialize(void);
-void tcg_llvm_close(struct TCGLLVMContext *l);
+TCGLLVMContext* tcg_llvm_initialize(void);
+void tcg_llvm_close(TCGLLVMContext *l);
 
 void tcg_llvm_tb_alloc(struct TranslationBlock *tb);
 void tcg_llvm_tb_free(struct TranslationBlock *tb);
 
-void tcg_llvm_gen_code(struct TCGLLVMContext *l, struct TCGContext *s,
+void tcg_llvm_gen_code(TCGLLVMContext *l, struct TCGContext *s,
                        struct TranslationBlock *tb);
 const char* tcg_llvm_get_func_name(struct TranslationBlock *tb);
 
-uintptr_t tcg_llvm_qemu_tb_exec(void *env, TranslationBlock *tb);
+uintptr_t tcg_llvm_qemu_tb_exec(void *env, struct TranslationBlock *tb);
 
 #ifndef CONFIG_S2E
 int tcg_llvm_search_last_pc(struct TranslationBlock *tb, uintptr_t searched_pc);

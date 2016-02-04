@@ -1,7 +1,17 @@
 #include <glib.h>
 #include <termios.h>
-#include "qemu_socket.h"
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include "qemu/osdep.h"
+#include "qemu/sockets.h"
 #include "qga/channel.h"
+
+#ifdef CONFIG_SOLARIS
+#include <stropts.h>
+#endif
 
 #define GA_CHANNEL_BAUDRATE_DEFAULT B38400 /* for isa-serial channels */
 
@@ -32,10 +42,11 @@ static gboolean ga_channel_listen_accept(GIOChannel *channel,
         g_warning("error converting fd to gsocket: %s", strerror(errno));
         goto out;
     }
-    fcntl(client_fd, F_SETFL, O_NONBLOCK);
+    qemu_set_nonblock(client_fd);
     ret = ga_channel_client_add(c, client_fd);
     if (ret) {
         g_warning("error setting up connection");
+        close(client_fd);
         goto out;
     }
     accepted = true;
@@ -123,14 +134,28 @@ static gboolean ga_channel_open(GAChannel *c, const gchar *path, GAChannelMethod
 
     switch (c->method) {
     case GA_CHANNEL_VIRTIO_SERIAL: {
-        int fd = qemu_open(path, O_RDWR | O_NONBLOCK | O_ASYNC);
+        int fd = qemu_open(path, O_RDWR | O_NONBLOCK
+#ifndef CONFIG_SOLARIS
+                           | O_ASYNC
+#endif
+                           );
         if (fd == -1) {
             g_critical("error opening channel: %s", strerror(errno));
-            exit(EXIT_FAILURE);
+            return false;
         }
+#ifdef CONFIG_SOLARIS
+        ret = ioctl(fd, I_SETSIG, S_OUTPUT | S_INPUT | S_HIPRI);
+        if (ret == -1) {
+            g_critical("error setting event mask for channel: %s",
+                       strerror(errno));
+            close(fd);
+            return false;
+        }
+#endif
         ret = ga_channel_client_add(c, fd);
         if (ret) {
             g_critical("error adding channel to main loop");
+            close(fd);
             return false;
         }
         break;
@@ -140,7 +165,7 @@ static gboolean ga_channel_open(GAChannel *c, const gchar *path, GAChannelMethod
         int fd = qemu_open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
         if (fd == -1) {
             g_critical("error opening channel: %s", strerror(errno));
-            exit(EXIT_FAILURE);
+            return false;
         }
         tcgetattr(fd, &tio);
         /* set up serial port for non-canonical, dumb byte streaming */
@@ -160,14 +185,18 @@ static gboolean ga_channel_open(GAChannel *c, const gchar *path, GAChannelMethod
         tcsetattr(fd, TCSANOW, &tio);
         ret = ga_channel_client_add(c, fd);
         if (ret) {
-            g_error("error adding channel to main loop");
+            g_critical("error adding channel to main loop");
+            close(fd);
+            return false;
         }
         break;
     }
     case GA_CHANNEL_UNIX_LISTEN: {
-        int fd = unix_listen(path, NULL, strlen(path));
-        if (fd == -1) {
-            g_critical("error opening path: %s", strerror(errno));
+        Error *local_err = NULL;
+        int fd = unix_listen(path, NULL, strlen(path), &local_err);
+        if (local_err != NULL) {
+            g_critical("%s", error_get_pretty(local_err));
+            error_free(local_err);
             return false;
         }
         ga_channel_listen_add(c, fd, true);
@@ -188,25 +217,24 @@ GIOStatus ga_channel_write_all(GAChannel *c, const gchar *buf, gsize size)
     GIOStatus status = G_IO_STATUS_NORMAL;
 
     while (size) {
+        g_debug("sending data, count: %d", (int)size);
         status = g_io_channel_write_chars(c->client_channel, buf, size,
                                           &written, &err);
-        g_debug("sending data, count: %d", (int)size);
-        if (err != NULL) {
+        if (status == G_IO_STATUS_NORMAL) {
+            size -= written;
+            buf += written;
+        } else if (status != G_IO_STATUS_AGAIN) {
             g_warning("error writing to channel: %s", err->message);
-            return G_IO_STATUS_ERROR;
+            return status;
         }
-        if (status != G_IO_STATUS_NORMAL) {
-            break;
-        }
-        size -= written;
     }
 
-    if (status == G_IO_STATUS_NORMAL) {
+    do {
         status = g_io_channel_flush(c->client_channel, &err);
-        if (err != NULL) {
-            g_warning("error flushing channel: %s", err->message);
-            return G_IO_STATUS_ERROR;
-        }
+    } while (status == G_IO_STATUS_AGAIN);
+
+    if (status != G_IO_STATUS_NORMAL) {
+        g_warning("error flushing channel: %s", err->message);
     }
 
     return status;
@@ -220,7 +248,7 @@ GIOStatus ga_channel_read(GAChannel *c, gchar *buf, gsize size, gsize *count)
 GAChannel *ga_channel_new(GAChannelMethod method, const gchar *path,
                           GAChannelCallback cb, gpointer opaque)
 {
-    GAChannel *c = g_malloc0(sizeof(GAChannel));
+    GAChannel *c = g_new0(GAChannel, 1);
     c->event_cb = cb;
     c->user_data = opaque;
 

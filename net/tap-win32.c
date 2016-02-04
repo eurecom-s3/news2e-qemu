@@ -26,12 +26,14 @@
  *  distribution); if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "net/tap.h"
+#include "tap_int.h"
 
 #include "qemu-common.h"
-#include "net.h"
-#include "sysemu.h"
-#include "qemu-error.h"
+#include "clients.h"            /* net_init_tap */
+#include "net/net.h"
+#include "net/tap.h"            /* tap_has_ufo, ... */
+#include "sysemu/sysemu.h"
+#include "qemu/error-report.h"
 #include <stdio.h>
 #include <windows.h>
 #include <winioctl.h>
@@ -75,7 +77,12 @@
 
 //#define DEBUG_TAP_WIN32
 
-#define TUN_ASYNCHRONOUS_WRITES 1
+/* FIXME: The asynch write path appears to be broken at
+ * present. WriteFile() ignores the lpNumberOfBytesWritten parameter
+ * for overlapped writes, with the result we return zero bytes sent,
+ * and after handling a single packet, receive is disabled for this
+ * interface. */
+/* #define TUN_ASYNCHRONOUS_WRITES 1 */
 
 #define TUN_BUFFER_SIZE 1560
 #define TUN_MAX_BUFFER_COUNT 32
@@ -354,7 +361,8 @@ static int get_device_guid(
                 &len);
 
             if (status != ERROR_SUCCESS || name_type != REG_SZ) {
-                    return -1;
+                ++i;
+                continue;
             }
             else {
                 if (is_tap_win32_dev(enum_name)) {
@@ -458,26 +466,47 @@ static int tap_win32_write(tap_win32_overlapped_t *overlapped,
     BOOL result;
     DWORD error;
 
+#ifdef TUN_ASYNCHRONOUS_WRITES
     result = GetOverlappedResult( overlapped->handle, &overlapped->write_overlapped,
                                   &write_size, FALSE);
 
     if (!result && GetLastError() == ERROR_IO_INCOMPLETE)
         WaitForSingleObject(overlapped->write_event, INFINITE);
+#endif
 
     result = WriteFile(overlapped->handle, buffer, size,
                        &write_size, &overlapped->write_overlapped);
 
+#ifdef TUN_ASYNCHRONOUS_WRITES
+    /* FIXME: we can't sensibly set write_size here, without waiting
+     * for the IO to complete! Moreover, we can't return zero,
+     * because that will disable receive on this interface, and we
+     * also can't assume it will succeed and return the full size,
+     * because that will result in the buffer being reclaimed while
+     * the IO is in progress. */
+#error Async writes are broken. Please disable TUN_ASYNCHRONOUS_WRITES.
+#else /* !TUN_ASYNCHRONOUS_WRITES */
     if (!result) {
-        switch (error = GetLastError())
-        {
-        case ERROR_IO_PENDING:
-#ifndef TUN_ASYNCHRONOUS_WRITES
-            WaitForSingleObject(overlapped->write_event, INFINITE);
-#endif
-            break;
-        default:
-            return -1;
+        error = GetLastError();
+        if (error == ERROR_IO_PENDING) {
+            result = GetOverlappedResult(overlapped->handle,
+                                         &overlapped->write_overlapped,
+                                         &write_size, TRUE);
         }
+    }
+#endif
+
+    if (!result) {
+#ifdef DEBUG_TAP_WIN32
+        LPTSTR msgbuf;
+        error = GetLastError();
+        FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
+                      NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                      &msgbuf, 0, NULL);
+        fprintf(stderr, "Tap-Win32: Error WriteFile %d - %s\n", error, msgbuf);
+        LocalFree(msgbuf);
+#endif
+        return 0;
     }
 
     return write_size;
@@ -564,7 +593,7 @@ static void tap_win32_free_buffer(tap_win32_overlapped_t *overlapped,
 }
 
 static int tap_win32_open(tap_win32_overlapped_t **phandle,
-                          const char *prefered_name)
+                          const char *preferred_name)
 {
     char device_path[256];
     char device_guid[0x100];
@@ -580,8 +609,9 @@ static int tap_win32_open(tap_win32_overlapped_t **phandle,
     DWORD version_len;
     DWORD idThread;
 
-    if (prefered_name != NULL)
-        snprintf(name_buffer, sizeof(name_buffer), "%s", prefered_name);
+    if (preferred_name != NULL) {
+        snprintf(name_buffer, sizeof(name_buffer), "%s", preferred_name);
+    }
 
     rc = get_device_guid(device_guid, sizeof(device_guid), name_buffer, sizeof(name_buffer));
     if (rc)
@@ -630,11 +660,11 @@ static int tap_win32_open(tap_win32_overlapped_t **phandle,
 /********************************************/
 
  typedef struct TAPState {
-     VLANClientState nc;
+     NetClientState nc;
      tap_win32_overlapped_t *handle;
  } TAPState;
 
-static void tap_cleanup(VLANClientState *nc)
+static void tap_cleanup(NetClientState *nc)
 {
     TAPState *s = DO_UPCAST(TAPState, nc, nc);
 
@@ -645,7 +675,7 @@ static void tap_cleanup(VLANClientState *nc)
     */
 }
 
-static ssize_t tap_receive(VLANClientState *nc, const uint8_t *buf, size_t size)
+static ssize_t tap_receive(NetClientState *nc, const uint8_t *buf, size_t size)
 {
     TAPState *s = DO_UPCAST(TAPState, nc, nc);
 
@@ -666,17 +696,76 @@ static void tap_win32_send(void *opaque)
     }
 }
 
+static bool tap_has_ufo(NetClientState *nc)
+{
+    return false;
+}
+
+static bool tap_has_vnet_hdr(NetClientState *nc)
+{
+    return false;
+}
+
+int tap_probe_vnet_hdr_len(int fd, int len)
+{
+    return 0;
+}
+
+void tap_fd_set_vnet_hdr_len(int fd, int len)
+{
+}
+
+int tap_fd_set_vnet_le(int fd, int is_le)
+{
+    return -EINVAL;
+}
+
+int tap_fd_set_vnet_be(int fd, int is_be)
+{
+    return -EINVAL;
+}
+
+static void tap_using_vnet_hdr(NetClientState *nc, bool using_vnet_hdr)
+{
+}
+
+static void tap_set_offload(NetClientState *nc, int csum, int tso4,
+                     int tso6, int ecn, int ufo)
+{
+}
+
+struct vhost_net *tap_get_vhost_net(NetClientState *nc)
+{
+    return NULL;
+}
+
+static bool tap_has_vnet_hdr_len(NetClientState *nc, int len)
+{
+    return false;
+}
+
+static void tap_set_vnet_hdr_len(NetClientState *nc, int len)
+{
+    abort();
+}
+
 static NetClientInfo net_tap_win32_info = {
-    .type = NET_CLIENT_TYPE_TAP,
+    .type = NET_CLIENT_OPTIONS_KIND_TAP,
     .size = sizeof(TAPState),
     .receive = tap_receive,
     .cleanup = tap_cleanup,
+    .has_ufo = tap_has_ufo,
+    .has_vnet_hdr = tap_has_vnet_hdr,
+    .has_vnet_hdr_len = tap_has_vnet_hdr_len,
+    .using_vnet_hdr = tap_using_vnet_hdr,
+    .set_offload = tap_set_offload,
+    .set_vnet_hdr_len = tap_set_vnet_hdr_len,
 };
 
-static int tap_win32_init(VLANState *vlan, const char *model,
+static int tap_win32_init(NetClientState *peer, const char *model,
                           const char *name, const char *ifname)
 {
-    VLANClientState *nc;
+    NetClientState *nc;
     TAPState *s;
     tap_win32_overlapped_t *handle;
 
@@ -685,7 +774,7 @@ static int tap_win32_init(VLANState *vlan, const char *model,
         return -1;
     }
 
-    nc = qemu_new_net_client(&net_tap_win32_info, vlan, NULL, model, name);
+    nc = qemu_new_net_client(&net_tap_win32_info, peer, model, name);
 
     s = DO_UPCAST(TAPState, nc, nc);
 
@@ -699,53 +788,33 @@ static int tap_win32_init(VLANState *vlan, const char *model,
     return 0;
 }
 
-int net_init_tap(QemuOpts *opts, Monitor *mon, const char *name, VLANState *vlan)
+int net_init_tap(const NetClientOptions *opts, const char *name,
+                 NetClientState *peer, Error **errp)
 {
-    const char *ifname;
+    /* FIXME error_setg(errp, ...) on failure */
+    const NetdevTapOptions *tap;
 
-    ifname = qemu_opt_get(opts, "ifname");
+    assert(opts->type == NET_CLIENT_OPTIONS_KIND_TAP);
+    tap = opts->u.tap;
 
-    if (!ifname) {
+    if (!tap->has_ifname) {
         error_report("tap: no interface name");
         return -1;
     }
 
-    if (tap_win32_init(vlan, "tap", name, ifname) == -1) {
+    if (tap_win32_init(peer, "tap", name, tap->ifname) == -1) {
         return -1;
     }
 
     return 0;
 }
 
-int tap_has_ufo(VLANClientState *vc)
+int tap_enable(NetClientState *nc)
 {
-    return 0;
+    abort();
 }
 
-int tap_has_vnet_hdr(VLANClientState *vc)
+int tap_disable(NetClientState *nc)
 {
-    return 0;
-}
-
-int tap_probe_vnet_hdr_len(int fd, int len)
-{
-    return 0;
-}
-
-void tap_fd_set_vnet_hdr_len(int fd, int len)
-{
-}
-
-void tap_using_vnet_hdr(VLANClientState *vc, int using_vnet_hdr)
-{
-}
-
-void tap_set_offload(VLANClientState *vc, int csum, int tso4,
-                     int tso6, int ecn, int ufo)
-{
-}
-
-struct vhost_net *tap_get_vhost_net(VLANClientState *nc)
-{
-    return NULL;
+    abort();
 }

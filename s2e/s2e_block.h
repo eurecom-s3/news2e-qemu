@@ -41,7 +41,7 @@
 extern "C" {
 #endif
 
-#include <block.h>
+#include "block/block.h"
 #include <stdint.h>
 
 typedef int (*s2e_raw_read)(struct BlockDriverState *bs, int64_t sector_num,
@@ -66,7 +66,7 @@ extern int (*__hook_bdrv_write)(
 
 void s2e_bdrv_fail();
 
-extern struct S2EExecutionState **g_block_s2e_state;
+extern S2EExecutionState **g_block_s2e_state;
 
 #ifdef __cplusplus
 }

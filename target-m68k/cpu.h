@@ -26,15 +26,11 @@
 
 #include "config.h"
 #include "qemu-common.h"
-#include "cpu-defs.h"
+#include "exec/cpu-defs.h"
 
-#include "softfloat.h"
+#include "fpu/softfloat.h"
 
 #define MAX_QREGS 32
-
-#define TARGET_HAS_ICE 1
-
-#define ELF_MACHINE	EM_68K
 
 #define EXCP_ACCESS         2   /* Access (MMU) error.  */
 #define EXCP_ADDRESS        3   /* Address error.  */
@@ -103,9 +99,6 @@ typedef struct CPUM68KState {
     uint32_t rambar0;
     uint32_t cacr;
 
-    /* ??? remove this.  */
-    uint32_t t1;
-
     int pending_vector;
     int pending_level;
 
@@ -113,15 +106,16 @@ typedef struct CPUM68KState {
 
     CPU_COMMON
 
+    /* Fields from here on are preserved across CPU reset. */
     uint32_t features;
 } CPUM68KState;
 
+#include "cpu-qom.h"
+
 void m68k_tcg_init(void);
-CPUM68KState *cpu_m68k_init(const char *cpu_model);
-int cpu_m68k_exec(CPUM68KState *s);
-void cpu_m68k_close(CPUM68KState *s);
-void do_interrupt(CPUM68KState *env1);
-void do_interrupt_m68k_hardirq(CPUM68KState *env1);
+void m68k_cpu_init_gdb(M68kCPU *cpu);
+M68kCPU *cpu_m68k_init(const char *cpu_model);
+int cpu_m68k_exec(CPUState *cpu);
 /* you can call this signal handler from your SIGBUS and SIGSEGV
    signal handlers to inform the virtual CPU of exceptions. non zero
    is returned if the signal was handled by the virtual CPU.  */
@@ -170,7 +164,7 @@ enum {
 #define MACSR_V     0x002
 #define MACSR_EV    0x001
 
-void m68k_set_irq_level(CPUM68KState *env, int level, uint8_t vector);
+void m68k_set_irq_level(M68kCPU *cpu, int level, uint8_t vector);
 void m68k_set_macsr(CPUM68KState *env, uint32_t val);
 void m68k_switch_sp(CPUM68KState *env);
 
@@ -216,9 +210,9 @@ void register_m68k_insns (CPUM68KState *env);
 #define TARGET_PHYS_ADDR_SPACE_BITS 32
 #define TARGET_VIRT_ADDR_SPACE_BITS 32
 
-#define cpu_init cpu_m68k_init
+#define cpu_init(cpu_model) CPU(cpu_m68k_init(cpu_model))
+
 #define cpu_exec cpu_m68k_exec
-#define cpu_gen_code cpu_m68k_gen_code
 #define cpu_signal_handler cpu_m68k_signal_handler
 #define cpu_list m68k_cpu_list
 
@@ -226,25 +220,15 @@ void register_m68k_insns (CPUM68KState *env);
 #define MMU_MODE0_SUFFIX _kernel
 #define MMU_MODE1_SUFFIX _user
 #define MMU_USER_IDX 1
-static inline int cpu_mmu_index (CPUM68KState *env)
+static inline int cpu_mmu_index (CPUM68KState *env, bool ifetch)
 {
     return (env->sr & SR_S) == 0 ? 1 : 0;
 }
 
-int cpu_m68k_handle_mmu_fault(CPUM68KState *env, target_ulong address, int rw,
+int m68k_cpu_handle_mmu_fault(CPUState *cpu, vaddr address, int rw,
                               int mmu_idx);
-#define cpu_handle_mmu_fault cpu_m68k_handle_mmu_fault
 
-#if defined(CONFIG_USER_ONLY)
-static inline void cpu_clone_regs(CPUM68KState *env, target_ulong newsp)
-{
-    if (newsp)
-        env->aregs[7] = newsp;
-    env->dregs[0] = 0;
-}
-#endif
-
-#include "cpu-all.h"
+#include "exec/cpu-all.h"
 
 static inline void cpu_get_tb_cpu_state(CPUM68KState *env, target_ulong *pc,
                                         target_ulong *cs_base, int *flags)
@@ -256,16 +240,6 @@ static inline void cpu_get_tb_cpu_state(CPUM68KState *env, target_ulong *pc,
             | ((env->macsr >> 4) & 0xf);        /* Bits 0-3 */
 }
 
-static inline bool cpu_has_work(CPUM68KState *env)
-{
-    return env->interrupt_request & CPU_INTERRUPT_HARD;
-}
-
-#include "exec-all.h"
-
-static inline void cpu_pc_from_tb(CPUM68KState *env, TranslationBlock *tb)
-{
-    env->pc = tb->pc;
-}
+#include "exec/exec-all.h"
 
 #endif

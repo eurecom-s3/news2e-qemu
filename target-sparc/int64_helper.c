@@ -18,10 +18,10 @@
  */
 
 #include "cpu.h"
-#include "helper.h"
+#include "exec/helper-proto.h"
 #include "trace.h"
 
-//#define DEBUG_PCALL
+#define DEBUG_PCALL
 
 #ifdef DEBUG_PCALL
 static const char * const excp_names[0x80] = {
@@ -59,10 +59,17 @@ static const char * const excp_names[0x80] = {
 };
 #endif
 
-void do_interrupt(CPUSPARCState *env)
+void sparc_cpu_do_interrupt(CPUState *cs)
 {
-    int intno = env->exception_index;
+    SPARCCPU *cpu = SPARC_CPU(cs);
+    CPUSPARCState *env = &cpu->env;
+    int intno = cs->exception_index;
     trap_state *tsptr;
+
+    /* Compute PSR before exposing state.  */
+    if (env->cc_op != CC_OP_FLAGS) {
+        cpu_get_psr(env);
+    }
 
 #ifdef DEBUG_PCALL
     if (qemu_loglevel_mask(CPU_LOG_INT)) {
@@ -84,12 +91,8 @@ void do_interrupt(CPUSPARCState *env)
             }
         }
 
-        qemu_log("%6d: %s (v=%04x) pc=%016" PRIx64 " npc=%016" PRIx64
-                " SP=%016" PRIx64 "\n",
-                count, name, intno,
-                env->pc,
-                env->npc, env->regwptr[6]);
-        log_cpu_state(env, 0);
+        qemu_log("%6d: %s (v=%04x)\n", count, name, intno);
+        log_cpu_state(cs, 0);
 #if 0
         {
             int i;
@@ -108,8 +111,8 @@ void do_interrupt(CPUSPARCState *env)
 #endif
 #if !defined(CONFIG_USER_ONLY)
     if (env->tl >= env->maxtl) {
-        cpu_abort(env, "Trap 0x%04x while trap level (%d) >= MAXTL (%d),"
-                  " Error state", env->exception_index, env->tl, env->maxtl);
+        cpu_abort(cs, "Trap 0x%04x while trap level (%d) >= MAXTL (%d),"
+                  " Error state", cs->exception_index, env->tl, env->maxtl);
         return;
     }
 #endif
@@ -157,7 +160,7 @@ void do_interrupt(CPUSPARCState *env)
     env->tbr |= ((env->tl > 1) ? 1 << 14 : 0) | (intno << 5);
     env->pc = env->tbr;
     env->npc = env->pc + 4;
-    env->exception_index = -1;
+    cs->exception_index = -1;
 }
 
 trap_state *cpu_tsptr(CPUSPARCState* env)

@@ -53,7 +53,7 @@ namespace s2e {
 
 class S2E;
 class S2EExecutionState;
-struct S2ETranslationBlock;
+class S2ETranslationBlock;
 
 class CpuExitException
 {
@@ -424,7 +424,7 @@ protected:
     static HandlerInfo s_handlerInfo[];
 };
 
-struct S2ETranslationBlock
+class S2ETranslationBlock
 {
     /** Reference counter. S2ETranslationBlock should not be freed
         until all LLVM functions are completely executed. This reference

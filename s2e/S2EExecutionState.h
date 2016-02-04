@@ -82,7 +82,7 @@ class Plugin;
 class PluginState;
 class S2EDeviceState;
 class S2EExecutionState;
-struct S2ETranslationBlock;
+class S2ETranslationBlock;
 
 //typedef std::tr1::unordered_map<const Plugin*, PluginState*> PluginStateMap;
 typedef std::map<const Plugin*, PluginState*> PluginStateMap;

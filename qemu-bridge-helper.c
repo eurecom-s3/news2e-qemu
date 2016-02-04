@@ -35,7 +35,11 @@
 
 #include <linux/sockios.h>
 
-#include "qemu-queue.h"
+#ifndef SIOCBRADDIF
+#include <linux/if_bridge.h>
+#endif
+
+#include "qemu/queue.h"
 
 #include "net/tap-linux.h"
 
@@ -221,7 +225,11 @@ static int drop_privileges(void)
 int main(int argc, char **argv)
 {
     struct ifreq ifr;
-    int fd, ctlfd, unixfd = -1;
+#ifndef SIOCBRADDIF
+    unsigned long ifargs[4];
+#endif
+    int ifindex;
+    int fd = -1, ctlfd = -1, unixfd = -1;
     int use_vnet = 0;
     int mtu;
     const char *bridge = NULL;
@@ -359,11 +367,39 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
+    /* Linux uses the lowest enslaved MAC address as the MAC address of
+     * the bridge.  Set MAC address to a high value so that it doesn't
+     * affect the MAC address of the bridge.
+     */
+    if (ioctl(ctlfd, SIOCGIFHWADDR, &ifr) < 0) {
+        fprintf(stderr, "failed to get MAC address of device `%s': %s\n",
+                iface, strerror(errno));
+        ret = EXIT_FAILURE;
+        goto cleanup;
+    }
+    ifr.ifr_hwaddr.sa_data[0] = 0xFE;
+    if (ioctl(ctlfd, SIOCSIFHWADDR, &ifr) < 0) {
+        fprintf(stderr, "failed to set MAC address of device `%s': %s\n",
+                iface, strerror(errno));
+        ret = EXIT_FAILURE;
+        goto cleanup;
+    }
+
     /* add the interface to the bridge */
     prep_ifreq(&ifr, bridge);
-    ifr.ifr_ifindex = if_nametoindex(iface);
-
-    if (ioctl(ctlfd, SIOCBRADDIF, &ifr) == -1) {
+    ifindex = if_nametoindex(iface);
+#ifndef SIOCBRADDIF
+    ifargs[0] = BRCTL_ADD_IF;
+    ifargs[1] = ifindex;
+    ifargs[2] = 0;
+    ifargs[3] = 0;
+    ifr.ifr_data = (void *)ifargs;
+    ret = ioctl(ctlfd, SIOCDEVPRIVATE, &ifr);
+#else
+    ifr.ifr_ifindex = ifindex;
+    ret = ioctl(ctlfd, SIOCBRADDIF, &ifr);
+#endif
+    if (ret == -1) {
         fprintf(stderr, "failed to add interface `%s' to bridge `%s': %s\n",
                 iface, bridge, strerror(errno));
         ret = EXIT_FAILURE;
@@ -400,7 +436,12 @@ int main(int argc, char **argv)
     /* profit! */
 
 cleanup:
-
+    if (fd >= 0) {
+        close(fd);
+    }
+    if (ctlfd >= 0) {
+        close(ctlfd);
+    }
     while ((acl_rule = QSIMPLEQ_FIRST(&acl_list)) != NULL) {
         QSIMPLEQ_REMOVE_HEAD(&acl_list, entry);
         g_free(acl_rule);
