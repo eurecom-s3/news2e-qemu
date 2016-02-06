@@ -51,6 +51,8 @@
 #include "block/snapshot.h"
 #include "block/qapi.h"
 
+#include "exec/s2e.h"
+
 
 #ifndef ETH_P_RARP
 #define ETH_P_RARP 0x8035
@@ -2187,3 +2189,35 @@ void vmstate_register_ram_global(MemoryRegion *mr)
 {
     vmstate_register_ram(mr, NULL);
 }
+
+#if defined(CONFIG_S2E)
+void *s2e_qemu_get_first_se(void)
+{
+    return savevm_state.handlers.tqh_first;
+}
+
+void *s2e_qemu_get_next_se(void *se)
+{
+    SaveStateEntry *sse = (SaveStateEntry*)se;
+    return sse->entry.tqe_next;
+}
+
+const char *s2e_qemu_get_se_idstr(void *se)
+{
+    SaveStateEntry *sse = (SaveStateEntry*)se;
+    return sse->idstr;
+}
+
+void s2e_qemu_save_state(QEMUFile *f, void *se)
+{
+    SaveStateEntry *sse = (SaveStateEntry*)se;
+    vmstate_save(f, sse, NULL);
+}
+
+void s2e_qemu_load_state(QEMUFile *f, void *se)
+{
+    SaveStateEntry *sse = (SaveStateEntry*)se;
+    vmstate_load(f, sse, sse->version_id);
+}
+#endif /* defined(CONFIG_S2E) */
+
