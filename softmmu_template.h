@@ -24,6 +24,7 @@
 #include "qemu/timer.h"
 #include "exec/address-spaces.h"
 #include "exec/memory.h"
+#include "exec/s2e.h"
 
 #define DATA_SIZE (1 << SHIFT)
 
@@ -549,6 +550,18 @@ void probe_write(CPUArchState *env, target_ulong addr, int mmu_idx,
 }
 #endif
 #endif /* !defined(SOFTMMU_CODE_ACCESS) */
+
+#if defined(CONFIG_S2E)
+#if !defined(SOFTMMU_CODE_ACCESS)
+DATA_TYPE glue(s2e_io_read, SUFFIX)(CPUState *cpu,
+                                    CPUIOTLBEntry *iotlbentry,
+                                    target_ulong addr,
+                                    uintptr_t retaddr)
+{
+    return glue(io_read, SUFFIX)(cpu->env_ptr, iotlbentry, addr, retaddr);
+}
+#endif /* defined(SOFTMMU_CODE_ACCESS) */
+#endif /* defined(CONFIG_S2E) */
 
 #undef READ_ACCESS_TYPE
 #undef SHIFT
