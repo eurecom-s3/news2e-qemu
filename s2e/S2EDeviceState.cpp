@@ -37,6 +37,7 @@ extern "C" {
 #include <qemu-common.h>
 #include <block/block.h>
 #include <qapi-types.h>
+#include "exec/s2e.h"
 
 void vm_stop(int reason);
 void vm_start(void);
@@ -82,14 +83,14 @@ bool S2EDeviceState::s_devicesInited=false;
 
 extern "C" {
 
-static int s2e_qemu_get_buffer(uint8_t *buf, int64_t pos, int size)
+static ssize_t s2e_qemu_get_buffer(void *opaque, uint8_t *buf, int64_t pos, size_t size)
 {
-    return g_s2e_state->getDeviceState()->getBuffer(buf, pos, size);
+    return static_cast<S2EDeviceState *>(opaque)->getBuffer(buf, pos, size);
 }
 
-static int s2e_qemu_put_buffer(const uint8_t *buf, int64_t pos, int size)
+static ssize_t s2e_qemu_put_buffer(void *opaque, const uint8_t *buf, int64_t pos, size_t size)
 {
-    return g_s2e_state->getDeviceState()->putBuffer(buf, pos, size);
+    return static_cast<S2EDeviceState *>(opaque)->putBuffer(buf, pos, size);
 }
 
 void s2e_init_device_state(S2EExecutionState *s)
@@ -122,13 +123,21 @@ S2EDeviceState::~S2EDeviceState()
     }
 }
 
+static const QEMUFileOps s2e_qemu_buffer_ops = {
+    .get_fd = NULL,
+    .get_buffer = s2e_qemu_get_buffer,
+    .put_buffer = s2e_qemu_put_buffer,
+    .close = NULL
+};
+
 void S2EDeviceState::initDeviceState()
 {
     m_stateBuffer = NULL;
     
     assert(!s_devicesInited);
-
-    s_memFile = qemu_memfile_open(s2e_qemu_get_buffer, s2e_qemu_put_buffer);
+    
+    s_memFile = qemu_fopen_ops(this, &s2e_qemu_buffer_ops);
+    
 
 
     std::set<std::string> ignoreList;
@@ -182,7 +191,8 @@ void S2EDeviceState::initDeviceState()
 
 void S2EDeviceState::saveDeviceState()
 {
-    qemu_make_readable(s_memFile);
+    assert(false && "stubbed");
+//    qemu_make_readable(s_memFile);
 
     //DPRINTF("Saving device state %p\n", this);
     /* Iterate through all device descritors and call
@@ -219,9 +229,10 @@ void S2EDeviceState::initFirstSnapshot()
 
 void S2EDeviceState::restoreDeviceState()
 {
+    assert(false && "stubbed");
     assert(s_finalStateSize && m_stateBuffer);
 
-    qemu_make_readable(s_memFile);
+//    qemu_make_readable(s_memFile);
     //DPRINTF("Restoring device state %p\n", this);
     for (vector<void*>::iterator it = s_devices.begin(); it != s_devices.end(); it++) {
         void *se = *it;
