@@ -110,6 +110,9 @@ class S2EExecutionState : public klee::ExecutionState
 protected:
     friend class S2EExecutor;
 
+    /* Pointer to Qemu CPU object */
+    CPUState *cpu;
+
     static unsigned s_lastSymbolicId;
 
     /** Unique numeric ID for the state */
@@ -210,6 +213,13 @@ public:
 
     S2EDeviceState *getDeviceState() {
         return &m_deviceState;
+    }
+
+    /**
+     * Get the Qemu CPU object.
+     */
+    CPUState* getCPUState() {
+        return this->cpu;
     }
 
     TranslationBlock *getTb() const;
