@@ -80,7 +80,7 @@ extern llvm::cl::opt<bool> DebugLogStateMerge;
 }
 
 namespace {
-CPUTLBEntry s_cputlb_empty_entry = { -1, -1, -1, -1 };
+CPUTLBEntry s_cputlb_empty_entry = { { {-1, -1, -1, -1} } };
 }
 
 extern llvm::cl::opt<bool> PrintModeSwitch;
@@ -111,7 +111,8 @@ S2EExecutionState::S2EExecutionState(klee::KFunction *kf) :
         m_needFinalizeTBExec(false), m_nextSymbVarId(0), m_runningExceptionEmulationCode(false)
 {
     //XXX: make this a struct, not a pointer...
-    m_timersState = new TimersState;
+    assert(false && "stubbed");
+//    m_timersState = new TimersState;
     m_dirtyMaskObject = NULL;
 }
 
@@ -136,7 +137,8 @@ S2EExecutionState::~S2EExecutionState()
     //XXX: This cannot be done, as device states may refer to each other
     //delete m_deviceState;
 
-    delete m_timersState;
+    assert(false && "stubbed");
+    //delete m_timersState;
 }
 
 
@@ -201,13 +203,13 @@ void S2EExecutionState::addressSpaceChange(const klee::MemoryObject *mo,
                         const klee::ObjectState *oldState,
                         klee::ObjectState *newState)
 {
-#ifdef S2E_ENABLE_S2E_TLB
+#if defined(S2E_ENABLE_S2E_TLB)
     if(mo->size == S2E_RAM_OBJECT_SIZE && oldState) {
         assert(m_cpuSystemState && m_cpuSystemObject);
 
 
-        CPUArchState* cpu;
-        cpu = m_active ?
+        CPUArchState* env;
+        env = m_active ?
                 (CPUArchState*)(m_cpuSystemState->address
                               - CPU_CONC_LIMIT) :
                 (CPUArchState*)(m_cpuSystemObject->getConcreteStore(true)
@@ -232,7 +234,7 @@ void S2EExecutionState::addressSpaceChange(const klee::MemoryObject *mo,
                 g_s2e->getDebugStream() << "  mmu_idx=" << coords.first<<
                                            " index=" << coords.second << "\n";
 #endif
-                S2ETLBEntry *entry = &cpu->s2e_tlb_table[coords.first][coords.second];
+                S2ETLBEntry *entry = &env->s2e_tlb_table[coords.first][coords.second];
                 assert(entry->objectState == (void*) oldState);
                 assert(newState);
                 entry->objectState = newState;
@@ -314,8 +316,9 @@ ExecutionState* S2EExecutionState::clone()
 
     ret->m_stateID = g_s2e->fetchAndIncrementStateId();
 
-    ret->m_timersState = new TimersState;
-    *ret->m_timersState = *m_timersState;
+    assert(false && "stubbed");
+//    ret->m_timersState = new TimersState;
+//    *ret->m_timersState = *m_timersState;
 
     // Clone the plugins
     PluginStateMap::iterator it;
@@ -624,71 +627,74 @@ uint64_t S2EExecutionState::getPc() const
 
 uint64_t S2EExecutionState::getFlags()
 {
-#ifdef TARGET_I386
-    /* restore flags in standard format */
-    WR_cpu(env, cc_src, cpu_cc_compute_all(env, CC_OP));
-    WR_cpu(env, cc_op, CC_OP_EFLAGS);
-    return cpu_get_eflags(env);
-#elif TARGET_ARM
-    // TODO: avoid duplication with cpsr_read()
-    uint8_t cpsr_symbolic = getSymbolicRegistersMask() & 0x0f;
-    if (cpsr_symbolic == 0) {
-        // Fast Path
-        return cpsr_read(reinterpret_cast<CPUArchState *>(m_cpuRegistersState->address));
-    } else {
-        // Check the symbolic bits
-        CPUArchState * s = reinterpret_cast<CPUArchState *>(m_cpuRegistersState->address);
-
-        // CF
-        target_ulong CF = 0;
-        if (cpsr_symbolic & 0x01) {
-            //TODO
-        } else {
-            CF = ((s->CF) << 29);
-        }
-
-        // VF
-        target_ulong VF = 0;
-        if (cpsr_symbolic & 0x02) {
-            //TODO
-        } else {
-            VF = ((s->VF & 0x80000000) >> 3);
-        }
-
-        // NF
-        target_ulong NF = 0;
-        if (cpsr_symbolic & 0x04) {
-            //TODO
-        } else {
-            NF = ((s->NF) & 0x80000000);
-        }
-
-        // ZF
-        target_ulong ZF = 0;
-        if (cpsr_symbolic & 0x08) {
-            //TODO
-        } else {
-            ZF = (s->ZF == 0);
-        }
-
-        // These bit are always concrete
-        target_ulong QF, thumb, condex1, condex2, GE;
-        QF = (env->QF << 27);
-        thumb = (env->thumb << 5);
-        condex1 = ((env->condexec_bits & 3) << 25);
-        condex2 = ((env->condexec_bits & 0xfc) << 8);
-        GE = (env->GE << 16);
-
-        // Re-assemble the cpsr
-        return env->uncached_cpsr | NF | (ZF << 30) |
-            CF | VF | QF
-            | thumb | condex1
-            | condex2
-            | GE;
-    }
-#else
+    assert(false && "stubbed");
     return 0;
-#endif
+
+//#ifdef TARGET_I386
+//    /* restore flags in standard format */
+//    WR_cpu(env, cc_src, cpu_cc_compute_all(env, CC_OP));
+//    WR_cpu(env, cc_op, CC_OP_EFLAGS);
+//    return cpu_get_eflags(env);
+//#elif TARGET_ARM
+//    // TODO: avoid duplication with cpsr_read()
+//    uint8_t cpsr_symbolic = getSymbolicRegistersMask() & 0x0f;
+//    if (cpsr_symbolic == 0) {
+//        // Fast Path
+//        return cpsr_read(reinterpret_cast<CPUArchState *>(m_cpuRegistersState->address));
+//    } else {
+//        // Check the symbolic bits
+//        CPUArchState * s = reinterpret_cast<CPUArchState *>(m_cpuRegistersState->address);
+//
+//        // CF
+//        target_ulong CF = 0;
+//        if (cpsr_symbolic & 0x01) {
+//            //TODO
+//        } else {
+//            CF = ((s->CF) << 29);
+//        }
+//
+//        // VF
+//        target_ulong VF = 0;
+//        if (cpsr_symbolic & 0x02) {
+//            //TODO
+//        } else {
+//            VF = ((s->VF & 0x80000000) >> 3);
+//        }
+//
+//        // NF
+//        target_ulong NF = 0;
+//        if (cpsr_symbolic & 0x04) {
+//            //TODO
+//        } else {
+//            NF = ((s->NF) & 0x80000000);
+//        }
+//
+//        // ZF
+//        target_ulong ZF = 0;
+//        if (cpsr_symbolic & 0x08) {
+//            //TODO
+//        } else {
+//            ZF = (s->ZF == 0);
+//        }
+//
+//        // These bit are always concrete
+//        target_ulong QF, thumb, condex1, condex2, GE;
+//        QF = (env->QF << 27);
+//        thumb = (env->thumb << 5);
+//        condex1 = ((env->condexec_bits & 3) << 25);
+//        condex2 = ((env->condexec_bits & 0xfc) << 8);
+//        GE = (env->GE << 16);
+//
+//        // Re-assemble the cpsr
+//        return env->uncached_cpsr | NF | (ZF << 30) |
+//            CF | VF | QF
+//            | thumb | condex1
+//            | condex2
+//            | GE;
+//    }
+//#else
+//    return 0;
+//#endif
 }
 
 void S2EExecutionState::setPc(uint64_t pc)
@@ -842,78 +848,80 @@ uint64_t S2EExecutionState::getPid() const
 
 uint64_t S2EExecutionState::getSymbolicRegistersMask() const
 {
-    const ObjectState* os = m_cpuRegistersObject;
-    if(os->isAllConcrete())
-        return 0;
-
-    uint64_t mask = 0;
-
-#ifdef TARGET_I386
-    uint64_t offset = 0;
-    /* XXX: x86-specific */
-    for (int i = 0; i < CPU_NB_REGS; ++i) { /* regs */
-        if (!os->isConcrete(offset, sizeof(*env->regs) << 3)) {
-            mask |= (1 << (i+5));
-        }
-        offset += sizeof (*env->regs);
-    }
-
-    if (!os->isConcrete(offsetof(CPUX86State, cc_op),
-                        sizeof(env->cc_op) << 3)) {
-        mask |= _M_CC_OP;
-    }
-    if (!os->isConcrete(offsetof(CPUX86State, cc_src),
-                        sizeof(env->cc_src) << 3)) {
-        mask |= _M_CC_SRC;
-    }
-    if (!os->isConcrete(offsetof(CPUX86State, cc_dst),
-                        sizeof(env->cc_dst) << 3)) {
-        mask |= _M_CC_DST;
-    }
-    if (!os->isConcrete(offsetof(CPUX86State, cc_tmp),
-                        sizeof(env->cc_tmp) << 3)) {
-        mask |= _M_CC_TMP;
-    }
-#elif defined(TARGET_ARM)
-    if(!os->isConcrete( 29*4, 4*8)) // CF
-        mask |= (1 << 1);
-    if(!os->isConcrete( 30*4, 4*8)) // VF
-        mask |= (1 << 2);
-    if(!os->isConcrete(31*4, 4*8)) // NF
-        mask |= (1 << 3);
-    if(!os->isConcrete(32*4, 4*8)) // ZF
-        mask |= (1 << 4);
-    for(int i = 0; i < 15; ++i) { /* regs */
-            if(!os->isConcrete((33+i)*4, 4*8))
-                mask |= (1 << (i+5));
-    }
-    if(!os->isConcrete(0, 4*8)) // spsr
-        mask |= (1 << 20);
-    for(int i = 0; i < 6; ++i) { /* banked_spsr */
-            if(!os->isConcrete((1+i)*4, 4*8))
-                mask |= (1 << (i+21));
-    }
-    for(int i = 0; i < 6; ++i) { /* banked r13 */
-            if(!os->isConcrete((7+i)*4, 4*8))
-                mask |= (1 << (i+27));
-    }
-    for(int i = 0; i < 6; ++i) { /* banked r14 */
-            if(!os->isConcrete((13+i)*4, 4*8))
-                mask |= (1 << (i+33));
-    }
-    for(int i = 0; i < 5; ++i) { /* usr_regs */
-            if(!os->isConcrete((19+i)*4, 4*8))
-                mask |= (1 << (i+39));
-    }
-    for(int i = 0; i < 5; ++i) { /* fiq_regs */
-            if(!os->isConcrete((24+i)*4, 4*8))
-                mask |= (1 << (i+44));
-    }
-#else
-    assert(false & "Update Hardcoded masking of symbolic fields of CPUArchState for your target.");
-#error "Target architecture not supported"
-#endif
-    return mask;
+    assert(false && "stubbed");
+    return 0;
+//    const ObjectState* os = m_cpuRegistersObject;
+//    if(os->isAllConcrete())
+//        return 0;
+//
+//    uint64_t mask = 0;
+//
+//#ifdef TARGET_I386
+//    uint64_t offset = 0;
+//    /* XXX: x86-specific */
+//    for (int i = 0; i < CPU_NB_REGS; ++i) { /* regs */
+//        if (!os->isConcrete(offset, sizeof(*env->regs) << 3)) {
+//            mask |= (1 << (i+5));
+//        }
+//        offset += sizeof (*env->regs);
+//    }
+//
+//    if (!os->isConcrete(offsetof(CPUX86State, cc_op),
+//                        sizeof(env->cc_op) << 3)) {
+//        mask |= _M_CC_OP;
+//    }
+//    if (!os->isConcrete(offsetof(CPUX86State, cc_src),
+//                        sizeof(env->cc_src) << 3)) {
+//        mask |= _M_CC_SRC;
+//    }
+//    if (!os->isConcrete(offsetof(CPUX86State, cc_dst),
+//                        sizeof(env->cc_dst) << 3)) {
+//        mask |= _M_CC_DST;
+//    }
+//    if (!os->isConcrete(offsetof(CPUX86State, cc_tmp),
+//                        sizeof(env->cc_tmp) << 3)) {
+//        mask |= _M_CC_TMP;
+//    }
+//#elif defined(TARGET_ARM)
+//    if(!os->isConcrete( 29*4, 4*8)) // CF
+//        mask |= (1 << 1);
+//    if(!os->isConcrete( 30*4, 4*8)) // VF
+//        mask |= (1 << 2);
+//    if(!os->isConcrete(31*4, 4*8)) // NF
+//        mask |= (1 << 3);
+//    if(!os->isConcrete(32*4, 4*8)) // ZF
+//        mask |= (1 << 4);
+//    for(int i = 0; i < 15; ++i) { /* regs */
+//            if(!os->isConcrete((33+i)*4, 4*8))
+//                mask |= (1 << (i+5));
+//    }
+//    if(!os->isConcrete(0, 4*8)) // spsr
+//        mask |= (1 << 20);
+//    for(int i = 0; i < 6; ++i) { /* banked_spsr */
+//            if(!os->isConcrete((1+i)*4, 4*8))
+//                mask |= (1 << (i+21));
+//    }
+//    for(int i = 0; i < 6; ++i) { /* banked r13 */
+//            if(!os->isConcrete((7+i)*4, 4*8))
+//                mask |= (1 << (i+27));
+//    }
+//    for(int i = 0; i < 6; ++i) { /* banked r14 */
+//            if(!os->isConcrete((13+i)*4, 4*8))
+//                mask |= (1 << (i+33));
+//    }
+//    for(int i = 0; i < 5; ++i) { /* usr_regs */
+//            if(!os->isConcrete((19+i)*4, 4*8))
+//                mask |= (1 << (i+39));
+//    }
+//    for(int i = 0; i < 5; ++i) { /* fiq_regs */
+//            if(!os->isConcrete((24+i)*4, 4*8))
+//                mask |= (1 << (i+44));
+//    }
+//#else
+//    assert(false & "Update Hardcoded masking of symbolic fields of CPUArchState for your target.");
+//#error "Target architecture not supported"
+//#endif
+//    return mask;
 }
 
 bool S2EExecutionState::readMemoryConcrete(uint64_t address, void *buf,
@@ -952,14 +960,16 @@ bool S2EExecutionState::writeMemoryConcrete(uint64_t address, void *buf,
 
 uint64_t S2EExecutionState::getPhysicalAddress(uint64_t virtualAddress) const
 {
-    assert(m_active && "Can not use getPhysicalAddress when the state"
-                       " is not active (TODO: fix it)");
-    target_phys_addr_t physicalAddress =
-        cpu_get_phys_page_debug(env, virtualAddress & TARGET_PAGE_MASK);
-    if(physicalAddress == (target_phys_addr_t) -1)
-        return (uint64_t) -1;
-
-    return physicalAddress | (virtualAddress & ~TARGET_PAGE_MASK);
+    assert(false && "stubbed");
+    return 0;
+//    assert(m_active && "Can not use getPhysicalAddress when the state"
+//                       " is not active (TODO: fix it)");
+//    hwaddr physicalAddress =
+//        cpu_get_phys_page_debug(env, virtualAddress & TARGET_PAGE_MASK);
+//    if(physicalAddress == (hwaddr) -1)
+//        return (uint64_t) -1;
+//
+//    return physicalAddress | (virtualAddress & ~TARGET_PAGE_MASK);
 }
 
 uint64_t S2EExecutionState::getHostAddress(uint64_t address,
@@ -1239,43 +1249,45 @@ bool S2EExecutionState::writeMemory64(uint64_t address,
 
 void S2EExecutionState::readRamConcreteCheck(uint64_t hostAddress, uint8_t* buf, uint64_t size)
 {
-    assert(m_active && m_runningConcrete);
-    uint64_t page_offset = hostAddress & ~S2E_RAM_OBJECT_MASK;
-    if(page_offset + size <= S2E_RAM_OBJECT_SIZE) {
-        /* Single-object access */
+    assert(false && "stubbed");
 
-        uint64_t page_addr = hostAddress & S2E_RAM_OBJECT_MASK;
-
-        //ObjectPair op = addressSpace.findObject(page_addr);
-        ObjectPair op = m_memcache.get(page_addr);
-        if (!op.first) {
-            op = addressSpace.findObject(page_addr);
-            m_memcache.put(page_addr, op);
-        }
-
-
-        assert(op.first && op.first->isUserSpecified &&
-               op.first->address == page_addr &&
-               op.first->size == S2E_RAM_OBJECT_SIZE);
-
-        for(uint64_t i=0; i<size; ++i) {
-            if(!op.second->readConcrete8(page_offset+i, buf+i)) {
-                if (PrintModeSwitch) {
-                    g_s2e->getMessagesStream()
-                            << "Switching to KLEE executor at pc = "
-                            << hexval(getPc()) << '\n';
-                }
-                m_startSymbexAtPC = getPc();
-                // XXX: what about regs_to_env ?
-                s2e_longjmp(env->jmp_env, 1);
-            }
-        }
-    } else {
-        /* Access spans multiple MemoryObject's */
-        uint64_t size1 = S2E_RAM_OBJECT_SIZE - page_offset;
-        readRamConcreteCheck(hostAddress, buf, size1);
-        readRamConcreteCheck(hostAddress + size1, buf + size1, size - size1);
-    }
+//    assert(m_active && m_runningConcrete);
+//    uint64_t page_offset = hostAddress & ~S2E_RAM_OBJECT_MASK;
+//    if(page_offset + size <= S2E_RAM_OBJECT_SIZE) {
+//        /* Single-object access */
+//
+//        uint64_t page_addr = hostAddress & S2E_RAM_OBJECT_MASK;
+//
+//        //ObjectPair op = addressSpace.findObject(page_addr);
+//        ObjectPair op = m_memcache.get(page_addr);
+//        if (!op.first) {
+//            op = addressSpace.findObject(page_addr);
+//            m_memcache.put(page_addr, op);
+//        }
+//
+//
+//        assert(op.first && op.first->isUserSpecified &&
+//               op.first->address == page_addr &&
+//               op.first->size == S2E_RAM_OBJECT_SIZE);
+//
+//        for(uint64_t i=0; i<size; ++i) {
+//            if(!op.second->readConcrete8(page_offset+i, buf+i)) {
+//                if (PrintModeSwitch) {
+//                    g_s2e->getMessagesStream()
+//                            << "Switching to KLEE executor at pc = "
+//                            << hexval(getPc()) << '\n';
+//                }
+//                m_startSymbexAtPC = getPc();
+//                // XXX: what about regs_to_env ?
+//                s2e_longjmp(env->jmp_env, 1);
+//            }
+//        }
+//    } else {
+//        /* Access spans multiple MemoryObject's */
+//        uint64_t size1 = S2E_RAM_OBJECT_SIZE - page_offset;
+//        readRamConcreteCheck(hostAddress, buf, size1);
+//        readRamConcreteCheck(hostAddress + size1, buf + size1, size - size1);
+//    }
 }
 
 void S2EExecutionState::readRamConcrete(uint64_t hostAddress, uint8_t* buf, uint64_t size)
@@ -1357,76 +1369,78 @@ void S2EExecutionState::writeRamConcrete(uint64_t hostAddress, const uint8_t* bu
 void S2EExecutionState::readRegisterConcrete(
         CPUArchState *cpuState, unsigned offset, uint8_t* buf, unsigned size)
 {
-    assert(m_active);
-    assert(((uint64_t)cpuState) == m_cpuRegistersState->address);
-    assert(offset + size <= CPU_CONC_LIMIT);
+    assert(false && "stubbed");
 
-    if(!m_runningConcrete ||
-            !m_cpuRegistersObject->isConcrete(offset, size*8)) {
-        ObjectState* wos = m_cpuRegistersObject;
-
-        for(unsigned i = 0; i < size; ++i) {
-            if(!wos->readConcrete8(offset+i, buf+i)) {
-                const char* reg;
-                switch(offset) {
-#ifdef TARGET_I386
-                    case offsetof(CPUX86State, regs[R_EAX]): reg = "eax"; break;
-                    case offsetof(CPUX86State, regs[R_ECX]): reg = "ecx"; break;
-                    case offsetof(CPUX86State, regs[R_EDX]): reg = "edx"; break;
-                    case offsetof(CPUX86State, regs[R_EBX]): reg = "ebx"; break;
-                    case offsetof(CPUX86State, regs[R_ESP]): reg = "esp"; break;
-                    case offsetof(CPUX86State, regs[R_EBP]): reg = "ebp"; break;
-                    case offsetof(CPUX86State, regs[R_ESI]): reg = "esi"; break;
-                    case offsetof(CPUX86State, regs[R_EDI]): reg = "edi"; break;
-
-                    case offsetof(CPUX86State, cc_src): reg = "cc_src"; break;
-                    case offsetof(CPUX86State, cc_dst): reg = "cc_dst"; break;
-                    case offsetof(CPUX86State, cc_op): reg = "cc_op"; break;
-                    case offsetof(CPUX86State, cc_tmp): reg = "cc_tmp"; break;
-#elif defined(TARGET_ARM)
-                    case 116: reg = "CF"; break;
-                    case 120: reg = "VF"; break;
-                    case 124: reg = "NF"; break;
-                    case 128: reg = "ZF"; break;
-                    case 132: reg = "r0"; break;
-                    case 136: reg = "r1"; break;
-                    case 140: reg = "r2"; break;
-                    case 144: reg = "r3"; break;
-                    case 148: reg = "r4"; break;
-                    case 152: reg = "r5"; break;
-                    case 156: reg = "r6"; break;
-                    case 160: reg = "r7"; break;
-                    case 164: reg = "r8"; break;
-                    case 168: reg = "r9"; break;
-                    case 172: reg = "r10"; break;
-                    case 176: reg = "r11"; break;
-                    case 180: reg = "r12"; break;
-                    case 184: reg = "r13"; break;
-                    case 188: reg = "r14"; break;
-                    case 192: reg = "r15"; break;
-#else
-#error "Target architecture not supported"
-#endif
-                    default: reg = "unknown"; break;
-                }
-                std::string reason = std::string("access to ") + reg +
-                                     " register from QEMU helper";
-                buf[i] = g_s2e->getExecutor()->toConstant(*this, wos->read8(offset+i),
-                                    reason.c_str())->getZExtValue(8);
-                wos->write8(offset+i, buf[i]);
-            }
-        }
-    } else {
-        //XXX: check if the size is always small enough
-        small_memcpy(buf, ((uint8_t*)cpuState)+offset, size);
-    }
-
-#if defined(S2E_TRACE_EFLAGS) && defined(TARGET_I386)
-    if (offsetof(CPUX86State, cc_src) == offset) {
-        m_s2e->getDebugStream() <<  std::hex << getPc() <<
-                "read conc cc_src " << (*(uint32_t*)((uint8_t*)buf)) << '\n';
-    }
-#endif
+//    assert(m_active);
+//    assert(((uint64_t)cpuState) == m_cpuRegistersState->address);
+//    assert(offset + size <= CPU_CONC_LIMIT);
+//
+//    if(!m_runningConcrete ||
+//            !m_cpuRegistersObject->isConcrete(offset, size*8)) {
+//        ObjectState* wos = m_cpuRegistersObject;
+//
+//        for(unsigned i = 0; i < size; ++i) {
+//            if(!wos->readConcrete8(offset+i, buf+i)) {
+//                const char* reg;
+//                switch(offset) {
+//#ifdef TARGET_I386
+//                    case offsetof(CPUX86State, regs[R_EAX]): reg = "eax"; break;
+//                    case offsetof(CPUX86State, regs[R_ECX]): reg = "ecx"; break;
+//                    case offsetof(CPUX86State, regs[R_EDX]): reg = "edx"; break;
+//                    case offsetof(CPUX86State, regs[R_EBX]): reg = "ebx"; break;
+//                    case offsetof(CPUX86State, regs[R_ESP]): reg = "esp"; break;
+//                    case offsetof(CPUX86State, regs[R_EBP]): reg = "ebp"; break;
+//                    case offsetof(CPUX86State, regs[R_ESI]): reg = "esi"; break;
+//                    case offsetof(CPUX86State, regs[R_EDI]): reg = "edi"; break;
+//
+//                    case offsetof(CPUX86State, cc_src): reg = "cc_src"; break;
+//                    case offsetof(CPUX86State, cc_dst): reg = "cc_dst"; break;
+//                    case offsetof(CPUX86State, cc_op): reg = "cc_op"; break;
+//                    case offsetof(CPUX86State, cc_tmp): reg = "cc_tmp"; break;
+//#elif defined(TARGET_ARM)
+//                    case 116: reg = "CF"; break;
+//                    case 120: reg = "VF"; break;
+//                    case 124: reg = "NF"; break;
+//                    case 128: reg = "ZF"; break;
+//                    case 132: reg = "r0"; break;
+//                    case 136: reg = "r1"; break;
+//                    case 140: reg = "r2"; break;
+//                    case 144: reg = "r3"; break;
+//                    case 148: reg = "r4"; break;
+//                    case 152: reg = "r5"; break;
+//                    case 156: reg = "r6"; break;
+//                    case 160: reg = "r7"; break;
+//                    case 164: reg = "r8"; break;
+//                    case 168: reg = "r9"; break;
+//                    case 172: reg = "r10"; break;
+//                    case 176: reg = "r11"; break;
+//                    case 180: reg = "r12"; break;
+//                    case 184: reg = "r13"; break;
+//                    case 188: reg = "r14"; break;
+//                    case 192: reg = "r15"; break;
+//#else
+//#error "Target architecture not supported"
+//#endif
+//                    default: reg = "unknown"; break;
+//                }
+//                std::string reason = std::string("access to ") + reg +
+//                                     " register from QEMU helper";
+//                buf[i] = g_s2e->getExecutor()->toConstant(*this, wos->read8(offset+i),
+//                                    reason.c_str())->getZExtValue(8);
+//                wos->write8(offset+i, buf[i]);
+//            }
+//        }
+//    } else {
+//        //XXX: check if the size is always small enough
+//        small_memcpy(buf, ((uint8_t*)cpuState)+offset, size);
+//    }
+//
+//#if defined(S2E_TRACE_EFLAGS) && defined(TARGET_I386)
+//    if (offsetof(CPUX86State, cc_src) == offset) {
+//        m_s2e->getDebugStream() <<  std::hex << getPc() <<
+//                "read conc cc_src " << (*(uint32_t*)((uint8_t*)buf)) << '\n';
+//    }
+//#endif
 }
 
 void S2EExecutionState::writeRegisterConcrete(CPUArchState *cpuState,
@@ -1609,11 +1623,12 @@ void S2EExecutionState::jumpToSymbolicCpp()
 
 void S2EExecutionState::jumpToSymbolic()
 {
-    assert(isActive() && isRunningConcrete());
-
-    m_startSymbexAtPC = getPc();
-    // XXX: what about regs_to_env ?
-    s2e_longjmp(env->jmp_env, 1);
+    assert(false && "stubbed");
+//    assert(isActive() && isRunningConcrete());
+//
+//    m_startSymbexAtPC = getPc();
+//    // XXX: what about regs_to_env ?
+//    s2e_longjmp(env->jmp_env, 1);
 }
 
 bool S2EExecutionState::needToJumpToSymbolic() const
@@ -1659,248 +1674,251 @@ void S2EExecutionState::dumpCpuState(llvm::raw_ostream &os) const
 
 bool S2EExecutionState::merge(const ExecutionState &_b)
 {
-    assert(dynamic_cast<const S2EExecutionState*>(&_b));
-    const S2EExecutionState& b = static_cast<const S2EExecutionState&>(_b);
+    assert(false && "stubbed");
+    return false;
 
-    assert(!m_active && !b.m_active);
-
-    llvm::raw_ostream& s = g_s2e->getMessagesStream(this);
-
-    if(DebugLogStateMerge)
-        s << "Attempting merge with state " << b.getID() << '\n';
-
-    if(pc != b.pc) {
-        if(DebugLogStateMerge)
-            s << "merge failed: different pc" << '\n';
-        return false;
-    }
-
-    // XXX is it even possible for these to differ? does it matter? probably
-    // implies difference in object states?
-    if(symbolics != b.symbolics) {
-        if(DebugLogStateMerge)
-            s << "merge failed: different symbolics" << '\n';
-        return false;
-    }
-
-    {
-        std::vector<StackFrame>::const_iterator itA = stack.begin();
-        std::vector<StackFrame>::const_iterator itB = b.stack.begin();
-        while (itA!=stack.end() && itB!=b.stack.end()) {
-            // XXX vaargs?
-            if(itA->caller!=itB->caller || itA->kf!=itB->kf) {
-                if(DebugLogStateMerge)
-                    s << "merge failed: different callstacks" << '\n';
-            }
-          ++itA;
-          ++itB;
-        }
-        if(itA!=stack.end() || itB!=b.stack.end()) {
-            if(DebugLogStateMerge)
-                s << "merge failed: different callstacks" << '\n';
-            return false;
-        }
-    }
-
-    std::set< ref<Expr> > aConstraints(constraints.begin(), constraints.end());
-    std::set< ref<Expr> > bConstraints(b.constraints.begin(),
-                                       b.constraints.end());
-    std::set< ref<Expr> > commonConstraints, aSuffix, bSuffix;
-    std::set_intersection(aConstraints.begin(), aConstraints.end(),
-                          bConstraints.begin(), bConstraints.end(),
-                          std::inserter(commonConstraints, commonConstraints.begin()));
-    std::set_difference(aConstraints.begin(), aConstraints.end(),
-                        commonConstraints.begin(), commonConstraints.end(),
-                        std::inserter(aSuffix, aSuffix.end()));
-    std::set_difference(bConstraints.begin(), bConstraints.end(),
-                        commonConstraints.begin(), commonConstraints.end(),
-                        std::inserter(bSuffix, bSuffix.end()));
-    if(DebugLogStateMerge) {
-        s << "\tconstraint prefix: [";
-        for(std::set< ref<Expr> >::iterator it = commonConstraints.begin(),
-                        ie = commonConstraints.end(); it != ie; ++it)
-            s << *it << ", ";
-        s << "]\n";
-        s << "\tA suffix: [";
-        for(std::set< ref<Expr> >::iterator it = aSuffix.begin(),
-                        ie = aSuffix.end(); it != ie; ++it)
-            s << *it << ", ";
-        s << "]\n";
-        s << "\tB suffix: [";
-        for(std::set< ref<Expr> >::iterator it = bSuffix.begin(),
-                        ie = bSuffix.end(); it != ie; ++it)
-        s << *it << ", ";
-        s << "]" << '\n';
-    }
-
-    /* Check CPUArchState */
-    {
-        uint8_t* cpuStateA = m_cpuSystemObject->getConcreteStore() - CPU_CONC_LIMIT;
-        uint8_t* cpuStateB = b.m_cpuSystemObject->getConcreteStore() - CPU_CONC_LIMIT;
-        if(memcmp(cpuStateA + CPU_CONC_LIMIT, cpuStateB + CPU_CONC_LIMIT,
-                  CPU_OFFSET(current_tb) - CPU_CONC_LIMIT)) {
-            if(DebugLogStateMerge)
-                s << "merge failed: different concrete cpu state" << "\n";
-            return false;
-        }
-    }
-
-    // We cannot merge if addresses would resolve differently in the
-    // states. This means:
-    //
-    // 1. Any objects created since the branch in either object must
-    // have been free'd.
-    //
-    // 2. We cannot have free'd any pre-existing object in one state
-    // and not the other
-
-    //if(DebugLogStateMerge) {
-    //    s << "\tchecking object states\n";
-    //    s << "A: " << addressSpace.objects << "\n";
-    //    s << "B: " << b.addressSpace.objects << "\n";
-    //}
-
-    std::set<const MemoryObject*> mutated;
-    MemoryMap::iterator ai = addressSpace.objects.begin();
-    MemoryMap::iterator bi = b.addressSpace.objects.begin();
-    MemoryMap::iterator ae = addressSpace.objects.end();
-    MemoryMap::iterator be = b.addressSpace.objects.end();
-    for(; ai!=ae && bi!=be; ++ai, ++bi) {
-        if (ai->first != bi->first) {
-            if (DebugLogStateMerge) {
-                if (ai->first < bi->first) {
-                    s << "\t\tB misses binding for: " << ai->first->id << "\n";
-                } else {
-                    s << "\t\tA misses binding for: " << bi->first->id << "\n";
-                }
-            }
-            if(DebugLogStateMerge)
-                s << "merge failed: different callstacks" << '\n';
-            return false;
-        }
-        if(ai->second != bi->second && !ai->first->isValueIgnored &&
-                    ai->first != m_cpuSystemState && ai->first != m_dirtyMask) {
-            const MemoryObject *mo = ai->first;
-            if(DebugLogStateMerge)
-                s << "\t\tmutated: " << mo->id << " (" << mo->name << ")\n";
-            if(mo->isSharedConcrete) {
-                if(DebugLogStateMerge)
-                    s << "merge failed: different shared-concrete objects "
-                      << '\n';
-                return false;
-            }
-            mutated.insert(mo);
-        }
-    }
-    if(ai!=ae || bi!=be) {
-        if(DebugLogStateMerge)
-            s << "merge failed: different address maps" << '\n';
-        return false;
-    }
-
-    // Create state predicates
-    ref<Expr> inA = ConstantExpr::alloc(1, Expr::Bool);
-    ref<Expr> inB = ConstantExpr::alloc(1, Expr::Bool);
-    for(std::set< ref<Expr> >::iterator it = aSuffix.begin(),
-                 ie = aSuffix.end(); it != ie; ++it)
-        inA = AndExpr::create(inA, *it);
-    for(std::set< ref<Expr> >::iterator it = bSuffix.begin(),
-                 ie = bSuffix.end(); it != ie; ++it)
-        inB = AndExpr::create(inB, *it);
-
-    // XXX should we have a preference as to which predicate to use?
-    // it seems like it can make a difference, even though logically
-    // they must contradict each other and so inA => !inB
-
-    // merge LLVM stacks
-
-    int selectCountStack = 0, selectCountMem = 0;
-
-    std::vector<StackFrame>::iterator itA = stack.begin();
-    std::vector<StackFrame>::const_iterator itB = b.stack.begin();
-    for(; itA!=stack.end(); ++itA, ++itB) {
-        StackFrame &af = *itA;
-        const StackFrame &bf = *itB;
-        for(unsigned i=0; i<af.kf->numRegisters; i++) {
-            ref<Expr> &av = af.locals[i].value;
-            const ref<Expr> &bv = bf.locals[i].value;
-            if(av.isNull() || bv.isNull()) {
-                // if one is null then by implication (we are at same pc)
-                // we cannot reuse this local, so just ignore
-            } else {
-                if(av != bv) {
-                    av = SelectExpr::create(inA, av, bv);
-                    selectCountStack += 1;
-                }
-            }
-        }
-    }
-
-    if(DebugLogStateMerge)
-        s << "\t\tcreated " << selectCountStack << " select expressions on the stack\n";
-
-    for(std::set<const MemoryObject*>::iterator it = mutated.begin(),
-                    ie = mutated.end(); it != ie; ++it) {
-        const MemoryObject *mo = *it;
-        const ObjectState *os = addressSpace.findObject(mo);
-        const ObjectState *otherOS = b.addressSpace.findObject(mo);
-        assert(os && !os->readOnly &&
-               "objects mutated but not writable in merging state");
-        assert(otherOS);
-
-        ObjectState *wos = addressSpace.getWriteable(mo, os);
-        for (unsigned i=0; i<mo->size; i++) {
-            ref<Expr> av = wos->read8(i);
-            ref<Expr> bv = otherOS->read8(i);
-            if(av != bv) {
-                wos->write(i, SelectExpr::create(inA, av, bv));
-                selectCountMem += 1;
-            }
-        }
-    }
-
-    if(DebugLogStateMerge)
-        s << "\t\tcreated " << selectCountMem << " select expressions in memory\n";
-
-    constraints = ConstraintManager();
-    for(std::set< ref<Expr> >::iterator it = commonConstraints.begin(),
-                ie = commonConstraints.end(); it != ie; ++it)
-        constraints.addConstraint(*it);
-
-    constraints.addConstraint(OrExpr::create(inA, inB));
-
-    // Merge dirty mask by clearing bits that differ. Clearning bits in
-    // dirty mask can only affect performance but not correcntess.
-    // NOTE: this requires flushing TLB
-    {
-        const ObjectState* os = addressSpace.findObject(m_dirtyMask);
-        ObjectState* wos = addressSpace.getWriteable(m_dirtyMask, os);
-        uint8_t* dirtyMaskA = wos->getConcreteStore();
-        const uint8_t* dirtyMaskB = b.addressSpace.findObject(m_dirtyMask)->getConcreteStore();
-
-        for(unsigned i = 0; i < m_dirtyMask->size; ++i) {
-            if(dirtyMaskA[i] != dirtyMaskB[i])
-                dirtyMaskA[i] = 0;
-        }
-    }
-
-    // Flush TLB
-    {
-        CPUArchState * cpu;
-        cpu = (CPUArchState *) (m_cpuSystemObject->getConcreteStore() - CPU_CONC_LIMIT);
-        cpu->current_tb = NULL;
-
-        for (int mmu_idx = 0; mmu_idx < NB_MMU_MODES; mmu_idx++) {
-            for(int i = 0; i < CPU_TLB_SIZE; i++)
-                cpu->tlb_table[mmu_idx][i] = s_cputlb_empty_entry;
-            for(int i = 0; i < CPU_S2E_TLB_SIZE; i++)
-                cpu->s2e_tlb_table[mmu_idx][i].objectState = 0;
-        }
-
-        memset (cpu->tb_jmp_cache, 0, TB_JMP_CACHE_SIZE * sizeof (void *));
-    }
-
-    return true;
+//    assert(dynamic_cast<const S2EExecutionState*>(&_b));
+//    const S2EExecutionState& b = static_cast<const S2EExecutionState&>(_b);
+//
+//    assert(!m_active && !b.m_active);
+//
+//    llvm::raw_ostream& s = g_s2e->getMessagesStream(this);
+//
+//    if(DebugLogStateMerge)
+//        s << "Attempting merge with state " << b.getID() << '\n';
+//
+//    if(pc != b.pc) {
+//        if(DebugLogStateMerge)
+//            s << "merge failed: different pc" << '\n';
+//        return false;
+//    }
+//
+//    // XXX is it even possible for these to differ? does it matter? probably
+//    // implies difference in object states?
+//    if(symbolics != b.symbolics) {
+//        if(DebugLogStateMerge)
+//            s << "merge failed: different symbolics" << '\n';
+//        return false;
+//    }
+//
+//    {
+//        std::vector<StackFrame>::const_iterator itA = stack.begin();
+//        std::vector<StackFrame>::const_iterator itB = b.stack.begin();
+//        while (itA!=stack.end() && itB!=b.stack.end()) {
+//            // XXX vaargs?
+//            if(itA->caller!=itB->caller || itA->kf!=itB->kf) {
+//                if(DebugLogStateMerge)
+//                    s << "merge failed: different callstacks" << '\n';
+//            }
+//          ++itA;
+//          ++itB;
+//        }
+//        if(itA!=stack.end() || itB!=b.stack.end()) {
+//            if(DebugLogStateMerge)
+//                s << "merge failed: different callstacks" << '\n';
+//            return false;
+//        }
+//    }
+//
+//    std::set< ref<Expr> > aConstraints(constraints.begin(), constraints.end());
+//    std::set< ref<Expr> > bConstraints(b.constraints.begin(),
+//                                       b.constraints.end());
+//    std::set< ref<Expr> > commonConstraints, aSuffix, bSuffix;
+//    std::set_intersection(aConstraints.begin(), aConstraints.end(),
+//                          bConstraints.begin(), bConstraints.end(),
+//                          std::inserter(commonConstraints, commonConstraints.begin()));
+//    std::set_difference(aConstraints.begin(), aConstraints.end(),
+//                        commonConstraints.begin(), commonConstraints.end(),
+//                        std::inserter(aSuffix, aSuffix.end()));
+//    std::set_difference(bConstraints.begin(), bConstraints.end(),
+//                        commonConstraints.begin(), commonConstraints.end(),
+//                        std::inserter(bSuffix, bSuffix.end()));
+//    if(DebugLogStateMerge) {
+//        s << "\tconstraint prefix: [";
+//        for(std::set< ref<Expr> >::iterator it = commonConstraints.begin(),
+//                        ie = commonConstraints.end(); it != ie; ++it)
+//            s << *it << ", ";
+//        s << "]\n";
+//        s << "\tA suffix: [";
+//        for(std::set< ref<Expr> >::iterator it = aSuffix.begin(),
+//                        ie = aSuffix.end(); it != ie; ++it)
+//            s << *it << ", ";
+//        s << "]\n";
+//        s << "\tB suffix: [";
+//        for(std::set< ref<Expr> >::iterator it = bSuffix.begin(),
+//                        ie = bSuffix.end(); it != ie; ++it)
+//        s << *it << ", ";
+//        s << "]" << '\n';
+//    }
+//
+//    /* Check CPUArchState */
+//    {
+//        uint8_t* cpuStateA = m_cpuSystemObject->getConcreteStore() - CPU_CONC_LIMIT;
+//        uint8_t* cpuStateB = b.m_cpuSystemObject->getConcreteStore() - CPU_CONC_LIMIT;
+//        if(memcmp(cpuStateA + CPU_CONC_LIMIT, cpuStateB + CPU_CONC_LIMIT,
+//                  CPU_OFFSET(current_tb) - CPU_CONC_LIMIT)) {
+//            if(DebugLogStateMerge)
+//                s << "merge failed: different concrete cpu state" << "\n";
+//            return false;
+//        }
+//    }
+//
+//    // We cannot merge if addresses would resolve differently in the
+//    // states. This means:
+//    //
+//    // 1. Any objects created since the branch in either object must
+//    // have been free'd.
+//    //
+//    // 2. We cannot have free'd any pre-existing object in one state
+//    // and not the other
+//
+//    //if(DebugLogStateMerge) {
+//    //    s << "\tchecking object states\n";
+//    //    s << "A: " << addressSpace.objects << "\n";
+//    //    s << "B: " << b.addressSpace.objects << "\n";
+//    //}
+//
+//    std::set<const MemoryObject*> mutated;
+//    MemoryMap::iterator ai = addressSpace.objects.begin();
+//    MemoryMap::iterator bi = b.addressSpace.objects.begin();
+//    MemoryMap::iterator ae = addressSpace.objects.end();
+//    MemoryMap::iterator be = b.addressSpace.objects.end();
+//    for(; ai!=ae && bi!=be; ++ai, ++bi) {
+//        if (ai->first != bi->first) {
+//            if (DebugLogStateMerge) {
+//                if (ai->first < bi->first) {
+//                    s << "\t\tB misses binding for: " << ai->first->id << "\n";
+//                } else {
+//                    s << "\t\tA misses binding for: " << bi->first->id << "\n";
+//                }
+//            }
+//            if(DebugLogStateMerge)
+//                s << "merge failed: different callstacks" << '\n';
+//            return false;
+//        }
+//        if(ai->second != bi->second && !ai->first->isValueIgnored &&
+//                    ai->first != m_cpuSystemState && ai->first != m_dirtyMask) {
+//            const MemoryObject *mo = ai->first;
+//            if(DebugLogStateMerge)
+//                s << "\t\tmutated: " << mo->id << " (" << mo->name << ")\n";
+//            if(mo->isSharedConcrete) {
+//                if(DebugLogStateMerge)
+//                    s << "merge failed: different shared-concrete objects "
+//                      << '\n';
+//                return false;
+//            }
+//            mutated.insert(mo);
+//        }
+//    }
+//    if(ai!=ae || bi!=be) {
+//        if(DebugLogStateMerge)
+//            s << "merge failed: different address maps" << '\n';
+//        return false;
+//    }
+//
+//    // Create state predicates
+//    ref<Expr> inA = ConstantExpr::alloc(1, Expr::Bool);
+//    ref<Expr> inB = ConstantExpr::alloc(1, Expr::Bool);
+//    for(std::set< ref<Expr> >::iterator it = aSuffix.begin(),
+//                 ie = aSuffix.end(); it != ie; ++it)
+//        inA = AndExpr::create(inA, *it);
+//    for(std::set< ref<Expr> >::iterator it = bSuffix.begin(),
+//                 ie = bSuffix.end(); it != ie; ++it)
+//        inB = AndExpr::create(inB, *it);
+//
+//    // XXX should we have a preference as to which predicate to use?
+//    // it seems like it can make a difference, even though logically
+//    // they must contradict each other and so inA => !inB
+//
+//    // merge LLVM stacks
+//
+//    int selectCountStack = 0, selectCountMem = 0;
+//
+//    std::vector<StackFrame>::iterator itA = stack.begin();
+//    std::vector<StackFrame>::const_iterator itB = b.stack.begin();
+//    for(; itA!=stack.end(); ++itA, ++itB) {
+//        StackFrame &af = *itA;
+//        const StackFrame &bf = *itB;
+//        for(unsigned i=0; i<af.kf->numRegisters; i++) {
+//            ref<Expr> &av = af.locals[i].value;
+//            const ref<Expr> &bv = bf.locals[i].value;
+//            if(av.isNull() || bv.isNull()) {
+//                // if one is null then by implication (we are at same pc)
+//                // we cannot reuse this local, so just ignore
+//            } else {
+//                if(av != bv) {
+//                    av = SelectExpr::create(inA, av, bv);
+//                    selectCountStack += 1;
+//                }
+//            }
+//        }
+//    }
+//
+//    if(DebugLogStateMerge)
+//        s << "\t\tcreated " << selectCountStack << " select expressions on the stack\n";
+//
+//    for(std::set<const MemoryObject*>::iterator it = mutated.begin(),
+//                    ie = mutated.end(); it != ie; ++it) {
+//        const MemoryObject *mo = *it;
+//        const ObjectState *os = addressSpace.findObject(mo);
+//        const ObjectState *otherOS = b.addressSpace.findObject(mo);
+//        assert(os && !os->readOnly &&
+//               "objects mutated but not writable in merging state");
+//        assert(otherOS);
+//
+//        ObjectState *wos = addressSpace.getWriteable(mo, os);
+//        for (unsigned i=0; i<mo->size; i++) {
+//            ref<Expr> av = wos->read8(i);
+//            ref<Expr> bv = otherOS->read8(i);
+//            if(av != bv) {
+//                wos->write(i, SelectExpr::create(inA, av, bv));
+//                selectCountMem += 1;
+//            }
+//        }
+//    }
+//
+//    if(DebugLogStateMerge)
+//        s << "\t\tcreated " << selectCountMem << " select expressions in memory\n";
+//
+//    constraints = ConstraintManager();
+//    for(std::set< ref<Expr> >::iterator it = commonConstraints.begin(),
+//                ie = commonConstraints.end(); it != ie; ++it)
+//        constraints.addConstraint(*it);
+//
+//    constraints.addConstraint(OrExpr::create(inA, inB));
+//
+//    // Merge dirty mask by clearing bits that differ. Clearning bits in
+//    // dirty mask can only affect performance but not correcntess.
+//    // NOTE: this requires flushing TLB
+//    {
+//        const ObjectState* os = addressSpace.findObject(m_dirtyMask);
+//        ObjectState* wos = addressSpace.getWriteable(m_dirtyMask, os);
+//        uint8_t* dirtyMaskA = wos->getConcreteStore();
+//        const uint8_t* dirtyMaskB = b.addressSpace.findObject(m_dirtyMask)->getConcreteStore();
+//
+//        for(unsigned i = 0; i < m_dirtyMask->size; ++i) {
+//            if(dirtyMaskA[i] != dirtyMaskB[i])
+//                dirtyMaskA[i] = 0;
+//        }
+//    }
+//
+//    // Flush TLB
+//    {
+//        CPUArchState * cpu;
+//        cpu = (CPUArchState *) (m_cpuSystemObject->getConcreteStore() - CPU_CONC_LIMIT);
+//        cpu->current_tb = NULL;
+//
+//        for (int mmu_idx = 0; mmu_idx < NB_MMU_MODES; mmu_idx++) {
+//            for(int i = 0; i < CPU_TLB_SIZE; i++)
+//                cpu->tlb_table[mmu_idx][i] = s_cputlb_empty_entry;
+//            for(int i = 0; i < CPU_S2E_TLB_SIZE; i++)
+//                cpu->s2e_tlb_table[mmu_idx][i].objectState = 0;
+//        }
+//
+//        memset (cpu->tb_jmp_cache, 0, TB_JMP_CACHE_SIZE * sizeof (void *));
+//    }
+//
+//    return true;
 }
 
 CPUArchState *S2EExecutionState::getConcreteCpuState() const
@@ -1914,84 +1932,87 @@ CPUArchState *S2EExecutionState::getConcreteCpuState() const
 //Fast function to read bytes from physical (uses caching)
 void S2EExecutionState::dmaRead(uint64_t hostAddress, uint8_t *buf, unsigned size)
 {
-    while(size > 0) {
-        uint64_t hostPage = hostAddress & S2E_RAM_OBJECT_MASK;
-        uint64_t length = (hostPage + S2E_RAM_OBJECT_SIZE) - hostAddress;
-        if (length > size) {
-            length = size;
-        }
-
-        ObjectPair op = m_memcache.get(hostPage);
-        if (!op.first) {
-            op = addressSpace.findObject(hostPage);
-            m_memcache.put(hostAddress, op);
-        }
-        assert(op.first && op.second && op.first->address == hostPage);
-        ObjectState *os = const_cast<ObjectState*>(op.second);
-        uint8_t *concreteStore;
-
-        unsigned offset = hostAddress & (S2E_RAM_OBJECT_SIZE-1);
-
-        if (op.first->isSharedConcrete) {
-            concreteStore = (uint8_t*)op.first->address;
-            memcpy(buf, concreteStore + offset, length);
-        } else {
-            concreteStore = os->getConcreteStore(true);
-            for (unsigned i=0; i<length; ++i) {
-                if (_s2e_check_concrete(os, offset+i, 1)) {
-                    buf[i] = concreteStore[offset+i];
-                }else {
-                    readRamConcrete(hostAddress+i, &buf[i], sizeof(buf[i]));
-                }
-            }
-        }
-
-        buf+=length;
-        hostAddress+=length;
-        size -= length;
-    }
+    assert(false && "stubbed");
+    
+//    while(size > 0) {
+//        uint64_t hostPage = hostAddress & S2E_RAM_OBJECT_MASK;
+//        uint64_t length = (hostPage + S2E_RAM_OBJECT_SIZE) - hostAddress;
+//        if (length > size) {
+//            length = size;
+//        }
+//
+//        ObjectPair op = m_memcache.get(hostPage);
+//        if (!op.first) {
+//            op = addressSpace.findObject(hostPage);
+//            m_memcache.put(hostAddress, op);
+//        }
+//        assert(op.first && op.second && op.first->address == hostPage);
+//        ObjectState *os = const_cast<ObjectState*>(op.second);
+//        uint8_t *concreteStore;
+//
+//        unsigned offset = hostAddress & (S2E_RAM_OBJECT_SIZE-1);
+//
+//        if (op.first->isSharedConcrete) {
+//            concreteStore = (uint8_t*)op.first->address;
+//            memcpy(buf, concreteStore + offset, length);
+//        } else {
+//            concreteStore = os->getConcreteStore(true);
+//            for (unsigned i=0; i<length; ++i) {
+//                if (_s2e_check_concrete(os, offset+i, 1)) {
+//                    buf[i] = concreteStore[offset+i];
+//                }else {
+//                    readRamConcrete(hostAddress+i, &buf[i], sizeof(buf[i]));
+//                }
+//            }
+//        }
+//
+//        buf+=length;
+//        hostAddress+=length;
+//        size -= length;
+//    }
 }
 
 void S2EExecutionState::dmaWrite(uint64_t hostAddress, uint8_t *buf, unsigned size)
 {
-    while(size > 0) {
-        uint64_t hostPage = hostAddress & S2E_RAM_OBJECT_MASK;
-        uint64_t length = (hostPage + S2E_RAM_OBJECT_SIZE) - hostAddress;
-        if (length > size) {
-            length = size;
-        }
-
-
-        ObjectPair op = m_memcache.get(hostPage);
-        if (!op.first) {
-            op = addressSpace.findObject(hostPage);
-            m_memcache.put(hostAddress, op);
-        }
-
-        assert(op.first && op.second && op.first->address == hostPage);
-        ObjectState *os = addressSpace.getWriteable(op.first, op.second);
-        uint8_t *concreteStore;
-
-        unsigned offset = hostAddress & (S2E_RAM_OBJECT_SIZE-1);
-
-        if (op.first->isSharedConcrete) {
-            concreteStore = (uint8_t*)op.first->address;
-            memcpy(concreteStore + offset, buf, length);
-        } else {
-            concreteStore = os->getConcreteStore(true);
-
-            for (unsigned i=0; i<length; ++i) {
-                if (_s2e_check_concrete(os, offset+i, 1)) {
-                    concreteStore[offset+i] = buf[i];
-                }else {
-                    writeRamConcrete(hostAddress+i, &buf[i], sizeof(buf[i]));
-                }
-            }
-        }
-        buf+=length;
-        hostAddress+=length;
-        size -= length;
-    }
+    assert(false && "stubbed");
+//    while(size > 0) {
+//        uint64_t hostPage = hostAddress & S2E_RAM_OBJECT_MASK;
+//        uint64_t length = (hostPage + S2E_RAM_OBJECT_SIZE) - hostAddress;
+//        if (length > size) {
+//            length = size;
+//        }
+//
+//
+//        ObjectPair op = m_memcache.get(hostPage);
+//        if (!op.first) {
+//            op = addressSpace.findObject(hostPage);
+//            m_memcache.put(hostAddress, op);
+//        }
+//
+//        assert(op.first && op.second && op.first->address == hostPage);
+//        ObjectState *os = addressSpace.getWriteable(op.first, op.second);
+//        uint8_t *concreteStore;
+//
+//        unsigned offset = hostAddress & (S2E_RAM_OBJECT_SIZE-1);
+//
+//        if (op.first->isSharedConcrete) {
+//            concreteStore = (uint8_t*)op.first->address;
+//            memcpy(concreteStore + offset, buf, length);
+//        } else {
+//            concreteStore = os->getConcreteStore(true);
+//
+//            for (unsigned i=0; i<length; ++i) {
+//                if (_s2e_check_concrete(os, offset+i, 1)) {
+//                    concreteStore[offset+i] = buf[i];
+//                }else {
+//                    writeRamConcrete(hostAddress+i, &buf[i], sizeof(buf[i]));
+//                }
+//            }
+//        }
+//        buf+=length;
+//        hostAddress+=length;
+//        size -= length;
+//    }
 }
 
 
