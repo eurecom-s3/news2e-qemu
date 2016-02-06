@@ -33,6 +33,7 @@
 #endif
 #include "exec/memattrs.h"
 #include "s2e/S2ESJLJ.h"
+#include "s2e/s2e_config.h"
 
 
 #ifndef TARGET_LONG_BITS
@@ -136,6 +137,7 @@ typedef struct CPUIOTLBEntry {
 #define CPU_COMMON_TLB \
     /* The meaning of the MMU modes is defined in the target code. */   \
     CPUTLBEntry tlb_table[NB_MMU_MODES][CPU_TLB_SIZE];                  \
+    _CPU_COMMON_S2E_TLB_TABLE                                           \
     CPUTLBEntry tlb_v_table[NB_MMU_MODES][CPU_VTLB_SIZE];               \
     CPUIOTLBEntry iotlb[NB_MMU_MODES][CPU_TLB_SIZE];                    \
     CPUIOTLBEntry iotlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];                 \
@@ -155,7 +157,8 @@ typedef struct S2ETLBEntry {
     uintptr_t addend;
 } S2ETLBEntry;
 
-#define CPU_S2E_TLB_BITS (CPU_TLB_BITS + TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)
+#define XXX_TARGET_PAGE_BITS 12 /* TODO: This has to go */
+#define CPU_S2E_TLB_BITS (CPU_TLB_BITS + XXX_TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)
 #define CPU_S2E_TLB_SIZE (1 << CPU_S2E_TLB_BITS)
 
 #define _CPU_COMMON_S2E_TLB_TABLE \
@@ -165,15 +168,20 @@ typedef struct S2ETLBEntry {
 #define _CPU_COMMON_S2E_TLB_TABLE
 #endif
 
-
-#define CPU_COMMON                                                      \
-    /* soft mmu support */                                              \
-    CPU_COMMON_TLB                                                      \
+#if defined(CONFIG_S2E)
+#define CPU_S2E                                                         \
     s2e_jmp_buf jmp_env;                                                \
     uint64_t s2e_icount; /* total icount for this CPU */                \
     uint64_t s2e_icount_before_tb; /* icount before starting current TB */ \
     uint64_t s2e_icount_after_tb; /* icount after starting current TB */  \
     struct TranslationBlock *s2e_current_tb; /* currently executing TB  */  \
+
+#endif /* defined(CONFIG_S2E) */
+
+#define CPU_COMMON                                                      \
+    /* soft mmu support */                                              \
+    CPU_COMMON_TLB                                                      \
+    CPU_S2E                                                             \
 
 
 /* TODO: Should go to some other place */
