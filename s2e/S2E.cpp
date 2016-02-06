@@ -33,6 +33,8 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
+#include <llvm/Support/Path.h> /* XXX: Needs to be here because of mysterious compiler errors */
+
 // XXX: qemu stuff should be included before anything from KLEE or LLVM !
 extern "C" {
 #include <qemu-common.h>
@@ -55,7 +57,6 @@ extern CPUArchState *env;
 
 #include <s2e/s2e_qemu.h>
 #include <llvm/Support/FileSystem.h>
-#include <llvm/Support/Path.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
@@ -631,6 +632,7 @@ void S2E::refreshPlugins()
 
 int S2E::fork()
 {
+    Error *main_loop_err = NULL;
 #ifdef CONFIG_WIN32
     return -1;
 #else
@@ -686,17 +688,18 @@ int S2E::fork()
         m_forking = true;
 
         qemu_init_cpu_loop();
-        if (main_loop_init()) {
+        if (qemu_init_main_loop(&main_loop_err)) {
             fprintf(stderr, "qemu_init_main_loop failed\n");
             exit(1);
         }
 
-        if (init_timer_alarm(0)<0) {
-            getDebugStream() << "Could not initialize timers" << '\n';
-            exit(-1);
-        }
-
-        qemu_init_vcpu(env);
+        assert(false && "stubbed");
+//        if (init_timer_alarm(0)<0) {
+//            getDebugStream() << "Could not initialize timers" << '\n';
+//            exit(-1);
+//        }
+//
+//        qemu_init_vcpu(env);
         cpu_synchronize_all_post_init();
         os_setup_signal_handling();
         vm_start();
