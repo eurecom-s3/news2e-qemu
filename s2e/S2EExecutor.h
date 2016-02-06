@@ -46,7 +46,7 @@ struct TranslationBlock;
 /* struct */ CPUArchState;
 
 namespace klee {
-    class Query;
+    struct Query;
 }
 
 namespace s2e {
@@ -426,6 +426,7 @@ protected:
 
 class S2ETranslationBlock
 {
+public:
     /** Reference counter. S2ETranslationBlock should not be freed
         until all LLVM functions are completely executed. This reference
         counter controls it. */
