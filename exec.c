@@ -16,16 +16,6 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
-#ifdef CONFIG_LLVM
-//#include "tcg-llvm.h"
-void tcg_llvm_tb_alloc(TranslationBlock *tb);
-void tcg_llvm_tb_free(struct TranslationBlock *tb);
-#endif
-
-#ifdef CONFIG_S2E
-#include <cpu-all.h>
-#include <s2e/s2e_qemu.h>
-#endif
 /*
  * The file was modified for S2E Selective Symbolic Execution Framework
  *
@@ -91,6 +81,7 @@ void tcg_llvm_tb_free(struct TranslationBlock *tb);
 #include <exec/cpu-all.h>
 #include <s2e/s2e_qemu.h>
 #endif
+#include "exec/s2e.h"
 
 //#define DEBUG_TB_INVALIDATE
 //#define DEBUG_FLUSH
@@ -117,7 +108,7 @@ AddressSpace address_space_io;
 AddressSpace address_space_memory;
 
 MemoryRegion io_mem_rom, io_mem_notdirty;
-static MemoryRegion io_mem_unassigned;
+MemoryRegion io_mem_unassigned; /* Needs to be visible to S2E */
 
 /* RAM is pre-allocated and passed into qemu_ram_alloc_from_ptr */
 #define RAM_PREALLOC   (1 << 0)
@@ -2059,6 +2050,65 @@ static bool notdirty_mem_accepts(void *opaque, hwaddr addr,
 {
     return is_write;
 }
+
+#ifdef CONFIG_S2E
+uintptr_t s2e_notdirty_mem_write(CPUState *cpu, hwaddr ram_addr)
+{
+
+    bool flag = cpu_physical_memory_get_dirty_flag(ram_addr, DIRTY_MEMORY_CODE);
+    assert(false && "Code needs to be tested, flag logic might be the other way around");
+
+    if (!flag) {
+#if !defined(CONFIG_USER_ONLY)
+        tb_invalidate_phys_page_fast(ram_addr, 4);
+        flag = cpu_physical_memory_get_dirty_flag(ram_addr, DIRTY_MEMORY_CODE);
+#endif
+    }
+    /* TODO: Before it set all dirty flags except CODE_DIRTY_FLAG ... */
+    cpu_physical_memory_set_dirty_flag(ram_addr, DIRTY_MEMORY_CODE);
+
+    /* we remove the notdirty callback only if the code has been
+       flushed */
+    if (flag) {
+        tlb_set_dirty(cpu, cpu->mem_io_vaddr);
+    }
+
+    return (uintptr_t)qemu_get_ram_ptr(ram_addr);
+}
+
+
+/* Some pages might be partially used for DMA. All read accesses outside DMA
+   regions in a page go here. */
+static uint64_t s2edma_mem_read(void *opaque, hwaddr ram_addr, unsigned size)
+{
+    switch(size) {
+        case 1: return ldub_raw(qemu_get_ram_ptr(ram_addr));
+        case 2: return lduw_raw(qemu_get_ram_ptr(ram_addr));
+        case 4: return ldl_raw(qemu_get_ram_ptr(ram_addr));
+    }
+    assert(false && "Invalid size");
+    return 0;
+}
+
+int s2e_ismemfunc(MemoryRegion *mr, int isWrite)
+{
+    if (isWrite) {
+        return mr->ops->write == notdirty_mem_write;
+    } else {
+        return mr->ops->read == s2edma_mem_read;
+    }
+}
+
+#endif
+
+#ifdef CONFIG_S2E
+static const MemoryRegionOps s2edma_mem_ops = {
+    .read = s2edma_mem_read,
+    .write = notdirty_mem_write,
+    .endianness = DEVICE_NATIVE_ENDIAN,
+};
+#endif
+
 
 static const MemoryRegionOps notdirty_mem_ops = {
     .write = notdirty_mem_write,
