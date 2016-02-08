@@ -1061,4 +1061,7 @@ uint64_t helper_be_ldq_cmmu(CPUArchState *env, target_ulong addr,
 
 #endif /* CONFIG_SOFTMMU */
 
+/* Helper function for S2E */
+void tcg_register_helper(TCGContext *s, void *func_ptr, const char *name);
+
 #endif /* TCG_H */

@@ -21,6 +21,7 @@
 #define _EXEC_ALL_H_
 
 #include "qemu-common.h"
+#include "exec/s2e.h"
 
 /* allow to see translation results - the slowdown should be negligible, so we leave it */
 #define DEBUG_DISAS
@@ -39,9 +40,6 @@ typedef ram_addr_t tb_page_addr_t;
 #define DISAS_JUMP    1 /* only pc was modified dynamically */
 #define DISAS_UPDATE  2 /* cpu state was modified dynamically */
 #define DISAS_TB_JUMP 3 /* only pc was modified statically */
-
-struct TranslationBlock;
-typedef struct TranslationBlock TranslationBlock;
 
 /* XXX: make safe guess about sizes */
 #define MAX_OP_PER_INSTR 266
@@ -186,8 +184,8 @@ namespace s2e { class S2ETranslationBlock; }
 using llvm::Function;
 using s2e::S2ETranslationBlock;
 #else
-struct Function;
-struct S2ETranslationBlock;
+typedef struct Function Function;
+typedef struct S2ETranslationBlock S2ETranslationBlock;
 #endif
 #endif
 
@@ -208,7 +206,6 @@ enum JumpType
     JT_RET, JT_LRET
 };
 #endif
-
 
 struct TranslationBlock {
     target_ulong pc;   /* simulated PC corresponding to this block (EIP + CS base) */
@@ -253,7 +250,7 @@ struct TranslationBlock {
 #ifdef CONFIG_LLVM
     /* pointer to LLVM translated code */
     TCGLLVMContext *tcg_llvm_context;
-    struct Function *llvm_function;
+    Function *llvm_function;
     uint8_t *llvm_tc_ptr;
     uint8_t *llvm_tc_end;
     struct TranslationBlock* llvm_tb_next[2];

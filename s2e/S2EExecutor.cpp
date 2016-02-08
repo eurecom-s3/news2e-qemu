@@ -36,6 +36,7 @@
  * All contributors listed in S2E-AUTHORS.
  *
  */
+#include <llvm/Support/Process.h> /* XXX: Needs to be here because of weird compiler errors */
 
 extern "C" {
 #include <qemu-common.h>
@@ -48,8 +49,8 @@ extern "C" {
 #include "sysemu/cpus.h"
 
 extern CPUArchState *env;
-void QEMU_NORETURN raise_exception(int exception_index);
-void QEMU_NORETURN raise_exception_err(int exception_index, int error_code);
+void QEMU_NORETURN raise_exception(CPUArchState *env, int exception_index);
+void QEMU_NORETURN raise_exception_err(CPUArchState *env, int exception_index, int error_code);
 extern const uint8_t parity_table[256];
 extern const uint8_t rclw_table[32];
 extern const uint8_t rclb_table[32];
@@ -75,6 +76,7 @@ uint64_t helper_set_cc_op_eflags(void);
 #include <malloc.h>
 #endif
 
+#include "exec/s2e.h"
 #include "S2EExecutor.h"
 #include <s2e/s2e_config.h>
 #include <s2e/S2E.h>
@@ -102,7 +104,6 @@ uint64_t helper_set_cc_op_eflags(void);
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/Support/DynamicLibrary.h>
-#include <llvm/Support/Process.h>
 #include <llvm/Support/CommandLine.h>
 
 #include <klee/PTree.h>
@@ -305,7 +306,7 @@ static void s2e_ext_sigsegv_handler(int signal, siginfo_t *info, void *context) 
 
 }
 
-bool S2EExternalDispatcher::runProtectedCall(Function *f, uint64_t *args) {
+bool S2EExternalDispatcher::runProtectedCall(llvm::Function *f, uint64_t *args) {
 
   #ifndef _WIN32
   struct sigaction segvAction, segvActionOld;
@@ -663,21 +664,21 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(fputc)
     __DEFINE_EXT_FUNCTION(fwrite)
 
-    __DEFINE_EXT_VARIABLE(io_mem_ram)
+//    __DEFINE_EXT_VARIABLE(io_mem_ram)
     __DEFINE_EXT_VARIABLE(io_mem_rom)
-    __DEFINE_EXT_VARIABLE(io_mem_unassigned)
+//    __DEFINE_EXT_VARIABLE(io_mem_unassigned)
     __DEFINE_EXT_VARIABLE(io_mem_notdirty)
 
     __DEFINE_EXT_FUNCTION(cpu_io_recompile)
 #ifdef TARGET_ARM
-    __DEFINE_EXT_FUNCTION(cpu_arm_handle_mmu_fault)
+    __DEFINE_EXT_FUNCTION(arm_cpu_handle_mmu_fault)
     __DEFINE_EXT_FUNCTION(cpsr_read)
     __DEFINE_EXT_FUNCTION(cpsr_write)
     __DEFINE_EXT_FUNCTION(arm_cpu_list)
 //    __DEFINE_EXT_FUNCTION(do_interrupt)
 #endif
 #ifdef TARGET_I386
-    __DEFINE_EXT_FUNCTION(cpu_x86_handle_mmu_fault)
+    __DEFINE_EXT_FUNCTION(x86_cpu_handle_mmu_fault)
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr0)
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr3)
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr4)
@@ -687,9 +688,10 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(cpu_get_apic_tpr)
     __DEFINE_EXT_FUNCTION(cpu_set_apic_tpr)
     __DEFINE_EXT_FUNCTION(cpu_smm_update)
-    __DEFINE_EXT_FUNCTION(hw_breakpoint_insert)
-    __DEFINE_EXT_FUNCTION(hw_breakpoint_remove)
-    __DEFINE_EXT_FUNCTION(check_hw_breakpoints)
+    assert(false && "stubbed");
+//    __DEFINE_EXT_FUNCTION(hw_breakpoint_insert)
+//    __DEFINE_EXT_FUNCTION(hw_breakpoint_remove)
+//    __DEFINE_EXT_FUNCTION(check_hw_breakpoints)
     __DEFINE_EXT_FUNCTION(cpu_get_tsc)
     helper_register_symbols();
 #endif
@@ -704,22 +706,24 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(cpu_abort)
     __DEFINE_EXT_FUNCTION(cpu_loop_exit)
 
-    __DEFINE_EXT_FUNCTION(tb_find_pc)
+    assert(false && "stubbed");
+//    __DEFINE_EXT_FUNCTION(tb_find_pc)
 
     __DEFINE_EXT_FUNCTION(qemu_system_reset_request)
 
     __DEFINE_EXT_FUNCTION(tlb_flush_page)
     __DEFINE_EXT_FUNCTION(tlb_flush)
 
-    __DEFINE_EXT_FUNCTION(io_readb_mmu)
-    __DEFINE_EXT_FUNCTION(io_readw_mmu)
-    __DEFINE_EXT_FUNCTION(io_readl_mmu)
-    __DEFINE_EXT_FUNCTION(io_readq_mmu)
+    assert(false && "stubbed");
+//    __DEFINE_EXT_FUNCTION(io_readb_mmu)
+//    __DEFINE_EXT_FUNCTION(io_readw_mmu)
+//    __DEFINE_EXT_FUNCTION(io_readl_mmu)
+//    __DEFINE_EXT_FUNCTION(io_readq_mmu)
 
-    __DEFINE_EXT_FUNCTION(io_writeb_mmu)
-    __DEFINE_EXT_FUNCTION(io_writew_mmu)
-    __DEFINE_EXT_FUNCTION(io_writel_mmu)
-    __DEFINE_EXT_FUNCTION(io_writeq_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writeb_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writew_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writel_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writeq_mmu)
 
     __DEFINE_EXT_FUNCTION(iotlb_to_region)
 
@@ -742,7 +746,8 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(s2e_notdirty_mem_write)
 
     __DEFINE_EXT_FUNCTION(cpu_io_recompile)
-    __DEFINE_EXT_FUNCTION(can_do_io)
+    assert(false && "stubbed");
+ //   __DEFINE_EXT_FUNCTION(can_do_io)
 
     __DEFINE_EXT_FUNCTION(ldub_phys)
     __DEFINE_EXT_FUNCTION(stb_phys)
@@ -816,15 +821,15 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
                     IntegerType::get(ctx, 64), 0))),
             false);
 
-    Function* tbFunction = Function::Create(
-            tbFunctionTy, Function::PrivateLinkage, "s2e_dummyTbFunction",
+    llvm::Function* tbFunction = llvm::Function::Create(
+            tbFunctionTy, llvm::Function::PrivateLinkage, "s2e_dummyTbFunction",
             m_tcgLLVMContext->getModule());
 
     /* Create dummy main function containing just two instructions:
        a call to TB function and ret */
-    Function* dummyMain = Function::Create(
-            FunctionType::get(llvm::Type::getVoidTy(ctx), false),
-            Function::PrivateLinkage, "s2e_dummyMainFunction",
+    llvm::Function* dummyMain = llvm::Function::Create(
+            llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), false),
+            llvm::Function::PrivateLinkage, "s2e_dummyMainFunction",
             m_tcgLLVMContext->getModule());
 
     BasicBlock* dummyMainBB = BasicBlock::Create(ctx, "entry", dummyMain);
@@ -838,7 +843,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     m_dummyMain = kmodule->functionMap[dummyMain];
 
     if (!execute_llvm) {
-        Function* function;
+        llvm::Function* function;
 
         function = kmodule->module->getFunction("tcg_llvm_trace_memory_access");
         assert(function);
@@ -871,8 +876,8 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
         addSpecialFunctionHandler(function, handleGetValue);
 
 
-        FunctionType *traceInstTy = FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
-        function = dynamic_cast<Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
+        llvm::FunctionType *traceInstTy = llvm::FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
+        function = dynamic_cast<llvm::Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
         assert(function);
         addSpecialFunctionHandler(function, handlerTraceInstruction);
 
@@ -920,7 +925,8 @@ void S2EExecutor::initializeStatistics()
 
 
 void S2EExecutor::flushTb() {
-    tb_flush(env); // release references to TB functions
+    assert(false && "stubbed");
+//    tb_flush(env); // release references to TB functions
 }
 
 S2EExecutor::~S2EExecutor()
@@ -982,13 +988,14 @@ S2EExecutionState* S2EExecutor::createInitialState()
     __DEFINE_EXT_OBJECT_RO(g_s2e)
     __DEFINE_EXT_OBJECT_RO(g_s2e_state)
     //__DEFINE_EXT_OBJECT_RO(g_s2e_exec_ret_addr)
-    __DEFINE_EXT_OBJECT_RO(io_mem_read)
-    __DEFINE_EXT_OBJECT_RO(io_mem_write)
+    assert(false && "stubbed");
+//    __DEFINE_EXT_OBJECT_RO(io_mem_read)
+//    __DEFINE_EXT_OBJECT_RO(io_mem_write)
     //__DEFINE_EXT_OBJECT_RO(io_mem_opaque)
     __DEFINE_EXT_OBJECT_RO(use_icount)
-    __DEFINE_EXT_OBJECT_RO(cpu_single_env)
-    __DEFINE_EXT_OBJECT_RO(loglevel)
-    __DEFINE_EXT_OBJECT_RO(logfile)
+//    __DEFINE_EXT_OBJECT_RO(cpu_single_env)
+//    __DEFINE_EXT_OBJECT_RO(loglevel)
+//    __DEFINE_EXT_OBJECT_RO(logfile)
 #ifdef TARGET_I386
     __DEFINE_EXT_OBJECT_RO_SYMB(parity_table)
     __DEFINE_EXT_OBJECT_RO_SYMB(rclw_table)
@@ -1312,13 +1319,15 @@ void S2EExecutor::stateSwitchTimerCallback(void *opaque)
         }
     }
 
-    qemu_mod_timer(c->m_stateSwitchTimer, qemu_get_clock_ms(host_clock) + 100);
+    assert(false && "stubbed");
+//    qemu_mod_timer(c->m_stateSwitchTimer, qemu_get_clock_ms(host_clock) + 100);
 }
 
 void S2EExecutor::initializeStateSwitchTimer()
 {
-    m_stateSwitchTimer = qemu_new_timer_ms(host_clock, &stateSwitchTimerCallback, this);
-    qemu_mod_timer(m_stateSwitchTimer, qemu_get_clock_ms(host_clock) + 100);
+    assert(false && "stubbed");
+//    m_stateSwitchTimer = qemu_new_timer_ms(host_clock, &stateSwitchTimerCallback, this);
+//    qemu_mod_timer(m_stateSwitchTimer, qemu_get_clock_ms(host_clock) + 100);
 }
 
 void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
@@ -1338,7 +1347,8 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
     //Clear the asynchronous request queue, which is not saved as part of
     //the snapshots by QEMU. This is the same mechanism as used by
     //load/save_vmstate, so it should work reliably
-    qemu_aio_flush();
+    assert(false && "stubbed");
+//    qemu_aio_flush();
     bdrv_flush_all();
     cpu_disable_ticks();
 
@@ -1363,7 +1373,9 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
         //copyInConcretes(*oldState);
         oldState->getDeviceState()->saveDeviceState();
         //oldState->m_qemuIcount = qemu_icount;
-        *oldState->m_timersState = timers_state;
+
+        assert(false && "stubbed");
+//        *oldState->m_timersState = timers_state;
 
         uint8_t *oldStore = oldState->m_cpuSystemObject->getConcreteStore();
         memcpy(oldStore, (uint8_t*) cpuMo->address, cpuMo->size);
@@ -1372,7 +1384,8 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
     }
 
     if(newState) {
-        timers_state = *newState->m_timersState;
+        assert(false && "stubbed");
+//        timers_state = *newState->m_timersState;
         //qemu_icount = newState->m_qemuIcount;
 
         jmp_buf jmp_env;
@@ -1423,8 +1436,10 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
         s2e_debug_print("Copied %d (count=%d)\n", totalCopied, objectsCopied);
     }
 
-    if(FlushTBsOnStateSwitch)
-        tb_flush(env);
+    if(FlushTBsOnStateSwitch) {
+        assert(false && "stubbed");
+//        tb_flush(env);
+    }
 
     g_s2e_disable_tlb_flush = 0;
 
@@ -1556,7 +1571,7 @@ void S2EExecutor::prepareFunctionExecution(S2EExecutionState *state,
            while creating added function) */
         for (Module::iterator i = kmodule->module->begin(),
                               ie = kmodule->module->end(); i != ie; ++i) {
-            Function *f = i;
+            llvm::Function *f = i;
             ref<klee::ConstantExpr> addr(0);
 
             // If the symbol has external weak linkage then it is implicitly
@@ -1625,7 +1640,8 @@ inline bool S2EExecutor::executeInstructions(S2EExecutionState *state, unsigned 
 
             //Handle the case where we killed the current state inside processFork
             if (m_forkProcTerminateCurrentState) {
-                state->writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
+                assert(false && "stubbed");
+//                state->writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
                 state->zombify();
                 m_forkProcTerminateCurrentState = false;
                 return true;
@@ -1814,7 +1830,7 @@ static inline void s2e_tb_reset_jump(TranslationBlock *tb, unsigned int n)
         tb->jmp_next[n] = NULL;
 
         /* suppress the jump to next tb in generated code */
-        tb_set_jmp_target(tb, n, (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[n]));
+        tb_set_jmp_target(tb, n, (uintptr_t)(static_cast<uint8_t *>(tb->tc_ptr) + tb->tb_next_offset[n]));
         tb->s2e_tb_next[n] = NULL;
     }
 }
@@ -1933,11 +1949,12 @@ uintptr_t S2EExecutor::executeTranslationBlock(
             TimerStatIncrementer t(stats::concreteModeTime);
         }
 
-        int new_scaling = timers_state.clock_scale / 2;
-        if (new_scaling == 0) {
-            new_scaling = 1;
-        }
-        cpu_enable_scaling(new_scaling);
+        assert(false && "stubbed");
+//        int new_scaling = timers_state.clock_scale / 2;
+//        if (new_scaling == 0) {
+//            new_scaling = 1;
+//        }
+//        cpu_enable_scaling(new_scaling);
 
         return executeTranslationBlockConcrete(state, tb);
     }
@@ -2098,7 +2115,8 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
     S2EExecutionState *s2eState = dynamic_cast<S2EExecutionState*>(&state);
 
     /* Checkpoint the device state before branching */
-    qemu_aio_flush();
+    assert(false && "stubbed");
+//    qemu_aio_flush();
     bdrv_flush_all();
     //s2eState->m_tlb.clearTlbOwnership();
 
@@ -2109,7 +2127,8 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
 
     cpu_disable_ticks();
     s2eState->getDeviceState()->saveDeviceState();
-    *s2eState->m_timersState = timers_state;
+    assert(false && "stubbed");
+//    *s2eState->m_timersState = timers_state;
     cpu_enable_ticks();
 
     foreach(MemoryObject* mo, m_saveOnContextSwitch) {
@@ -2205,8 +2224,9 @@ void S2EExecutor::terminateState(ExecutionState &s)
 
     //No need for exiting the loop if we kill another state.
     if (!m_inLoadBalancing && (&state == g_s2e_state)) {
-        state.writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
-        qemu_mod_timer(m_stateSwitchTimer, qemu_get_clock_ms(rt_clock));
+        assert(false && "stubbed");
+//        state.writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
+//        qemu_mod_timer(m_stateSwitchTimer, qemu_get_clock_ms(rt_clock));
         throw CpuExitException();
     }
 }
@@ -2251,7 +2271,8 @@ void S2EExecutor::yieldState(ExecutionState &s)
     state.writeCpuState(CPU_CONC_LIMIT, state.getPc() + 10, CPU_REG_SIZE << 3);
 
     // Stop current execution
-    state.writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
+    assert(false && "stubbed");
+//    state.writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
     throw CpuExitException();
 }
 
@@ -2471,8 +2492,8 @@ void s2e_initialize_execution(S2E *s2e, S2EExecutionState *initial_state,
 {
     s2e->getExecutor()->initializeExecution(initial_state, execute_always_klee);
     //XXX: move it to better place (signal handler for this?)
-    tcg_register_helper((void*)&s2e_tcg_execution_handler, "s2e_tcg_execution_handler");
-    tcg_register_helper((void*)&s2e_tcg_custom_instruction_handler, "s2e_tcg_custom_instruction_handler");
+    tcg_register_helper(&tcg_ctx, (void*)&s2e_tcg_execution_handler, "s2e_tcg_execution_handler");
+    tcg_register_helper(&tcg_ctx, (void*)&s2e_tcg_custom_instruction_handler, "s2e_tcg_custom_instruction_handler");
 }
 
 void s2e_register_cpu(S2E *s2e, S2EExecutionState *initial_state,

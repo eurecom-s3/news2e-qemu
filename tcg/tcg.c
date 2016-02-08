@@ -39,6 +39,7 @@
 #include "qemu-common.h"
 #include "qemu/host-utils.h"
 #include "qemu/timer.h"
+#include "exec/s2e.h"
 
 /* Note: the long term plan is to reduce the dependencies on the QEMU
    CPU definitions. Currently they are used for qemu_ld/st
@@ -359,6 +360,18 @@ void tcg_context_init(TCGContext *s)
     }
 
     tcg_target_init(s);
+}
+
+void tcg_register_helper(TCGContext *s, void *func_ptr, const char *name)
+{
+    TCGHelperInfo *helper_info = (TCGHelperInfo *) g_malloc0(sizeof(TCGHelperInfo));
+    helper_info->name = name;
+    helper_info->func = func_ptr;
+    assert(false && "stubbed");
+    helper_info->flags = 0;
+    helper_info->sizemask = 0;
+    g_hash_table_insert(s->helpers, (gpointer)func_ptr,
+                                                (gpointer)helper_info);
 }
 
 void tcg_prologue_init(TCGContext *s)
