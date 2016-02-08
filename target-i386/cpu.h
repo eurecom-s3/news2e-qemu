@@ -822,7 +822,7 @@ typedef struct CPUX86State {
     /* standard registers */
     target_ulong regs[CPU_NB_REGS];
     target_ulong eip;
-/*    target_ulong eflags;*/ /* eflags register. During CPU emulation, CC
+    target_ulong eflags; /* eflags register. During CPU emulation, CC
                         flags and DF are set to zero because they are
                         stored elsewhere */
 
@@ -838,7 +838,7 @@ typedef struct CPUX86State {
     /* S2E note: XXX: what about FPU ? */
     
     int32_t df; /* D flag : 1 if D = 0, -1 if D = 1 */
-    target_ulong mflags; /* Mode and control flags from eflags */
+    /* target_ulong mflags; */ /* Mode and control flags from eflags */
     
     uint32_t hflags; /* TB flags, see HF_xxx constants. These flags
                         are known at translation time. */
@@ -1038,22 +1038,33 @@ static inline void __WR_env_raw(CPUX86State* cpuState, unsigned offset,
 
 static inline target_ulong cpu_get_eflags(CPUX86State* env)
 {
+    assert(false && "stubbed");
+    return 0;
+/*
     assert(RR_cpu(env, cc_op) == CC_OP_EFLAGS);
     return env->mflags | RR_cpu(env, cc_src) | (env->df & DF_MASK) | 0x2;
+*/
 }
 
 //XXX: Temporary hack to dump cpu state without crashing
 static inline target_ulong cpu_get_eflags_dirty(CPUX86State* env)
 {
+    assert(false && "stubbed");
+    return 0;
+    /*
     return env->mflags | RR_cpu(env, cc_src) | (env->df & DF_MASK) | 0x2;
+    */
 }
 
 static inline void cpu_set_eflags(CPUX86State* env, target_ulong eflags)
 {
+    assert(false && "stubbed");
+    /*
     WR_cpu(env, cc_op, CC_OP_EFLAGS);
     WR_cpu(env, cc_src, eflags & CFLAGS_MASK);
     env->df = (eflags & DF_MASK) ? -1 : 1;
     env->mflags = eflags & MFLAGS_MASK;
+    */
 }
 
 
@@ -1115,7 +1126,7 @@ static inline void cpu_x86_load_seg_cache(CPUX86State *env,
         if (env->hflags & HF_CS64_MASK) {
             /* zero base assumed for DS, ES and SS in long mode */
         } else if (!(env->cr[0] & CR0_PE_MASK) ||
-                   (env->mflags & VM_MASK) ||
+                   (env->eflags & VM_MASK) ||
                    !(env->hflags & HF_CS32_MASK)) {
             /* XXX: try to avoid this test. The problem comes from the
                fact that is real mode or vm86 mode we only modify the
@@ -1256,15 +1267,17 @@ uint64_t cpu_get_tsc(CPUX86State *env);
 #define MMU_KNOSMAP_IDX 2
 static inline int cpu_mmu_index(CPUX86State *env, bool ifetch)
 {
+    assert(false && "stubbed");
     return (env->hflags & HF_CPL_MASK) == 3 ? MMU_USER_IDX :
-        (!(env->hflags & HF_SMAP_MASK) || (env->mflags & AC_MASK))
+        (!(env->hflags & HF_SMAP_MASK) || (env->eflags & AC_MASK))
         ? MMU_KNOSMAP_IDX : MMU_KSMAP_IDX;
 }
 
 static inline int cpu_mmu_index_kernel(CPUX86State *env)
 {
+    assert(false && "stubbed");
     return !(env->hflags & HF_SMAP_MASK) ? MMU_KNOSMAP_IDX :
-        ((env->hflags & HF_CPL_MASK) < 3 && (env->mflags & AC_MASK))
+        ((env->hflags & HF_CPL_MASK) < 3 && (env->eflags & AC_MASK))
         ? MMU_KNOSMAP_IDX : MMU_KSMAP_IDX;
 }
 
@@ -1304,10 +1317,11 @@ void optimize_flags_init(void);
 static inline void cpu_get_tb_cpu_state(CPUX86State *env, target_ulong *pc,
                                         target_ulong *cs_base, int *flags)
 {
+    assert(false && "stubbed");
     *cs_base = env->segs[R_CS].base;
     *pc = *cs_base + env->eip;
     *flags = env->hflags |
-        (env->mflags & (IOPL_MASK | TF_MASK | RF_MASK | VM_MASK | AC_MASK));
+        (env->eflags & (IOPL_MASK | TF_MASK | RF_MASK | VM_MASK | AC_MASK));
 }
 
 void do_cpu_init(X86CPU *cpu);
@@ -1338,7 +1352,8 @@ void update_fp_status(CPUX86State *env);
 
 static inline uint32_t cpu_compute_eflags(CPUX86State *env)
 {
-    return env->mflags | cpu_cc_compute_all(env, CC_OP) | (env->df & DF_MASK);
+    assert(false && "stubbed");
+    return env->eflags | cpu_cc_compute_all(env, CC_OP) | (env->df & DF_MASK);
 }
 
 /* NOTE: the translator must set DisasContext.cc_op to CC_OP_EFLAGS
@@ -1350,7 +1365,7 @@ static inline void cpu_load_eflags(CPUX86State *env, int eflags,
     CC_SRC = eflags & (CC_O | CC_S | CC_Z | CC_A | CC_P | CC_C);
     CC_OP = CC_OP_EFLAGS;
     env->df = 1 - (2 * ((eflags >> 10) & 1));
-    env->mflags = (env->mflags & ~update_mask) |
+    env->eflags = (env->eflags & ~update_mask) |
         (eflags & update_mask) | 0x2;
 }
 

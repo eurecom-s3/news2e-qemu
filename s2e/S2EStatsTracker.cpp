@@ -33,6 +33,7 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
+#include <llvm/Support/Process.h> /* Has to be here because of weird compile error */
 #include "S2EStatsTracker.h"
 
 #include <s2e/S2EExecutor.h>
@@ -42,7 +43,6 @@
 #include <klee/SolverStats.h>
 #include <klee/Internal/System/Time.h>
 
-#include <llvm/Support/Process.h>
 
 #include <sstream>
 
