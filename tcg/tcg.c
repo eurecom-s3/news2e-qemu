@@ -362,7 +362,7 @@ void tcg_context_init(TCGContext *s)
     tcg_target_init(s);
 }
 
-void tcg_register_helper(TCGContext *s, void *func_ptr, const char *name)
+void tcg_helper_register(TCGContext *s, void *func_ptr, const char *name)
 {
     TCGHelperInfo *helper_info = (TCGHelperInfo *) g_malloc0(sizeof(TCGHelperInfo));
     helper_info->name = name;
@@ -372,6 +372,17 @@ void tcg_register_helper(TCGContext *s, void *func_ptr, const char *name)
     helper_info->sizemask = 0;
     g_hash_table_insert(s->helpers, (gpointer)func_ptr,
                                                 (gpointer)helper_info);
+}
+
+const char *tcg_helper_get_name(TCGContext *s, void *helper)
+{
+    TCGHelperInfo *info = g_hash_table_lookup(s->helpers, helper);
+
+    if (!info)  {
+        return NULL;
+    }
+
+    return info->name;
 }
 
 void tcg_prologue_init(TCGContext *s)
@@ -2568,10 +2579,14 @@ struct jit_descriptor {
 };
 
 void __jit_debug_register_code(void) __attribute__((noinline));
+#if !defined(CONFIG_S2E)
+/* Do not include this descriptor in S2E code, as LLVM already provides
+ * it */
 void __jit_debug_register_code(void)
 {
     asm("");
 }
+#endif /* !defined(CONFIG_S2E) */
 
 /* Must statically initialize the version, because GDB may check
    the version before we can set it.  */

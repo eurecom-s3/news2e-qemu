@@ -184,9 +184,4 @@ typedef struct S2ETLBEntry {
     CPU_S2E                                                             \
 
 
-/* TODO: Should go to some other place */
-#ifdef CONFIG_S2E
-#define EXCP_S2E        0x10004 /* S2E requested exiting cpu loop */
-#endif
-
 #endif

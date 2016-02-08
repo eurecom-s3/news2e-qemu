@@ -97,6 +97,7 @@ obj-y += disas.o
 obj-$(call notempty,$(TARGET_XML_FILES)) += gdbstub-xml.o
 obj-$(call lnot,$(CONFIG_KVM)) += kvm-stub.o
 
+
 obj-$(CONFIG_LIBDECNUMBER) += libdecnumber/decContext.o
 obj-$(CONFIG_LIBDECNUMBER) += libdecnumber/decNumber.o
 obj-$(CONFIG_LIBDECNUMBER) += libdecnumber/dpd/decimal32.o
@@ -159,7 +160,7 @@ GENERATED_HEADERS += hmp-commands.h hmp-commands-info.h qmp-commands-old.h
 endif # CONFIG_SOFTMMU
 
 ifdef CONFIG_S2E
-s2e-obj-y = s2e/
+s2e-obj-y =  s2e/ tcg/tcg-llvm.o
 dummy := $(call unnest-vars,,s2e-obj-y)
 
 $(s2e-obj-y): QEMU_CXXFLAGS += $(LLVM_CXXFLAGS) $(S2E_CXXFLAGS)

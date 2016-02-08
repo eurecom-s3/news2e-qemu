@@ -42,27 +42,24 @@ extern "C" {
 extern "C" {
 #include "config.h"
 #include "qemu-common.h"
-#include "disas.h"
+#include "disas/disas.h"
 
 #if defined(CONFIG_SOFTMMU)
-
-#include "../../softmmu_defs.h"
-
-
+//TODO: What about endianness? Is it correct to always use little endian here as long as the host is le?
 static void *qemu_ld_helpers[5] = {
-    (void*) __ldb_mmu,
-    (void*) __ldw_mmu,
-    (void*) __ldl_mmu,
-    (void*) __ldq_mmu,
-    (void*) __ldq_mmu,
+    (void*) helper_ret_ldub_mmu,
+    (void*) helper_le_lduw_mmu,
+    (void*) helper_le_ldul_mmu,
+    (void*) helper_le_ldq_mmu,
+    (void*) helper_le_ldq_mmu,
 };
 
 static void *qemu_st_helpers[5] = {
-    (void*) __stb_mmu,
-    (void*) __stw_mmu,
-    (void*) __stl_mmu,
-    (void*) __stq_mmu,
-    (void*) __stq_mmu,
+    (void*) helper_ret_stb_mmu,
+    (void*) helper_le_stw_mmu,
+    (void*) helper_le_stl_mmu,
+    (void*) helper_le_stq_mmu,
+    (void*) helper_le_stq_mmu,
 };
 
 #endif
@@ -113,7 +110,8 @@ using namespace llvm;
 
 class TJITMemoryManager;
 
-struct TCGLLVMContextPrivate {
+class TCGLLVMContextPrivate {
+    friend class TCGLLVMContext;
     LLVMContext& m_context;
     IRBuilder<> m_builder;
 
@@ -159,7 +157,7 @@ struct TCGLLVMContextPrivate {
      * for mem-based globals, store base value index */
     int m_globalsIdx[TCG_MAX_TEMPS];
 
-    BasicBlock* m_labels[TCG_MAX_LABELS];
+    std::map<TCGLabel *, BasicBlock*> m_labels;
 
 public:
     TCGLLVMContextPrivate();
@@ -250,8 +248,8 @@ public:
     void initializeHelpers();
 #endif
 
-    BasicBlock* getLabel(int idx);
-    void delLabel(int idx);
+    BasicBlock* getLabel(TCGLabel *lbl);
+    void delLabel(TCGLabel *lbl);
     void startNewBasicBlock(BasicBlock *bb = NULL);
 
     /* Code generation */
@@ -358,7 +356,6 @@ TCGLLVMContextPrivate::TCGLLVMContextPrivate()
     std::memset(m_values, 0, sizeof(m_values));
     std::memset(m_memValuesPtr, 0, sizeof(m_memValuesPtr));
     std::memset(m_globalsIdx, 0, sizeof(m_globalsIdx));
-    std::memset(m_labels, 0, sizeof(m_labels));
 
     InitializeNativeTarget();
 
@@ -624,24 +621,20 @@ void TCGLLVMContextPrivate::initGlobalsAndLocalTemps()
     }
 }
 
-inline BasicBlock* TCGLLVMContextPrivate::getLabel(int idx)
+inline BasicBlock* TCGLLVMContextPrivate::getLabel(TCGLabel *lbl)
 {
-    if(!m_labels[idx]) {
+    if (m_labels.find(lbl) == m_labels.end()) 
+    {
         std::ostringstream bbName;
-        bbName << "label_" << idx;
-        m_labels[idx] = BasicBlock::Create(m_context, bbName.str());
+        bbName << "label_" << lbl->id;
+        m_labels.insert(std::make_pair(lbl, BasicBlock::Create(m_context, bbName.str())));
     }
-    return m_labels[idx];
+    return m_labels[lbl];
 }
 
-inline void TCGLLVMContextPrivate::delLabel(int idx)
+inline void TCGLLVMContextPrivate::delLabel(TCGLabel *lbl)
 {
-    /* XXX
-    if(m_labels[idx] && m_labels[idx]->use_empty() &&
-            !m_labels[idx]->getParent())
-        delete m_labels[idx];
-    */
-    m_labels[idx] = NULL;
+    m_labels.erase(lbl);
 }
 
 void TCGLLVMContextPrivate::startNewBasicBlock(BasicBlock *bb)
@@ -751,20 +744,10 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
     int nb_args = def.nb_args;
 
     switch(opc) {
-    case INDEX_op_debug_insn_start:
+    case INDEX_op_insn_start:
         break;
 
     /* predefined ops */
-    case INDEX_op_nop:
-    case INDEX_op_nop1:
-    case INDEX_op_nop2:
-    case INDEX_op_nop3:
-        break;
-
-    case INDEX_op_nopn:
-        nb_args = args[0];
-        break;
-
     case INDEX_op_discard:
         delValue(args[0]);
         break;
@@ -856,7 +839,7 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
         break;
 
     case INDEX_op_br:
-        m_builder.CreateBr(getLabel(args[0]));
+        m_builder.CreateBr(getLabel(arg_label(args[0])));
         startNewBasicBlock();
         break;
 
@@ -885,7 +868,7 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
                 tcg_abort();                                        \
         }                                                           \
         BasicBlock* bb = BasicBlock::Create(m_context);             \
-        m_builder.CreateCondBr(v, getLabel(args[3]), bb);           \
+        m_builder.CreateCondBr(v, getLabel(arg_label(args[3])), bb);           \
         startNewBasicBlock(bb);                                     \
     } break;
 
@@ -899,8 +882,8 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
 #undef __OP_BRCOND
 
     case INDEX_op_set_label:
-        assert(getLabel(args[0])->getParent() == 0);
-        startNewBasicBlock(getLabel(args[0]));
+        assert(getLabel(arg_label(args[0]))->getParent() == 0);
+        startNewBasicBlock(getLabel(arg_label(args[0])));
         break;
 
     case INDEX_op_movi_i32:
@@ -1203,20 +1186,12 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
         setValue(args[0], v);         \
         break;
 
-    __OP_QEMU_ST(INDEX_op_qemu_st8,   8)
-    __OP_QEMU_ST(INDEX_op_qemu_st16, 16)
-    __OP_QEMU_ST(INDEX_op_qemu_st32, 32)
-    __OP_QEMU_ST(INDEX_op_qemu_st64, 64)
+    __OP_QEMU_ST(INDEX_op_qemu_st_i32, 32)
+    __OP_QEMU_ST(INDEX_op_qemu_st_i64, 64)
 
-    __OP_QEMU_LD(INDEX_op_qemu_ld8s,   8, S)
-    __OP_QEMU_LD(INDEX_op_qemu_ld8u,   8, Z)
-    __OP_QEMU_LD(INDEX_op_qemu_ld16s, 16, S)
-    __OP_QEMU_LD(INDEX_op_qemu_ld16u, 16, Z)
-    __OP_QEMU_LD(INDEX_op_qemu_ld32s, 32, S)
-    __OP_QEMU_LD(INDEX_op_qemu_ld32u, 32, Z)
-    __OP_QEMU_LD(INDEX_op_qemu_ld64,  64, Z)
+    __OP_QEMU_LDD(INDEX_op_qemu_ld_i32, 32)
+    __OP_QEMU_LDD(INDEX_op_qemu_ld_i64, 64)
 
-    __OP_QEMU_LDD(INDEX_op_qemu_ld32, 32)
 
 #undef __OP_QEMU_LD
 #undef __OP_QEMU_ST
@@ -1341,14 +1316,13 @@ void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
     initGlobalsAndLocalTemps();
 
     /* Generate code for each opc */
-    const TCGArg *args = gen_opparam_buf;
-    for(int opc_index=0; ;++opc_index) {
-        int opc = gen_opc_buf[opc_index];
-
-        if(opc == INDEX_op_end)
-            break;
-
-        if(opc == INDEX_op_debug_insn_start) {
+    TCGArg *args = s->gen_opparam_buf;
+    TCGOp *op;
+    for ( int opc_idx = s->gen_first_op_idx; opc_idx >= 0; opc_idx = op->next) {
+        op = &s->gen_op_buf[opc_idx];
+        TCGOpcode opc = op->opc;
+ 
+        if(opc == INDEX_op_insn_start) {
 #ifndef CONFIG_S2E
             // volatile store of current OPC index
             m_builder.CreateStore(ConstantInt::get(wordType(), opc_index),
@@ -1384,8 +1358,7 @@ void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
     for(int i=0; i<TCG_MAX_TEMPS; ++i)
         delPtrForValue(i);
 
-    for(int i=0; i<TCG_MAX_LABELS; ++i)
-        delLabel(i);
+    m_labels.clear();
 
 #ifndef NDEBUG
     verifyFunction(*m_tbFunction);
@@ -1409,7 +1382,7 @@ void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
 #ifdef DEBUG_DISAS
     if (unlikely(qemu_loglevel_mask(CPU_LOG_TB_OP))) {
         qemu_log("OP:\n");
-        tcg_dump_ops(s, logfile);
+        tcg_dump_ops(s);
         qemu_log("\n");
     }
 #endif
