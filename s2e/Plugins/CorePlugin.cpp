@@ -35,12 +35,10 @@
 
 // XXX: qemu stuff should be included before anything from KLEE or LLVM !
 extern "C" {
-#include "tcg-op.h"
-#include <qemu-timer.h>
+//#include "tcg-op.h"
+#include "qemu/timer.h"
 #include "qmp-commands.h"
-#include "monitor.h"
-
-extern CPUArchState *env;
+#include "monitor/monitor.h"
 }
 
 #include "CorePlugin.h"
@@ -69,20 +67,22 @@ extern "C" {
 
 static void s2e_timer_cb(void *opaque)
 {
-    CorePlugin *c = (CorePlugin*)opaque;
-    g_s2e->getDebugStream() << "Firing timer event" << '\n';
-
-    g_s2e->getExecutor()->updateStats(g_s2e_state);
-    c->onTimer.emit();
-    qemu_mod_timer(c->getTimer(), qemu_get_clock_ms(rt_clock) + 1000);
+    assert(false && "stubbed");
+//    CorePlugin *c = (CorePlugin*)opaque;
+//    g_s2e->getDebugStream() << "Firing timer event" << '\n';
+//
+//    g_s2e->getExecutor()->updateStats(g_s2e_state);
+//    c->onTimer.emit();
+//    qemu_mod_timer(c->getTimer(), qemu_get_clock_ms(rt_clock) + 1000);
 }
 
 void CorePlugin::initializeTimers()
 {
-    s2e()->getDebugStream() << "Initializing periodic timer" << '\n';
-    /* Initialize the timer handler */
-    m_Timer = qemu_new_timer_ms(rt_clock, s2e_timer_cb, this);
-    qemu_mod_timer(m_Timer, qemu_get_clock_ms(rt_clock) + 1000);
+    assert(false && "stubbed");
+//    s2e()->getDebugStream() << "Initializing periodic timer" << '\n';
+//    /* Initialize the timer handler */
+//    m_Timer = qemu_new_timer_ms(rt_clock, s2e_timer_cb, this);
+//    qemu_mod_timer(m_Timer, qemu_get_clock_ms(rt_clock) + 1000);
 }
 
 void CorePlugin::initialize()
@@ -97,39 +97,42 @@ int g_s2e_enable_signals = true;
 
 void s2e_tcg_execution_handler(void* signal, uint64_t pc)
 {
-    try {
-        ExecutionSignal *s = (ExecutionSignal*)signal;
-        if (g_s2e_enable_signals) {
-            s->emit(g_s2e_state, pc);
-        }
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    try {
+//        ExecutionSignal *s = (ExecutionSignal*)signal;
+//        if (g_s2e_enable_signals) {
+//            s->emit(g_s2e_state, pc);
+//        }
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_tcg_custom_instruction_handler(uint64_t arg)
 {
-    assert(!g_s2e->getCorePlugin()->onCustomInstruction.empty() &&
-           "You must activate a plugin that uses custom instructions.");
-
-    try {
-        g_s2e->getCorePlugin()->onCustomInstruction.emit(g_s2e_state, arg);
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    assert(!g_s2e->getCorePlugin()->onCustomInstruction.empty() &&
+//           "You must activate a plugin that uses custom instructions.");
+//
+//    try {
+//        g_s2e->getCorePlugin()->onCustomInstruction.emit(g_s2e_state, arg);
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_tcg_emit_custom_instruction(S2E*, uint64_t arg)
 {
-    TCGv_i64 t0 = tcg_temp_new_i64();
-    tcg_gen_movi_i64(t0, arg);
-
-    TCGArg args[1];
-    args[0] = GET_TCGV_I64(t0);
-    tcg_gen_helperN((void*) s2e_tcg_custom_instruction_handler,
-                0, 2, TCG_CALL_DUMMY_ARG, 1, args);
-
-    tcg_temp_free_i64(t0);
+    assert(false && "stubbed");
+//    TCGv_i64 t0 = tcg_temp_new_i64();
+//    tcg_gen_movi_i64(t0, arg);
+//
+//    TCGArg args[1];
+//    args[0] = GET_TCGV_I64(t0);
+//    tcg_gen_helperN((void*) s2e_tcg_custom_instruction_handler,
+//                0, 2, TCG_CALL_DUMMY_ARG, 1, args);
+//
+//    tcg_temp_free_i64(t0);
 }
 
 /* Instrument generated code to emit signal on execution */
@@ -138,135 +141,138 @@ void s2e_tcg_emit_custom_instruction(S2E*, uint64_t arg)
    that do not explicitely update the program counter by themselves. */
 static void s2e_tcg_instrument_code(S2E*, ExecutionSignal* signal, uint64_t pc, uint64_t nextpc=-1)
 {
-    TCGv_ptr t0 = tcg_temp_new_ptr();
-    TCGv_i64 t1 = tcg_temp_new_i64();
-
-    if (nextpc != (uint64_t)-1) {
-#if TCG_TARGET_REG_BITS == 64 && defined(TARGET_X86_64)
-        TCGv_i64 tpc = tcg_temp_new_i64();
-        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
-        tcg_gen_movi_i64(tpc, (tcg_target_ulong) nextpc);
-        tcg_gen_st_i64(tpc, cpu_env, offsetof(CPUX86State, eip));
-        tcg_temp_free_i64(tpc);
-#else
-        TCGv_i32 tpc = tcg_temp_new_i32();
-        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
-        tcg_gen_movi_i32(tpc, (tcg_target_ulong) nextpc);
-        tcg_gen_st_i32(tpc, cpu_env, CPU_CONC_LIMIT);
-
-        tcg_temp_free_i32(tpc);
-#endif
-    }
-
-    // XXX: here we rely on CPUState being the first tcg global temp
-    TCGArg args[2];
-    args[0] = GET_TCGV_PTR(t0);
-    args[1] = GET_TCGV_I64(t1);
-
-#if TCG_TARGET_REG_BITS == 64
-    const int sizemask = 4 | 2;
-    tcg_gen_movi_i64(TCGV_PTR_TO_NAT(t0), (tcg_target_ulong) signal);
-#else
-    const int sizemask = 4;
-    tcg_gen_movi_i32(TCGV_PTR_TO_NAT(t0), (tcg_target_ulong) signal);
-#endif
-
-    tcg_gen_movi_i64(t1, pc);
-
-    tcg_gen_helperN((void*) s2e_tcg_execution_handler,
-                0, sizemask, TCG_CALL_DUMMY_ARG, 2, args);
-
-    tcg_temp_free_i64(t1);
-    tcg_temp_free_ptr(t0);
-}
-
-void s2e_on_translate_block_start(
-        S2E* s2e, S2EExecutionState* state,
-        TranslationBlock *tb, uint64_t pc)
-{
-    assert(state->isActive());
-
-    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-                                    tb->s2e_tb->executionSignals.back());
-    assert(signal->empty());
-
-    try {
-        s2e->getCorePlugin()->onTranslateBlockStart.emit(signal, state, tb, pc);
-        if(!signal->empty()) {
-            s2e_tcg_instrument_code(s2e, signal, pc);
-            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-        }
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
-}
-
-void s2e_on_translate_block_end(
-        S2E* s2e, S2EExecutionState *state,
-        TranslationBlock *tb,
-        uint64_t insPc, int staticTarget, uint64_t targetPc)
-{
-    assert(state->isActive());
-
-    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-                                    tb->s2e_tb->executionSignals.back());
-    assert(signal->empty());
-
-    try {
-        s2e->getCorePlugin()->onTranslateBlockEnd.emit(
-                signal, state, tb, insPc,
-                staticTarget, targetPc);
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
-
-    if(!signal->empty()) {
-        s2e_tcg_instrument_code(s2e, signal, insPc);
-        tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-    }
+    assert(false && "stubbed");
+//    TCGv_ptr t0 = tcg_temp_new_ptr();
+//    TCGv_i64 t1 = tcg_temp_new_i64();
+//
+//    if (nextpc != (uint64_t)-1) {
+//#if TCG_TARGET_REG_BITS == 64 && defined(TARGET_X86_64)
+//        TCGv_i64 tpc = tcg_temp_new_i64();
+//        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
+//        tcg_gen_movi_i64(tpc, (tcg_target_ulong) nextpc);
+//        tcg_gen_st_i64(tpc, cpu_env, offsetof(CPUX86State, eip));
+//        tcg_temp_free_i64(tpc);
+//#else
+//        TCGv_i32 tpc = tcg_temp_new_i32();
+//        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
+//        tcg_gen_movi_i32(tpc, (tcg_target_ulong) nextpc);
+//        tcg_gen_st_i32(tpc, cpu_env, CPU_CONC_LIMIT);
+//
+//        tcg_temp_free_i32(tpc);
+//#endif
+//    }
+//
+//    // XXX: here we rely on CPUState being the first tcg global temp
+//    TCGArg args[2];
+//    args[0] = GET_TCGV_PTR(t0);
+//    args[1] = GET_TCGV_I64(t1);
+//
+//#if TCG_TARGET_REG_BITS == 64
+//    const int sizemask = 4 | 2;
+//    tcg_gen_movi_i64(TCGV_PTR_TO_NAT(t0), (tcg_target_ulong) signal);
+//#else
+//    const int sizemask = 4;
+//    tcg_gen_movi_i32(TCGV_PTR_TO_NAT(t0), (tcg_target_ulong) signal);
+//#endif
+//
+//    tcg_gen_movi_i64(t1, pc);
+//
+//    tcg_gen_helperN((void*) s2e_tcg_execution_handler,
+//                0, sizemask, TCG_CALL_DUMMY_ARG, 2, args);
+//
+//    tcg_temp_free_i64(t1);
+//    tcg_temp_free_ptr(t0);
+//}
+//
+//void s2e_on_translate_block_start(
+//        S2E* s2e, S2EExecutionState* state,
+//        TranslationBlock *tb, uint64_t pc)
+//{
+//    assert(state->isActive());
+//
+//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+//                                    tb->s2e_tb->executionSignals.back());
+//    assert(signal->empty());
+//
+//    try {
+//        s2e->getCorePlugin()->onTranslateBlockStart.emit(signal, state, tb, pc);
+//        if(!signal->empty()) {
+//            s2e_tcg_instrument_code(s2e, signal, pc);
+//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+//        }
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
+//}
+//
+//void s2e_on_translate_block_end(
+//        S2E* s2e, S2EExecutionState *state,
+//        TranslationBlock *tb,
+//        uint64_t insPc, int staticTarget, uint64_t targetPc)
+//{
+//    assert(state->isActive());
+//
+//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+//                                    tb->s2e_tb->executionSignals.back());
+//    assert(signal->empty());
+//
+//    try {
+//        s2e->getCorePlugin()->onTranslateBlockEnd.emit(
+//                signal, state, tb, insPc,
+//                staticTarget, targetPc);
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
+//
+//    if(!signal->empty()) {
+//        s2e_tcg_instrument_code(s2e, signal, insPc);
+//        tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+//    }
 }
 
 void s2e_on_translate_instruction_start(
         S2E* s2e, S2EExecutionState* state,
         TranslationBlock *tb, uint64_t pc)
 {
-    assert(state->isActive());
-
-    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-                                    tb->s2e_tb->executionSignals.back());
-    assert(signal->empty());
-
-    try {
-        s2e->getCorePlugin()->onTranslateInstructionStart.emit(signal, state, tb, pc);
-        if(!signal->empty()) {
-            s2e_tcg_instrument_code(s2e, signal, pc);
-            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-        }
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    assert(state->isActive());
+//
+//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+//                                    tb->s2e_tb->executionSignals.back());
+//    assert(signal->empty());
+//
+//    try {
+//        s2e->getCorePlugin()->onTranslateInstructionStart.emit(signal, state, tb, pc);
+//        if(!signal->empty()) {
+//            s2e_tcg_instrument_code(s2e, signal, pc);
+//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+//        }
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_on_translate_jump_start(
         S2E* s2e, S2EExecutionState* state,
         TranslationBlock *tb, uint64_t pc, int jump_type)
 {
-    assert(state->isActive());
-
-    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-                                    tb->s2e_tb->executionSignals.back());
-    assert(signal->empty());
-
-    try {
-        s2e->getCorePlugin()->onTranslateJumpStart.emit(signal, state, tb,
-                                                        pc, jump_type);
-        if(!signal->empty()) {
-            s2e_tcg_instrument_code(s2e, signal, pc);
-            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-        }
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    assert(state->isActive());
+//
+//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+//                                    tb->s2e_tb->executionSignals.back());
+//    assert(signal->empty());
+//
+//    try {
+//        s2e->getCorePlugin()->onTranslateJumpStart.emit(signal, state, tb,
+//                                                        pc, jump_type);
+//        if(!signal->empty()) {
+//            s2e_tcg_instrument_code(s2e, signal, pc);
+//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+//        }
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 //Nextpc is the program counter of the of the instruction that
@@ -275,55 +281,58 @@ void s2e_on_translate_instruction_end(
         S2E* s2e, S2EExecutionState* state,
         TranslationBlock *tb, uint64_t pc, uint64_t nextpc)
 {
-    assert(state->isActive());
-
-    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-                                    tb->s2e_tb->executionSignals.back());
-    assert(signal->empty());
-
-    try {
-        s2e->getCorePlugin()->onTranslateInstructionEnd.emit(signal, state, tb, pc);
-        if(!signal->empty()) {
-            s2e_tcg_instrument_code(s2e, signal, pc, nextpc);
-            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-        }
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    assert(state->isActive());
+//
+//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+//                                    tb->s2e_tb->executionSignals.back());
+//    assert(signal->empty());
+//
+//    try {
+//        s2e->getCorePlugin()->onTranslateInstructionEnd.emit(signal, state, tb, pc);
+//        if(!signal->empty()) {
+//            s2e_tcg_instrument_code(s2e, signal, pc, nextpc);
+//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+//        }
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_on_translate_register_access(
         TranslationBlock *tb, uint64_t pc,
         uint64_t readMask, uint64_t writeMask, int isMemoryAccess)
 {
-    assert(g_s2e_state->isActive());
-
-    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-                                    tb->s2e_tb->executionSignals.back());
-    assert(signal->empty());
-
-    try {
-        g_s2e->getCorePlugin()->onTranslateRegisterAccessEnd.emit(signal,
-                  g_s2e_state, tb, pc, readMask, writeMask, (bool)isMemoryAccess);
-
-        if(!signal->empty()) {
-            s2e_tcg_instrument_code(g_s2e, signal, pc);
-            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-        }
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    assert(g_s2e_state->isActive());
+//
+//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+//                                    tb->s2e_tb->executionSignals.back());
+//    assert(signal->empty());
+//
+//    try {
+//        g_s2e->getCorePlugin()->onTranslateRegisterAccessEnd.emit(signal,
+//                  g_s2e_state, tb, pc, readMask, writeMask, (bool)isMemoryAccess);
+//
+//        if(!signal->empty()) {
+//            s2e_tcg_instrument_code(g_s2e, signal, pc);
+//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+//        }
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 static void s2e_on_exception_slow(unsigned intNb)
 {
-    assert(g_s2e_state->isActive());
-
-    try {
-        g_s2e->getCorePlugin()->onException.emit(g_s2e_state, intNb, g_s2e_state->getPc());
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    assert(g_s2e_state->isActive());
+//
+//    try {
+//        g_s2e->getCorePlugin()->onException.emit(g_s2e_state, intNb, g_s2e_state->getPc());
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_on_exception(unsigned intNb)
@@ -342,47 +351,48 @@ static void s2e_trace_memory_access_slow(
         uint64_t vaddr, uint64_t haddr, uint8_t* buf, unsigned size,
         int isWrite, int isIO)
 {
-    uint64_t value = 0;
-    unsigned copy_size = (size > sizeof(value)) ? sizeof (value) : size;
-    memcpy(&value, buf, copy_size);
-    klee::ref<klee::Expr> exprValue = klee::ConstantExpr::create(value, copy_size << 3);
-
-    try {
-        klee::ref<klee::Expr> exprResult = g_s2e->getCorePlugin()->onDataMemoryAccess.emit(g_s2e_state,
-            klee::ConstantExpr::create(vaddr, 64),
-            klee::ConstantExpr::create(haddr, 64),
-            exprValue,
-            isWrite, isIO);
-
-        if (exprResult.isNull())
-        {
-            //Do nothing. HAHA!
-        }
-        else if (isa<klee::ConstantExpr>(exprResult))
-        {
-            if (cast<klee::ConstantExpr>(exprResult)->getWidth() / 8 != copy_size)
-            {
-                g_s2e->getWarningsStream() << "Return value size of onDataMemoryAccess signal handler differs from argument" << '\n';
-                //TODO: raise error
-                return;
-            }
-
-            uint64_t resultValue = cast<klee::ConstantExpr>(exprResult)->getZExtValue();
-
-            if (resultValue != value)
-                memcpy(buf, &resultValue, copy_size);
-        }
-        else
-        {
-            g_s2e->getDebugStream() << "DEBUG: onDataMemoryAccess returned symbolic value in concrete mode, switching to symbolic mode ..." << '\n';
-            g_s2e_state->jumpToSymbolicCpp();
-        }
-
-
-
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    uint64_t value = 0;
+//    unsigned copy_size = (size > sizeof(value)) ? sizeof (value) : size;
+//    memcpy(&value, buf, copy_size);
+//    klee::ref<klee::Expr> exprValue = klee::ConstantExpr::create(value, copy_size << 3);
+//
+//    try {
+//        klee::ref<klee::Expr> exprResult = g_s2e->getCorePlugin()->onDataMemoryAccess.emit(g_s2e_state,
+//            klee::ConstantExpr::create(vaddr, 64),
+//            klee::ConstantExpr::create(haddr, 64),
+//            exprValue,
+//            isWrite, isIO);
+//
+//        if (exprResult.isNull())
+//        {
+//            //Do nothing. HAHA!
+//        }
+//        else if (isa<klee::ConstantExpr>(exprResult))
+//        {
+//            if (cast<klee::ConstantExpr>(exprResult)->getWidth() / 8 != copy_size)
+//            {
+//                g_s2e->getWarningsStream() << "Return value size of onDataMemoryAccess signal handler differs from argument" << '\n';
+//                //TODO: raise error
+//                return;
+//            }
+//
+//            uint64_t resultValue = cast<klee::ConstantExpr>(exprResult)->getZExtValue();
+//
+//            if (resultValue != value)
+//                memcpy(buf, &resultValue, copy_size);
+//        }
+//        else
+//        {
+//            g_s2e->getDebugStream() << "DEBUG: onDataMemoryAccess returned symbolic value in concrete mode, switching to symbolic mode ..." << '\n';
+//            g_s2e_state->jumpToSymbolicCpp();
+//        }
+//
+//
+//
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 /**
@@ -400,20 +410,22 @@ void s2e_trace_memory_access(
 
 void s2e_on_page_fault(S2E *s2e, S2EExecutionState* state, uint64_t addr, int is_write)
 {
-    try {
-        s2e->getCorePlugin()->onPageFault.emit(state, addr, (bool)is_write);
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    try {
+//        s2e->getCorePlugin()->onPageFault.emit(state, addr, (bool)is_write);
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_on_tlb_miss(S2E *s2e, S2EExecutionState* state, uint64_t addr, int is_write)
 {
-    try {
-        s2e->getCorePlugin()->onTlbMiss.emit(state, addr, (bool)is_write);
-    } catch(s2e::CpuExitException&) {
-        s2e_longjmp(env->jmp_env, 1);
-    }
+    assert(false && "stubbed");
+//    try {
+//        s2e->getCorePlugin()->onTlbMiss.emit(state, addr, (bool)is_write);
+//    } catch(s2e::CpuExitException&) {
+//        s2e_longjmp(env->jmp_env, 1);
+//    }
 }
 
 void s2e_on_device_registration(S2E *s2e)
@@ -436,16 +448,17 @@ void s2e_trace_port_access(
         uint64_t port, uint64_t value, unsigned size,
         int isWrite)
 {
-    if(!s2e->getCorePlugin()->onPortAccess.empty()) {
-        try {
-            s2e->getCorePlugin()->onPortAccess.emit(state,
-                klee::ConstantExpr::create(port, 64),
-                klee::ConstantExpr::create(value, size),
-                isWrite);
-        } catch(s2e::CpuExitException&) {
-            s2e_longjmp(env->jmp_env, 1);
-        }
-    }
+    assert(false && "stubbed");
+//    if(!s2e->getCorePlugin()->onPortAccess.empty()) {
+//        try {
+//            s2e->getCorePlugin()->onPortAccess.emit(state,
+//                klee::ConstantExpr::create(port, 64),
+//                klee::ConstantExpr::create(value, size),
+//                isWrite);
+//        } catch(s2e::CpuExitException&) {
+//            s2e_longjmp(env->jmp_env, 1);
+//        }
+//    }
 }
 
 int s2e_is_port_symbolic(struct S2E *s2e, struct S2EExecutionState* state, uint64_t port)

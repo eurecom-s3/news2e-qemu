@@ -4,5 +4,7 @@ s2e-obj-y += ConfigFile.o ExprInterface.o \
 	S2EExecutionState.o S2EExecutor.o S2EStatsTracker.o \
 	SelectRemovalPass.o Slab.o Synchronization.o \
 
+s2e-obj-y += Plugins/
+
 #s2e-obj-y +=   QemuSocket.o
-obj-y += $(s2e-obj-y)
+obj-y += $(s2e-obj-y) ${s2e-plugin-obj-y}
