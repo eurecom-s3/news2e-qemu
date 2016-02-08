@@ -487,26 +487,28 @@ uint64_t S2ELUAExecutionState::readParameterCdecl(lua_State *L, uint32_t param)
     target_ulong sp = m_state->getSp() + (param + 1) * size;
 
 #ifdef TARGET_X86_64
-    if ((env->hflags & HF_CS64_MASK) && param > 5) {
-        sp = m_state->getSp() + (param - 5) * CPU_REG_SIZE;
-    }
-    if ((env->hflags & HF_CS64_MASK) && param < 6) {
-        unsigned int offset = 0;
-        switch (param) {
-        default:
-        case 0: offset = CPU_OFFSET(regs[R_EDI]); break;
-        case 1: offset = CPU_OFFSET(regs[R_ESI]); break;
-        case 2: offset = CPU_OFFSET(regs[R_EDX]); break;
-        case 3: offset = CPU_OFFSET(regs[R_ECX]); break;
-        case 4: offset = CPU_OFFSET(regs[8]);     break;
-        case 5: offset = CPU_OFFSET(regs[9]);     break;
-        }
-
-        if (!m_state->readCpuRegisterConcrete(offset, &val, sizeof (val)))
-            g_s2e->getDebugStream() << "S2ELUAExecutionState: could not read"
-                " parameter " << param <<
-                " at CPU->regs[" << hexval(CPU_CONC_LIMIT - offset) << "]\n";
-    } else
+	assert(false && "stubbed");
+	return 0;
+//    if ((env->hflags & HF_CS64_MASK) && param > 5) {
+//        sp = m_state->getSp() + (param - 5) * CPU_REG_SIZE;
+//    }
+//    if ((env->hflags & HF_CS64_MASK) && param < 6) {
+//        unsigned int offset = 0;
+//        switch (param) {
+//        default:
+//        case 0: offset = CPU_OFFSET(regs[R_EDI]); break;
+//        case 1: offset = CPU_OFFSET(regs[R_ESI]); break;
+//        case 2: offset = CPU_OFFSET(regs[R_EDX]); break;
+//        case 3: offset = CPU_OFFSET(regs[R_ECX]); break;
+//        case 4: offset = CPU_OFFSET(regs[8]);     break;
+//        case 5: offset = CPU_OFFSET(regs[9]);     break;
+//        }
+//
+//        if (!m_state->readCpuRegisterConcrete(offset, &val, sizeof (val)))
+//            g_s2e->getDebugStream() << "S2ELUAExecutionState: could not read"
+//                " parameter " << param <<
+//                " at CPU->regs[" << hexval(CPU_CONC_LIMIT - offset) << "]\n";
+//    } else
 #endif /* TARGET_X86_64 */
     if (!m_state->readMemoryConcrete(sp, &val, size)) {
         g_s2e->getDebugStream() << "S2ELUAExecutionState: could not read"
@@ -565,24 +567,26 @@ bool S2ELUAExecutionState::writeParameterCdecl(lua_State *L, uint32_t param, uin
   target_ulong sp = m_state->getSp() + (param + 1) * CPU_REG_SIZE;
 
 #ifdef TARGET_X86_64
-  if ((env->hflags & HF_CS64_MASK) && param > 5) {
-      sp = m_state->getSp() + (param - 5) * CPU_REG_SIZE;
-  }
-  if ((env->hflags & HF_CS64_MASK) && param < 6) {
-      unsigned int offset = 0;
-      switch (param) {
-      default:
-      case 0: offset = CPU_OFFSET(regs[R_EDI]); break;
-      case 1: offset = CPU_OFFSET(regs[R_ESI]); break;
-      case 2: offset = CPU_OFFSET(regs[R_EDX]); break;
-      case 3: offset = CPU_OFFSET(regs[R_ECX]); break;
-      case 4: offset = CPU_OFFSET(regs[8]);     break;
-      case 5: offset = CPU_OFFSET(regs[9]);     break;
-      }
-
-      m_state->writeCpuRegisterConcrete(offset, &archval, sizeof(archval));
-      return true;
-  } else
+  assert(false && "stubbed");
+  return false;
+//  if ((env->hflags & HF_CS64_MASK) && param > 5) {
+//      sp = m_state->getSp() + (param - 5) * CPU_REG_SIZE;
+//  }
+//  if ((env->hflags & HF_CS64_MASK) && param < 6) {
+//      unsigned int offset = 0;
+//      switch (param) {
+//      default:
+//      case 0: offset = CPU_OFFSET(regs[R_EDI]); break;
+//      case 1: offset = CPU_OFFSET(regs[R_ESI]); break;
+//      case 2: offset = CPU_OFFSET(regs[R_EDX]); break;
+//      case 3: offset = CPU_OFFSET(regs[R_ECX]); break;
+//      case 4: offset = CPU_OFFSET(regs[8]);     break;
+//      case 5: offset = CPU_OFFSET(regs[9]);     break;
+//      }
+//
+//      m_state->writeCpuRegisterConcrete(offset, &archval, sizeof(archval));
+//      return true;
+//  } else
 #endif /* TARGET_X86_64 */
       return m_state->writeMemoryConcrete(sp, &archval, sizeof(archval));
 #endif

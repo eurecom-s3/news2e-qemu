@@ -46,7 +46,7 @@
 #include <vector>
 #include <set>
 
-#include "machine.h"
+#include "s2e/assembler_helpers.h"
 
 namespace s2e
 {

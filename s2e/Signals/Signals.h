@@ -38,11 +38,11 @@
 
 #include <s2e/s2e_config.h>
 
-#ifdef S2E_USE_FAST_SIGNALS
-#define sigc fsigc
-#include "fsigc++.h"
-#else
+//#ifdef S2E_USE_FAST_SIGNALS
+//#define sigc fsigc
+//#include "fsigc++.h"
+//#else
 #include <sigc++/sigc++.h>
-#endif
+//#endif
 
 #endif

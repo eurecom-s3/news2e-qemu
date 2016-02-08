@@ -40,22 +40,48 @@
 
 #define _S2E_MACHINE_H_
 
-#include <inttypes.h>
+#include <stdint.h>
+
+#ifdef WIN32
+#define bit_scan_forward_64 bit_scan_forward_64_win32
+#define s2e_setjmp s2e_setjmp_win32
+#define s2e_longjmp s2e_longjmp_win32
+#else
+#define bit_scan_forward_64 bit_scan_forward_64_posix
+#define s2e_setjmp s2e_setjmp_posix
+#define s2e_longjmp s2e_longjmp_posix
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-//XXX: ugly hack to support underscores
-#ifndef _WIN32
-#define bit_scan_forward_64 bit_scan_forward_64_posix
-int bit_scan_forward_64_posix(uint64_t *SetIndex, uint64_t Mask)  asm ("bit_scan_forward_64_posix");
+struct s2e_jmpbuf {
+	uint64_t rax;
+	uint64_t rbx;
+	uint64_t rcx;
+	uint64_t rdx;
+	uint64_t rsi;
+	uint64_t rdi;
+	uint64_t rbp;
+	uint64_t rsp;
 
-#else
+	uint64_t r8;
+	uint64_t r9;
+	uint64_t r10;
+	uint64_t r11;
+	uint64_t r12;
+	uint64_t r13;
+	uint64_t r14;
+	uint64_t r15;
+	uint64_t rip;
+} __attribute__((__packed__));
 
 int bit_scan_forward_64(uint64_t *SetIndex, uint64_t Mask);
-#endif
-#ifdef __cplusplus
+int s2e_setjmp(struct s2e_jmpbuf *buf);
+int s2e_longjmp(struct s2e_jmpbuf *buf, int val);
+
+#ifdef __cplusplus 
 }
 #endif
 

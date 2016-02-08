@@ -725,72 +725,76 @@ uint64_t S2EExecutionState::getSp() const
 //was executed.
 bool S2EExecutionState::bypassFunction(unsigned paramCount)
 {
-    bool ok = false;
-    uint64_t retAddr;
-    target_ulong newSp = 0;
-    ok = getReturnAddress(&retAddr);
-
-#if defined(TARGET_I386)
-    newSp = getSp();
-#ifdef TARGET_X86_64
-    if (env->hflags & HF_CS64_MASK) {
-    // First six parameters in x86_64 are passed in registers, with the rest on
-    // the stack
-        newSp += (paramCount > 6) ? (paramCount - 5) * CPU_REG_SIZE : CPU_REG_SIZE;
-    } else
-#else
-    newSp += (paramCount + 1) * sizeof (uint32_t);
-#endif
-
-#elif defined(TARGET_ARM)
-    if (retAddr & 1) {
-        // return-to-Thumb case, this is actually retAddr+1
-        retAddr &= ~1;
-    }
-    // First four parameters in ARM are passed in registers, with the rest on
-    // the stack
-    newSp = getSp();
-    newSp += (paramCount > 4) ? (paramCount - 3) * CPU_REG_SIZE : CPU_REG_SIZE;
-#else
-    assert(false && "Not implemented for this architecture");
-#endif
-    if (ok) {
-        setSp(newSp);
-        setPc(retAddr);
-    }
-    return ok;
-
+	assert(false && "stubbed");
+	return false;
+//    bool ok = false;
+//    uint64_t retAddr;
+//    target_ulong newSp = 0;
+//    ok = getReturnAddress(&retAddr);
+//
+//#if defined(TARGET_I386)
+//    newSp = getSp();
+//#ifdef TARGET_X86_64
+//    if (env->hflags & HF_CS64_MASK) {
+//    // First six parameters in x86_64 are passed in registers, with the rest on
+//    // the stack
+//        newSp += (paramCount > 6) ? (paramCount - 5) * CPU_REG_SIZE : CPU_REG_SIZE;
+//    } else
+//#else
+//    newSp += (paramCount + 1) * sizeof (uint32_t);
+//#endif
+//
+//#elif defined(TARGET_ARM)
+//    if (retAddr & 1) {
+//        // return-to-Thumb case, this is actually retAddr+1
+//        retAddr &= ~1;
+//    }
+//    // First four parameters in ARM are passed in registers, with the rest on
+//    // the stack
+//    newSp = getSp();
+//    newSp += (paramCount > 4) ? (paramCount - 3) * CPU_REG_SIZE : CPU_REG_SIZE;
+//#else
+//    assert(false && "Not implemented for this architecture");
+//#endif
+//    if (ok) {
+//        setSp(newSp);
+//        setPc(retAddr);
+//    }
+//    return ok;
+//
 }
 
 //May be called right after the machine call instruction
 bool S2EExecutionState::getReturnAddress(uint64_t *retAddr)
 {
-    bool ok = false;
-    target_ulong t_retAddr = 0;
-    target_ulong size = 0;
-    *retAddr = 0;
-
-#ifdef TARGET_I386
-    size = sizeof (uint32_t);
-#ifdef TARGET_X86_64
-    if (env->hflags & HF_CS64_MASK) size = CPU_REG_SIZE;
-#endif /* TARGET_X86_64 */
-    ok = readMemoryConcrete(getSp(), &t_retAddr, size);
-
-#elif defined(TARGET_ARM)
-    size = CPU_REG_SIZE;
-    ok = readCpuRegisterConcrete(CPU_OFFSET(regs[14]), &t_retAddr, size);
-    // Beware: in return-to-Thumb case, you got retaddr+1
-#else
-    assert(false && "Not implemented on this architecture");
-#endif
-
-    if (!ok) {
-        g_s2e->getDebugStream() << "Could not get the return address" << '\n';
-    } else {
-        *retAddr = static_cast<uint64_t>(t_retAddr);
-    }
-    return ok;
+	assert(false && "stubbed");
+	return false;
+//    bool ok = false;
+//    target_ulong t_retAddr = 0;
+//    target_ulong size = 0;
+//    *retAddr = 0;
+//
+//#ifdef TARGET_I386
+//    size = sizeof (uint32_t);
+//#ifdef TARGET_X86_64
+//    if (env->hflags & HF_CS64_MASK) size = CPU_REG_SIZE;
+//#endif /* TARGET_X86_64 */
+//    ok = readMemoryConcrete(getSp(), &t_retAddr, size);
+//
+//#elif defined(TARGET_ARM)
+//    size = CPU_REG_SIZE;
+//    ok = readCpuRegisterConcrete(CPU_OFFSET(regs[14]), &t_retAddr, size);
+//    // Beware: in return-to-Thumb case, you got retaddr+1
+//#else
+//    assert(false && "Not implemented on this architecture");
+//#endif
+//
+//    if (!ok) {
+//        g_s2e->getDebugStream() << "Could not get the return address" << '\n';
+//    } else {
+//        *retAddr = static_cast<uint64_t>(t_retAddr);
+//    }
+//    return ok;
 }
 
 void S2EExecutionState::dumpStack(unsigned count)
@@ -1597,17 +1601,18 @@ std::vector<ref<Expr> > S2EExecutionState::createSymbolicArray(
 //XXX: remove circular references with executor?
 void S2EExecutionState::undoCallAndJumpToSymbolic()
 {
-    if (needToJumpToSymbolic()) {
-        //Undo the call
-        target_ulong size = sizeof (uint32_t);
-#ifdef TARGET_X86_64
-        if (env->hflags & HF_CS64_MASK) size = CPU_REG_SIZE;
-#endif /* TARGET_X86_64 */
-        assert(getTb()->pcOfLastInstr);
-        setSp(getSp() + size);
-        setPc(getTb()->pcOfLastInstr);
-        jumpToSymbolicCpp();
-    }
+	assert(false && "stubbed");
+//    if (needToJumpToSymbolic()) {
+//        //Undo the call
+//        target_ulong size = sizeof (uint32_t);
+//#ifdef TARGET_X86_64
+//        if (env->hflags & HF_CS64_MASK) size = CPU_REG_SIZE;
+//#endif /* TARGET_X86_64 */
+//        assert(getTb()->pcOfLastInstr);
+//        setSp(getSp() + size);
+//        setPc(getTb()->pcOfLastInstr);
+//        jumpToSymbolicCpp();
+//    }
 }
 
 void S2EExecutionState::jumpToSymbolicCpp()

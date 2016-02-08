@@ -182,12 +182,13 @@ static void s2e_tcg_instrument_code(S2E*, ExecutionSignal* signal, uint64_t pc, 
 //
 //    tcg_temp_free_i64(t1);
 //    tcg_temp_free_ptr(t0);
-//}
-//
-//void s2e_on_translate_block_start(
-//        S2E* s2e, S2EExecutionState* state,
-//        TranslationBlock *tb, uint64_t pc)
-//{
+}
+
+void s2e_on_translate_block_start(
+        S2E* s2e, S2EExecutionState* state,
+        TranslationBlock *tb, uint64_t pc)
+{
+    assert(false && "stubbed");
 //    assert(state->isActive());
 //
 //    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
@@ -203,13 +204,14 @@ static void s2e_tcg_instrument_code(S2E*, ExecutionSignal* signal, uint64_t pc, 
 //    } catch(s2e::CpuExitException&) {
 //        s2e_longjmp(env->jmp_env, 1);
 //    }
-//}
-//
-//void s2e_on_translate_block_end(
-//        S2E* s2e, S2EExecutionState *state,
-//        TranslationBlock *tb,
-//        uint64_t insPc, int staticTarget, uint64_t targetPc)
-//{
+}
+
+void s2e_on_translate_block_end(
+        S2E* s2e, S2EExecutionState *state,
+        TranslationBlock *tb,
+        uint64_t insPc, int staticTarget, uint64_t targetPc)
+{
+    assert(false && "stubbed");
 //    assert(state->isActive());
 //
 //    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
@@ -461,7 +463,7 @@ void s2e_trace_port_access(
 //    }
 }
 
-int s2e_is_port_symbolic(struct S2E *s2e, struct S2EExecutionState* state, uint64_t port)
+int s2e_is_port_symbolic(S2E *s2e, S2EExecutionState* state, uint64_t port)
 {
     return s2e->getCorePlugin()->isPortSymbolic(port);
 }
@@ -522,14 +524,12 @@ void s2e_on_initialization_complete(void)
     }
 }
 
-int qmp_s2e_exec(Monitor *mon, const QDict *args, QObject **ret)
+void qmp_s2e_exec(QDict *qdict, QObject **ret, Error **err)
 {
     QDict *retDict = qdict_new();
 
-    g_s2e->getCorePlugin()->onMonitorCommand.emit(mon, args, retDict);
+    g_s2e->getCorePlugin()->onMonitorCommand.emit(qdict, retDict, err);
     *ret = QOBJECT(retDict);
-
-    return 0;
 }
 
 void s2e_on_monitor_event(QDict *event)

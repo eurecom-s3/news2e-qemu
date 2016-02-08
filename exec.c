@@ -2081,13 +2081,15 @@ uintptr_t s2e_notdirty_mem_write(CPUState *cpu, hwaddr ram_addr)
    regions in a page go here. */
 static uint64_t s2edma_mem_read(void *opaque, hwaddr ram_addr, unsigned size)
 {
-    switch(size) {
-        case 1: return ldub_raw(qemu_get_ram_ptr(ram_addr));
-        case 2: return lduw_raw(qemu_get_ram_ptr(ram_addr));
-        case 4: return ldl_raw(qemu_get_ram_ptr(ram_addr));
-    }
-    assert(false && "Invalid size");
-    return 0;
+	assert(false && "stubbed");
+	return 0;
+//    switch(size) {
+//        case 1: return ldub_raw(qemu_get_ram_ptr(ram_addr));
+//        case 2: return lduw_raw(qemu_get_ram_ptr(ram_addr));
+//        case 4: return ldl_raw(qemu_get_ram_ptr(ram_addr));
+//    }
+//    assert(false && "Invalid size");
+//    return 0;
 }
 
 int s2e_ismemfunc(MemoryRegion *mr, int isWrite)
@@ -2097,6 +2099,22 @@ int s2e_ismemfunc(MemoryRegion *mr, int isWrite)
     } else {
         return mr->ops->read == s2edma_mem_read;
     }
+}
+
+uintptr_t s2e_get_host_address(hwaddr paddr)
+{
+	assert(false && "stubbed");
+	return 0;
+/* 
+    MemoryRegionSection *section;
+    section = phys_page_find(paddr >> TARGET_PAGE_BITS);
+    if (!section || !is_ram_rom_romd(section)) {
+        return (uintptr_t) -1;
+    }
+
+    return (uintptr_t)memory_region_get_ram_ptr(section->mr)
+            + section_addr(section, paddr);
+*/
 }
 
 #endif

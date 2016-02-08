@@ -1506,13 +1506,12 @@ const char* tcg_llvm_get_func_name(TranslationBlock *tb)
     return buf;
 }
 
-uintptr_t tcg_llvm_qemu_tb_exec(void *env1, TranslationBlock *tb)
+uintptr_t tcg_llvm_qemu_tb_exec(CPUState *cpu, TranslationBlock *tb)
 {
+    CPUArchState *env = (CPUArchState *) cpu->env_ptr;
 #ifndef CONFIG_S2E
     tcg_llvm_runtime.last_tb = tb;
 #endif
-    extern CPUArchState *env;
-    env = (CPUArchState*)env1;
     uintptr_t next_tb;
 
     next_tb = ((uintptr_t (*)(void*)) tb->llvm_tc_ptr)(&env);

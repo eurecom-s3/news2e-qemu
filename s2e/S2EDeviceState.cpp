@@ -181,8 +181,9 @@ void S2EDeviceState::initDeviceState()
     if (!PersistentDiskWrites) {
         g_s2e->getMessagesStream() <<
                 "WARNING!!! All writes to disk will be lost after shutdown." << '\n';
-        __hook_bdrv_read = s2e_bdrv_read;
-        __hook_bdrv_write = s2e_bdrv_write;
+		assert(false && "stubbed");
+//        __hook_bdrv_read = s2e_bdrv_read;
+//        __hook_bdrv_write = s2e_bdrv_write;
     }else {
         g_s2e->getMessagesStream() <<
                 "WARNING!!! All disk writes will be SHARED across states! BEWARE OF CORRUPTION!" << '\n';

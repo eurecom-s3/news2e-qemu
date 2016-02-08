@@ -294,9 +294,9 @@ public:
      * the S2E-specific command parameters.
      */
     sigc::signal<void,
-                Monitor * /* mon */,
                 const QDict * /* qdict */,
-                QDict * /* ret */>
+                QDict * /* ret */,
+                Error ** /* error */>
           onMonitorCommand;
 
     /**
