@@ -76,6 +76,7 @@ uint64_t helper_set_cc_op_eflags(void);
 #endif
 
 #include "exec/s2e.h"
+#include "s2e/helpers.h"
 #include "s2e/cxx/S2EExecutor.h"
 #include "s2e/cxx/TCGLLVMContext.h"
 #include "s2e/TCGLLVMRuntime.h"
@@ -673,7 +674,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
 
     __DEFINE_EXT_FUNCTION(cpu_io_recompile)
 #ifdef TARGET_ARM
-    assert(false && "stubbed");
+   llvm::errs() << "TODO: implement " << __func__ << '\n';
     //__DEFINE_EXT_FUNCTION(arm_cpu_handle_mmu_fault)
     __DEFINE_EXT_FUNCTION(cpsr_read)
     __DEFINE_EXT_FUNCTION(cpsr_write)
@@ -686,13 +687,13 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr3)
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr4)
     __DEFINE_EXT_FUNCTION(cpu_x86_cpuid)
-    assert(false && "stubbed");
+    llvm::errs() << "TODO: implement " << __func__ << '\n';
 //    __DEFINE_EXT_FUNCTION(cpu_get_apic_base)
 //    __DEFINE_EXT_FUNCTION(cpu_set_apic_base)
 //    __DEFINE_EXT_FUNCTION(cpu_get_apic_tpr)
 //    __DEFINE_EXT_FUNCTION(cpu_set_apic_tpr)
     __DEFINE_EXT_FUNCTION(cpu_smm_update)
-    assert(false && "stubbed");
+    llvm::errs() << "TODO: implement " << __func__ << '\n';
 //    __DEFINE_EXT_FUNCTION(hw_breakpoint_insert)
 //    __DEFINE_EXT_FUNCTION(hw_breakpoint_remove)
 //    __DEFINE_EXT_FUNCTION(check_hw_breakpoints)
@@ -710,7 +711,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(cpu_abort)
     __DEFINE_EXT_FUNCTION(cpu_loop_exit)
 
-    assert(false && "stubbed");
+    llvm::errs() << "TODO: implement " << __func__ << '\n';
 //    __DEFINE_EXT_FUNCTION(tb_find_pc)
 
     __DEFINE_EXT_FUNCTION(qemu_system_reset_request)
@@ -718,7 +719,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(tlb_flush_page)
     __DEFINE_EXT_FUNCTION(tlb_flush)
 
-    assert(false && "stubbed");
+    llvm::errs() << "TODO: implement " << __func__ << '\n';
 //    __DEFINE_EXT_FUNCTION(io_readb_mmu)
 //    __DEFINE_EXT_FUNCTION(io_readw_mmu)
 //    __DEFINE_EXT_FUNCTION(io_readl_mmu)
@@ -750,7 +751,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(s2e_notdirty_mem_write)
 
     __DEFINE_EXT_FUNCTION(cpu_io_recompile)
-    assert(false && "stubbed");
+    llvm::errs() << "TODO: implement " << __func__ << '\n';
  //   __DEFINE_EXT_FUNCTION(can_do_io)
 
     __DEFINE_EXT_FUNCTION(ldub_phys)
@@ -764,16 +765,6 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
 
     __DEFINE_EXT_FUNCTION(ldq_phys)
     __DEFINE_EXT_FUNCTION(stq_phys)
-
-#if 0
-    //Implementing these functions prevents special function handler
-    //from being called...
-    if (execute_llvm) {
-        __DEFINE_EXT_FUNCTION(tcg_llvm_fork_and_concretize)
-        __DEFINE_EXT_FUNCTION(tcg_llvm_trace_memory_access)
-        __DEFINE_EXT_FUNCTION(tcg_llvm_trace_port_access)
-    }
-#endif
 
     if(UseSelectCleaner) {
         m_tcgLLVMContext->getFunctionPassManager()->add(new SelectRemovalPass());

@@ -41,7 +41,7 @@ void S2E_CallOnTranslateBlockStartHandlers(S2E *self, S2EExecutionState *state, 
 void S2E_CallOnTranslateInstructionStartHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc);
 
 
-/*
+/**
  * Call registered handlers for the OnTranslateInstructionEnd event.
  * @param self Instance pointer
  * @param state Current execution state
@@ -50,7 +50,7 @@ void S2E_CallOnTranslateInstructionStartHandlers(S2E *self, S2EExecutionState *s
  */
 void S2e_CallOnTranslateInstructionEndHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc, uint64_t nextPc);
 
-/*
+/**
  * Call registered handlers for the OnTranslateBlockEnd event.
  * @param self Instance pointer
  * @param state Current execution state

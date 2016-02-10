@@ -330,11 +330,6 @@ void tcg_llvm_make_symbolic(void *addr, unsigned nbytes, const char *name);
 void tcg_llvm_get_value(void *addr, unsigned nbytes, bool addConstraint);
 //#endif
 
-
-/* Register target-specific helpers with LLVM */
-void helper_register_symbols(void);
-void helper_register_symbol(const char *name, void *address);
-
 #ifdef __cplusplus
 }
 #endif

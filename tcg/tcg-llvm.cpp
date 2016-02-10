@@ -1452,6 +1452,12 @@ void TCGLLVMContext::generateCode(TCGContext *s, TranslationBlock *tb)
 
 TCGLLVMContext* TCGLLVM_Initialize(void)
 {
+    // Initialize targets and assembly printers/parsers.
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllDisassemblers();
+
     return TCGLLVMContext_GetInstance();
 }
 

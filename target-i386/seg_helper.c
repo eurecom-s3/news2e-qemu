@@ -2631,3 +2631,11 @@ void helper_check_iol(CPUX86State *env, uint32_t t0)
 {
     check_io(env, t0, 4, GETPC());
 }
+
+#if defined(CONFIG_S2E) && !defined(S2E_LLVM_LIB)
+void helper_register_symbols()
+{
+    helper_register_symbol("helper_load_seg", helper_load_seg);
+}
+#endif
+

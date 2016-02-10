@@ -15,11 +15,6 @@ TCGLLVMContext* TCGLLVMContext_GetInstance(void)
 	static TCGLLVMContext *self = NULL;
 
 	if (self == NULL) {
-		if (!llvm_is_multithreaded()) {
-			llvm::errs() << "ERROR - " << __FILE__ << ":" << __LINE__ << ": Could not initialize LLVM threading" << '\n';
-			exit(-1);
-		}
-
 		self = new TCGLLVMContext;
 	}
 
