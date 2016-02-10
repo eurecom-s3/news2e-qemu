@@ -128,9 +128,6 @@ int main(int argc, char **argv)
 #include "sysemu/arch_init.h"
 #include "qemu/osdep.h"
 
-#ifdef CONFIG_S2E
-#include <s2e/s2e_qemu.h>
-#endif
 #include <hw/pci/fakepci.h>
 
 #include "ui/qemu-spice.h"
@@ -142,6 +139,9 @@ int main(int argc, char **argv)
 #include "crypto/init.h"
 #include "sysemu/replay.h"
 #include "qapi/qmp/qerror.h"
+
+#include "s2e/S2E.h"
+#include "s2e/tcg-llvm.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 #define MAX_SCLP_CONSOLES 1
@@ -206,9 +206,7 @@ uint8_t qemu_extra_params_fw[2];
 
 int icount_align_option;
 
-#if !defined(CONFIG_S2E)
 fake_pci_t g_fake_pci;
-#endif
 typedef struct FWBootEntry FWBootEntry;
 
 struct FWBootEntry {
@@ -930,25 +928,27 @@ static void configure_rtc(QemuOpts *opts)
     }
 }
 
-#ifdef CONFIG_S2E
 static void s2e_cleanup(void)
 {
+	assert(false && "stubbed");
+  /*
     if(g_s2e) {
         s2e_close(g_s2e);
         g_s2e = NULL;
     }
+  */
 }
-#endif
 
-#ifdef CONFIG_LLVM
 static void tcg_llvm_cleanup(void)
 {
+	assert(false && "stubbed");
+    /*
     if(tcg_llvm_ctx) {
         tcg_llvm_close(tcg_llvm_ctx);
         tcg_llvm_ctx = NULL;
     }
+    */
 }
-#endif
 
 /***********************************************************/
 /* Bluetooth support */
@@ -2308,6 +2308,7 @@ char *qemu_find_file(int type, const char *name)
 
     switch (type) {
     case QEMU_FILE_TYPE_LIB:
+		assert(false && "This is a bad hack and should be removed immediately");
         #define TARGET_NAME "arm"
         /* XXX: Terrible hack. Redo it properly! */
         subdir="../" TARGET_NAME "-s2e-softmmu/";
@@ -3041,13 +3042,7 @@ int main(int argc, char **argv, char **envp)
     MachineClass *machine_class;
     const char *cpu_model;
 
-#ifdef CONFIG_S2E
-    const char *s2e_config_file = NULL;
-    const char *s2e_output_dir = NULL;
-    int execute_always_klee = 0;
-    int s2e_verbose = 0;
-    int s2e_max_processes = 1;
-#endif
+	S2ECommandLineOptions s2e_cmdline_opts = S2ECommandLineOptions_DefaultValues();
 
     const char *vga_model = NULL;
     const char *qtest_chrdev = NULL;
@@ -3186,14 +3181,12 @@ int main(int argc, char **argv, char **envp)
                 cpu_model = optarg;
                 break;
 
-#ifdef CONFIG_S2E
             case QEMU_OPTION_s2e_config_file:
-              s2e_config_file = optarg;
+              s2e_cmdline_opts.config_file = optarg;
               break;
             case QEMU_OPTION_s2e_output_dir:
-              s2e_output_dir = optarg;
+              s2e_cmdline_opts.output_dir = optarg;
               break;
-#else
             case QEMU_OPTION_fake_pci_name:
               g_fake_pci.name = optarg;
               break;
@@ -3257,7 +3250,6 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_fake_pci_cap_pcie: // PCI-E support
               g_fake_pci.cap_pcie = strtol(optarg, NULL, 0);
               break;
-#endif
 
             case QEMU_OPTION_hda:
                 {
@@ -4097,39 +4089,25 @@ int main(int argc, char **argv, char **envp)
                     }
                     break;
                 }
-#if defined(CONFIG_LLVM)
-            case QEMU_OPTION_execute_llvm:
-                if (!has_llvm_engine) {
-                    fprintf(stderr, "Cannot execute un LLVM mode (S2E mode present or LLVM mode missing)\n");
-                    exit(1);
-                }
-                generate_llvm = 1;
-                execute_llvm = 1;
-                break;
-            case QEMU_OPTION_generate_llvm:
-                if (!has_llvm_engine) {
-                    fprintf(stderr, "Cannot execute un LLVM mode (S2E mode present or LLVM mode missing)\n");
-                    exit(1);
-                }
-
-                generate_llvm = 1;
-                break;
-#endif
-#ifdef CONFIG_S2E
             case QEMU_OPTION_always_klee:
-                execute_always_klee = 1;
+                s2e_cmdline_opts.always_execute_klee = true;
                 break;
             case QEMU_OPTION_s2e_verbose:
-                s2e_verbose = 1;
+				s2e_cmdline_opts.verbose = true;
                 break;
             case QEMU_OPTION_s2e_max_processes:
-                s2e_max_processes = strtol(optarg, NULL, 0);
-                if (s2e_max_processes == 0) {
-                    s2e_max_processes = 1;
-                }
+                s2e_cmdline_opts.max_processes = strtoul(optarg, NULL, 0);
+				if (s2e_cmdline_opts.max_processes < 1) {
+					s2e_cmdline_opts.max_processes = 1;
+				}
                 break;
-#endif
-
+            case QEMU_OPTION_execute_llvm:
+                s2e_cmdline_opts.always_generate_llvm = true;
+                s2e_cmdline_opts.execute_llvm = true;
+                break;
+            case QEMU_OPTION_generate_llvm:
+                s2e_cmdline_opts.always_generate_llvm = true;
+                break;
             case QEMU_OPTION_qtest:
                 qtest_chrdev = optarg;
                 break;
@@ -4291,30 +4269,24 @@ int main(int argc, char **argv, char **envp)
             exit(1);
         }
     }
-#if defined(CONFIG_LLVM)
-#if defined(CONFIG_S2E)
-    if (execute_always_klee && execute_llvm) {
-        fprintf(stderr, "Cannot execute both in KLEE and LLVM mode\n");
+    if (s2e_cmdline_opts.always_execute_klee && s2e_cmdline_opts.execute_llvm) {
+        error_report("Cannot execute both in KLEE and LLVM mode");
         exit(1);
     }
-#endif
 
-    tcg_llvm_ctx = tcg_llvm_initialize();
-#endif
+	TCGLLVMContext *tcg_llvm_ctx = TCGLLVM_Initialize();
 
-#ifdef CONFIG_S2E
-    if (!s2e_config_file) {
-      fprintf(stderr, "Warning: S2E configuration file was not specified, "
-                        "using the default (empty) file\n");
+    if (!s2e_cmdline_opts.config_file) {
+    	error_report("S2E configuration file was not specified, "
+                        "Running S2E without a configuration does not make sense. Terminating.");
+		exit(1);
     }
-    g_s2e = s2e_initialize(argc, argv, tcg_llvm_ctx,
-                           s2e_config_file, s2e_output_dir,
-                           s2e_verbose, s2e_max_processes);
+	printf("Initializing s2e\n");
+	S2E* g_s2e = S2E_New(argc, argv, tcg_llvm_ctx, &s2e_cmdline_opts);
+	S2EExecutionState *g_s2e_state = S2E_CreateInitialState(g_s2e);
 
-    g_s2e_state = s2e_create_initial_state(g_s2e);
 
     atexit(s2e_cleanup);;
-#endif
     
     /* If no data_dir is specified then try to find it relative to the
        executable path.  */
@@ -4705,12 +4677,11 @@ int main(int argc, char **argv, char **envp)
         select_vgahw(vga_model);
     }
 
-#ifdef CONFIG_S2E
-    s2e_on_device_registration(g_s2e);
+	S2E_CallOnDeviceRegistrationHandlers(g_s2e);
+
 //#elif defined(TARGET_I386)
 //    fakepci_register_device(&g_fake_pci);
 // TODO: fakepci for ARM?
-#endif
 
     if (qemu_opts_foreach(qemu_find_opts("device"), device_help_func, NULL, 0) != 0) {
         exit(0);
@@ -4843,15 +4814,13 @@ int main(int argc, char **argv, char **envp)
      * when bus is created by qdev.c */
     qemu_register_reset(qbus_reset_all_fn, sysbus_get_default());
     qemu_run_machine_init_done_notifiers();
-    
-#ifdef CONFIG_S2E
-    s2e_init_device_state(g_s2e_state);
-    s2e_init_timers(g_s2e);
-
-    s2e_initialize_execution(g_s2e, g_s2e_state, execute_always_klee);
-    s2e_register_dirty_mask(g_s2e, g_s2e_state, (uint64_t)ram_list.phys_dirty, last_ram_offset() >> TARGET_PAGE_BITS);
-    s2e_on_initialization_complete();
-#endif
+   
+	S2EExecutionState_InitDeviceState(g_s2e_state);
+	S2E_InitTimers(g_s2e);	
+	
+	S2E_InitExecution(g_s2e, g_s2e_state);
+	S2E_RegisterDirtyMask(g_s2e, g_s2e_state);
+	S2E_CallOnInitializationCompleteHandlers(g_s2e);
 
     if (rom_check_and_register_reset() != 0) {
         error_report("rom check and register reset failed");
@@ -4910,13 +4879,8 @@ int main(int argc, char **argv, char **envp)
     tpm_cleanup();
 #endif
 
-#ifdef CONFIG_S2E
     s2e_cleanup();
-#endif
-
-#ifdef CONFIG_LLVM
     tcg_llvm_cleanup();
-#endif
 
     return 0;
 }

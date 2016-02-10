@@ -49,11 +49,7 @@
 #include "s2e/s2e_qemu.h"
 #endif
 
-
-#if defined(CONFIG_LLVM)
-#include "tcg/tcg-llvm.h"
-const int has_llvm_engine = 1;
-#endif
+#include "s2e/target/tcg-llvm.h"
 
 int generate_llvm = 0;
 int execute_llvm = 0;

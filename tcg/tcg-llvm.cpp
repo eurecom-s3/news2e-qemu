@@ -37,7 +37,9 @@ extern "C" {
 #include "tcg.h"
 }
 
-#include "tcg-llvm.h"
+#include "s2e/target/tcg-llvm.h"
+#include "s2e/cxx/TCGLLVMContext.h"
+#include "s2e/TCGLLVMRuntime.h"
 
 extern "C" {
 #include "config.h"
@@ -87,24 +89,17 @@ static void *qemu_st_helpers[5] = {
 #include <iostream>
 #include <sstream>
 
-
 //#undef NDEBUG
 
-extern "C" {
-    TCGLLVMContext* tcg_llvm_ctx = 0;
+TCGLLVMContext* tcg_llvm_ctx = 0;
 
-    /* These data is accessible from generated code */
-    TCGLLVMRuntime tcg_llvm_runtime = {
-        0, 0, {0,0,0}
-#ifdef CONFIG_S2E
-        , 0
-#endif
-#ifndef CONFIG_S2E
-        , 0, 0, 0
-#endif
-    };
+/* These data is accessible from generated code */
+TCGLLVMRuntime tcg_llvm_runtime = {
+    0, 0, {0,0,0}
+    , 0
+};
 
-}
+
 
 using namespace llvm;
 
@@ -1455,18 +1450,14 @@ void TCGLLVMContext::generateCode(TCGContext *s, TranslationBlock *tb)
 /*****************************/
 /* Functions for QEMU c code */
 
-TCGLLVMContext* tcg_llvm_initialize()
+TCGLLVMContext* TCGLLVM_Initialize(void)
 {
-    if (!llvm_start_multithreaded()) {
-        fprintf(stderr, "Could not initialize LLVM threading\n");
-        exit(-1);
-    }
-    return new TCGLLVMContext;
+    return TCGLLVMContext_GetInstance();
 }
 
-void tcg_llvm_close(TCGLLVMContext *l)
+void TCGLLVMContext_Close(TCGLLVMContext *self)
 {
-    delete l;
+    delete self;
 }
 
 void tcg_llvm_gen_code(TCGLLVMContext *l, TCGContext *s, TranslationBlock *tb)
@@ -1474,7 +1465,7 @@ void tcg_llvm_gen_code(TCGLLVMContext *l, TCGContext *s, TranslationBlock *tb)
     l->generateCode(s, tb);
 }
 
-void tcg_llvm_tb_alloc(TranslationBlock *tb)
+void TCGLLVM_TbAlloc(TranslationBlock *tb)
 {
     tb->tcg_llvm_context = NULL;
     tb->llvm_function = NULL;

@@ -37,8 +37,8 @@
 
 #define __MODULE_MONITOR_PLUGIN_H__
 
-#include <s2e/Plugin.h>
-#include <s2e/S2EExecutionState.h>
+#include "s2e/cxx/Plugin.h"
+#include "s2e/cxx/S2EExecutionState.h"
 #include "ModuleDescriptor.h"
 #include "ThreadDescriptor.h"
 

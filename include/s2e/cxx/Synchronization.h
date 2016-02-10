@@ -33,8 +33,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_SYNCHRONIZATION_H
-#define S2E_SYNCHRONIZATION_H
+#ifndef S2E_CXX_SYNCHRONIZATION_H
+#define S2E_CXX_SYNCHRONIZATION_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #include <inttypes.h>
 #include <string>
@@ -134,4 +138,4 @@ public:
 
 }
 
-#endif
+#endif /* S2E_CXX_SYNCHRONIZATION_H */

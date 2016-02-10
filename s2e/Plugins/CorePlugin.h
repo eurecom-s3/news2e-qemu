@@ -36,7 +36,7 @@
 #ifndef S2E_CORE_PLUGIN_H
 #define S2E_CORE_PLUGIN_H
 
-#include <s2e/Plugin.h>
+#include "s2e/cxx/Plugin.h"
 #include <klee/Expr.h>
 
 #include <s2e/Signals/Signals.h>

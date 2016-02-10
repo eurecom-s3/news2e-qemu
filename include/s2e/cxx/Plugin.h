@@ -33,15 +33,19 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_PLUGIN_H
-#define S2E_PLUGIN_H
+#ifndef S2E_CXX_PLUGIN_H
+#define S2E_CXX_PLUGIN_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #include <string>
 #include <vector>
-//#include <tr1/unordered_map>
 #include <map>
 #include <set>
-#include <s2e/Signals/Signals.h>
+
+#include "s2e/Signals/Signals.h"
 
 namespace s2e {
 
@@ -203,4 +207,4 @@ inline const std::string& Plugin::getConfigKey() const {
 
 } // namespace s2e
 
-#endif // S2E_PLUGIN_H
+#endif // S2E_CXX_PLUGIN_H

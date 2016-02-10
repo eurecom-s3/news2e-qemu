@@ -33,8 +33,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_UTILS_H
-#define S2E_UTILS_H
+#ifndef S2E_CXX_UTILS_H
+#define S2E_CXX_UTILS_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #include <cstdio>
 #include <cassert>
@@ -172,4 +176,4 @@ public:
 
 } // namespace s2e
 
-#endif // S2E_UTILS_H
+#endif // S2E_CXX_UTILS_H

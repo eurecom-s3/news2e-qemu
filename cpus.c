@@ -1386,10 +1386,10 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
 
     /* share a single thread for all cpus with TCG */
     if (!tcg_cpu_thread) {
-    #ifdef CONFIG_S2E
+#ifdef CONFIG_S2E
         /* Forks inherit parent's memory, therefore we do not want
            to allocate new memory regions, just overwrite them. */
-        if (!s2e_is_forking()) {
+        if (!S2E_IsForking(g_s2e)) {
             cpu->thread = g_malloc0(sizeof(QemuThread));
             cpu->halt_cond = g_malloc0(sizeof(QemuCond));
         }

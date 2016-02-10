@@ -29,9 +29,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_EXPR_INTERFACE_H
+#ifndef S2E_CXX_EXPR_INTERFACE_H
+#define S2E_CXX_EXPR_INTERFACE_H
 
-#define S2E_EXPR_INTERFACE_H
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,4 +53,4 @@ void *s2e_expr_read_mem_l(void *_mgr, uint64_t virtual_address);
 }
 #endif
 
-#endif
+#endif /* S2E_CXX_EXPR_INTERFACE_H */

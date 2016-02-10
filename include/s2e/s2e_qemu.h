@@ -38,24 +38,6 @@
 
 #include <inttypes.h>
 
-#ifdef __cplusplus
-namespace s2e {
-    class S2E;
-    class S2EExecutionState;
-    class S2ETranslationBlock;
-}
-class TCGLLVMContext;
-using s2e::S2E;
-using s2e::S2EExecutionState;
-using s2e::S2ETranslationBlock;
-#else
-typedef struct S2E S2E;
-typedef struct S2EExecutionState S2EExecutionState;
-typedef struct S2ETranslationBlock S2ETranslationBlock;
-typedef struct TCGLLVMContext TCGLLVMContext;
-#endif
-
-struct TranslationBlock;
 struct S2ETLBEntry;
 struct QDict;
 

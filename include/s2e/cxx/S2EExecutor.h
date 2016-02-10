@@ -33,8 +33,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_EXECUTOR_H
-#define S2E_EXECUTOR_H
+#ifndef S2E_CXX_EXECUTOR_H
+#define S2E_CXX_EXECUTOR_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #include <klee/Executor.h>
 #include <llvm/Support/raw_ostream.h>
@@ -445,4 +449,4 @@ public:
 
 } // namespace s2e
 
-#endif // S2E_EXECUTOR_H
+#endif // S2E_CXX_EXECUTOR_H

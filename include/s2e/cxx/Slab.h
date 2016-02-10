@@ -33,9 +33,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef SLAB_H
+#ifndef _S2E_CXX_SLAB_H
+#define _S2E_CXX_SLAB_H
 
-#define SLAB_H
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 
 #include <inttypes.h>
@@ -290,4 +293,4 @@ public:
 }
 
 
-#endif
+#endif /* _S2E_CXX_SLAB_H */

@@ -1,6 +1,9 @@
-#ifndef _S2E_MEMORY_CACHE_
+#ifndef _S2E_CXX_MEMORY_CACHE_
+#define _S2E_CXX_MEMORY_CACHE_
 
-#define _S2E_MEMORY_CACHE_
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #include <vector>
 #include <inttypes.h>
@@ -260,4 +263,4 @@ public:
 
 }
 
-#endif
+#endif /* _S2E_CXX_MEMORY_CACHE_ */

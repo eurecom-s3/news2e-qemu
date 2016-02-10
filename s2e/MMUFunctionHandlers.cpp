@@ -43,9 +43,9 @@ extern "C" {
 extern MemoryRegion io_mem_unassigned;
 }
 
-#include "S2EExecutor.h"
-#include "S2EExecutionState.h"
-#include "S2E.h"
+#include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/S2EExecutionState.h"
+#include "s2e/cxx/S2E.h"
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/s2e_qemu.h>
 #include "exec/s2e.h"

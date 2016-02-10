@@ -37,7 +37,7 @@
 #include <llvm/IRBuilder.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
-#include "SelectRemovalPass.h"
+#include "s2e/cxx/SelectRemovalPass.h"
 #include <iostream>
 
 using namespace llvm;

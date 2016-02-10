@@ -34,10 +34,10 @@
  */
 
 #include <llvm/Support/Process.h> /* Has to be here because of weird compile error */
-#include "S2EStatsTracker.h"
+#include "s2e/cxx/S2EStatsTracker.h"
 
-#include <s2e/S2EExecutor.h>
-#include <s2e/S2EExecutionState.h>
+#include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/S2EExecutionState.h"
 
 #include <klee/CoreStats.h>
 #include <klee/SolverStats.h>

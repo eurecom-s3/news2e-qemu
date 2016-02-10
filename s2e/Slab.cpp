@@ -39,7 +39,7 @@
 //#define DEBUG_ALLOC
 //#define TESTSUITE_ALLOC
 
-#include "Slab.h"
+#include "s2e/cxx/Slab.h"
 
 
 #ifdef _WIN32

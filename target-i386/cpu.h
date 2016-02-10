@@ -48,9 +48,6 @@
 
 #include "exec/cpu-defs.h"
 
-#ifdef CONFIG_S2E
-#include <s2e/s2e_qemu.h>
-#endif
 
 #include "fpu/softfloat.h"
 
@@ -1010,6 +1007,10 @@ typedef struct CPUX86State {
     TPRAccess tpr_access_type;
 } CPUX86State;
 
+#include "s2e/target/S2EExecutionState.h"
+#include "s2e/S2E.h"
+
+
 #include "cpu-qom.h"
 
 #if defined(CONFIG_S2E) && !defined(S2E_LLVM_LIB)
@@ -1017,14 +1018,14 @@ typedef struct CPUX86State {
 static inline target_ulong __RR_env_raw(CPUX86State* cpuState,
                                         unsigned offset, unsigned size) {
     target_ulong result = 0;
-    s2e_read_register_concrete(g_s2e, g_s2e_state, cpuState,
-                               offset, (uint8_t*) &result, size);
+    S2EExecutionState_ReadRegisterConcrete(g_s2e_state, cpuState,
+                    offset, (uint8_t *) &result, size);
     return result;
 }
 static inline void __WR_env_raw(CPUX86State* cpuState, unsigned offset,
                                 target_ulong value, unsigned size) {
-    s2e_write_register_concrete(g_s2e, g_s2e_state, cpuState,
-                                offset, (uint8_t*) &value, size);
+    S2EExecutionState_WriteRegisterConcrete(g_s2e_state, cpuState,
+                                offset, (uint8_t const*) &value, size);
 }
 #define RR_cpu(cpu, reg) ((typeof(cpu->reg)) \
             __RR_env_raw(cpu, offsetof(CPUX86State, reg), sizeof(cpu->reg)))
@@ -1167,7 +1168,7 @@ int cpu_x86_get_descr_debug(CPUX86State *env, unsigned int selector,
 static inline void cpu_x86_set_cpl(CPUX86State *s, int cpl)
 {
 #ifdef CONFIG_S2E
-    s2e_on_privilege_change(s->hflags & HF_CPL_MASK, cpl);
+    S2E_CallOnPrivilegeChangeHandlers(g_s2e, s->hflags & HF_CPL_MASK, cpl);
 #endif
 #if HF_CPL_MASK == 3
     s->hflags = (s->hflags & ~HF_CPL_MASK) | cpl;

@@ -33,9 +33,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef _S2E_DEVICE_STATE_H_
+#ifndef _S2E_CXX_DEVICE_STATE_H_
+#define _S2E_CXX_DEVICE_STATE_H_
 
-#define _S2E_DEVICE_STATE_H_
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 extern "C" {
 #include "hw/hw.h"
@@ -49,7 +52,7 @@ extern "C" {
 
 #include <klee/AddressSpace.h>
 
-#include "s2e_block.h"
+#include "s2e/s2e_block.h"
 
 namespace s2e {
 
@@ -114,4 +117,4 @@ public:
 
 }
 
-#endif
+#endif /* _S2E_CXX_DEVICE_STATE_H_ */

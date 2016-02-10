@@ -22,6 +22,7 @@
 
 #include "qemu-common.h"
 #include "exec/s2e.h"
+#include "s2e/S2ETranslationBlock.h"
 
 /* allow to see translation results - the slowdown should be negligible, so we leave it */
 #define DEBUG_DISAS

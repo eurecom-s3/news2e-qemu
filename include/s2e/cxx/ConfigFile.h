@@ -33,8 +33,12 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_CONFIG_FILE_H
-#define S2E_CONFIG_FILE_H
+#ifndef S2E_CXX_CONFIG_FILE_H
+#define S2E_CXX_CONFIG_FILE_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
 #include <vector>
 #include <string>
@@ -384,4 +388,4 @@ public:
 
 } // namespace s2e
 
-#endif
+#endif /* S2E_CXX_CONFIG_FILE_H */

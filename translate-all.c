@@ -76,9 +76,7 @@
 #include "qemu/bitmap.h"
 #include "qemu/timer.h"
 
-#if defined(CONFIG_S2E) || defined(CONFIG_LLVM)
-#include "tcg/tcg-llvm.h"
-#endif
+#include "s2e/target/tcg-llvm.h"
 
 //#define DEBUG_TB_INVALIDATE
 //#define DEBUG_FLUSH
@@ -795,7 +793,7 @@ static TranslationBlock *tb_alloc(target_ulong pc)
     s2e_tb_alloc(g_s2e, tb);
 #endif
 #ifdef CONFIG_LLVM
-    tcg_llvm_tb_alloc(tb);
+	TCGLLVM_TbAlloc(tb);
 #endif
 
     return tb;

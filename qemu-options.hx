@@ -27,14 +27,32 @@ STEXI
 Display version information and exit
 ETEXI
 
-#ifdef CONFIG_S2E
 DEF("s2e-config-file", HAS_ARG, QEMU_OPTION_s2e_config_file,
-    "s2e-config-file   file      Path to S2E configuration file\n", QEMU_ARCH_ALL)
+    "s2e-config-file   file      Path to lua S2E configuration file\n", QEMU_ARCH_ALL)
+STEXI
+@item -s2e-config-file
+@findex -s2e-config-file
+Path to the lua configuration file used to configure S2E
+ETEXI
+
 DEF("s2e-output-dir", HAS_ARG, QEMU_OPTION_s2e_output_dir,
     "s2e-output-dir    dir       Path to S2E output directory\n", QEMU_ARCH_ALL)
+
 DEF("s2e-max-processes", HAS_ARG, QEMU_OPTION_s2e_max_processes,
     "s2e-max-processes num       Maximum number of processes to fork\n", QEMU_ARCH_ALL)
-#else
+
+DEF("s2e-verbose", 0, QEMU_OPTION_s2e_verbose,
+    "-s2e-verbose    show more information during execution\n", QEMU_ARCH_ALL)
+
+DEF("execute-always-klee", 0, QEMU_OPTION_always_klee,
+    "-execute-always-klee    execute everything using KLEE interpreter\n", QEMU_ARCH_ALL)
+
+DEF("execute-llvm", 0, QEMU_OPTION_execute_llvm,
+    "-execute-llvm           execute code using LLVM JIT\n", QEMU_ARCH_ALL)
+
+DEF("generate-llvm", 0, QEMU_OPTION_generate_llvm,
+    "-generate-llvm  translate code into LLVM but don't execute it\n", QEMU_ARCH_ALL)
+
 DEF("fake-pci-name", HAS_ARG, QEMU_OPTION_fake_pci_name,
     "fake-pci-name name        Name of the fake PCI device (used in snapshots)\n", QEMU_ARCH_ALL)
 
@@ -77,7 +95,6 @@ DEF("fake-pci-cap-msi", HAS_ARG, QEMU_OPTION_fake_pci_cap_msi,
 DEF("fake-pci-cap-pcie", HAS_ARG, QEMU_OPTION_fake_pci_cap_pcie,
     "fake-pci-cap-pcie\n", QEMU_ARCH_ALL)
 
-#endif
 
 
 DEF("machine", HAS_ARG, QEMU_OPTION_machine, \

@@ -46,7 +46,7 @@
 #include <iostream>
 
 #include <cstring>
-#include <s2e/Utils.h>
+#include "s2e/cxx/Utils.h"
 
 namespace s2e {
 

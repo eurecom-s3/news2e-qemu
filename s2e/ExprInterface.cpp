@@ -30,14 +30,18 @@
  */
 
 #include <klee/Expr.h>
+
 #include <llvm/ADT/SmallVector.h>
+
 #include <inttypes.h>
-#include "Utils.h"
-#include "ExprInterface.h"
-#include "S2E.h"
-#include "S2EExecutor.h"
-#include "S2EExecutionState.h"
-#include "s2e_qemu.h"
+
+#include "s2e/cxx/Utils.h"
+#include "s2e/cxx/ExprInterface.h"
+#include "s2e/cxx/S2E.h"
+#include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/S2EExecutionState.h"
+#include "s2e/s2e_qemu.h"
+#include "s2e/S2E.h"
 
 /**
  * The expression interface allows the QEMU emulation code to manipulate

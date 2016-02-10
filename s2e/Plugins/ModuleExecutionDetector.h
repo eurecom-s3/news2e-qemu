@@ -39,7 +39,7 @@
 
 #include <s2e/Plugins/ModuleDescriptor.h>
 
-#include <s2e/Plugin.h>
+#include "s2e/cxx/Plugin.h"
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/Plugins/OSMonitor.h>
 

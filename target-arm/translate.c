@@ -52,6 +52,7 @@
 #ifdef CONFIG_S2E
 #include <s2e/s2e_qemu.h>
 #endif
+#include "s2e/S2E.h"
 
 #define ENABLE_ARCH_4T    arm_dc_feature(s, ARM_FEATURE_V4T)
 #define ENABLE_ARCH_5     arm_dc_feature(s, ARM_FEATURE_V5)
@@ -97,10 +98,10 @@ static const char *regnames[] =
       "r8", "r9", "r10", "r11", "r12", "r13", "r14", "pc" };
 
 #ifdef CONFIG_S2E
-static inline void gen_instr_end(DisasContext *s)
+static inline void s2e_gen_instr_end(DisasContext *s)
 {
     if (!s->done_instr_end) {
-        s2e_on_translate_instruction_end(g_s2e, g_s2e_state, s->tb, s->insPc, s->useNextPc ? s->nextPc : (uint64_t)-1);
+        S2e_CallOnTranslateInstructionEndHandlers(g_s2e, g_s2e_state, s->tb, s->insPc, s->useNextPc ? s->nextPc : (uint64_t)-1);
         s->done_instr_end = 1;
     }
 }
@@ -4009,9 +4010,8 @@ static inline void gen_goto_tb(DisasContext *s, int n, target_ulong dest)
     tb = s->tb;
 
 #ifdef CONFIG_S2E
-    s2e_on_translate_block_end(g_s2e, g_s2e_state,
-                               tb, s->insPc, 1, dest);
-    gen_instr_end(s);
+	S2E_CallOnTranslateBlockEndHandlers(g_s2e, g_s2e_state, tb, s->insPc, true, dest);
+    s2e_gen_instr_end(s);
 #endif
 
     if ((tb->pc & TARGET_PAGE_MASK) == (dest & TARGET_PAGE_MASK)) {
@@ -11372,7 +11372,7 @@ void gen_intermediate_code(CPUARMState *env, TranslationBlock *tb)
     tcg_gen_movi_i64(tmp64, (uint64_t) tb);
     tcg_gen_st_i64(tmp64, cpu_env, offsetof(CPUArchState, s2e_current_tb));
 
-    s2e_on_translate_block_start(g_s2e, g_s2e_state, tb, pc_start);
+	S2E_CallOnTranslateBlockStartHandlers(g_s2e, g_s2e_state, tb, pc_start);
 #endif
 
     gen_tb_start(tb);
@@ -11476,7 +11476,7 @@ void gen_intermediate_code(CPUARMState *env, TranslationBlock *tb)
         dc->insPc = dc->pc;
         dc->done_instr_end = 0;
 
-        s2e_on_translate_instruction_start(g_s2e, g_s2e_state, tb, dc->insPc);
+		S2E_CallOnTranslateInstructionStartHandlers(g_s2e, g_s2e_state, tb, dc->insPc);
         tb->pcOfLastInstr = pc_start;
         dc->useNextPc = 0;
         dc->nextPc = -1;
@@ -11521,7 +11521,7 @@ void gen_intermediate_code(CPUARMState *env, TranslationBlock *tb)
             dc->nextPc = dc->pc;
             dc->useNextPc = 1;
         }
-        gen_instr_end(dc);
+        s2e_gen_instr_end(dc);
 #endif
 
 
@@ -11637,9 +11637,8 @@ void gen_intermediate_code(CPUARMState *env, TranslationBlock *tb)
             /* indicate that the hash table must be used to find the next TB */
 
 #ifdef CONFIG_S2E
-            s2e_on_translate_block_end(g_s2e, g_s2e_state,
-                               tb, dc->insPc, 0, 0);
-            gen_instr_end(dc);
+			S2E_CallOnTranslateBlockEndHandlers(g_s2e, g_s2e_state, tb, dc->insPc, false, 0);
+            s2e_gen_instr_end(dc);
 #endif
             tcg_gen_exit_tb(0);
             break;

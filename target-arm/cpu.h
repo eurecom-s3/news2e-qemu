@@ -39,9 +39,9 @@
 
 #include "fpu/softfloat.h"
 
-#ifdef CONFIG_S2E
-#include <s2e/s2e_qemu.h>
-#endif
+#include "s2e/TCGLLVMContext.h"
+#include "s2e/S2E.h"
+
 
 #define EXCP_UDEF            1   /* undefined instruction */
 #define EXCP_SWI             2   /* software interrupt */
@@ -511,6 +511,7 @@ typedef struct CPUARMState {
     const struct arm_boot_info *boot_info;
 } CPUARMState;
 
+#include "s2e/target/S2EExecutionState.h"
 #include "cpu-qom.h"
 
 #if defined(CONFIG_S2E) && !defined(S2E_LLVM_LIB)
@@ -518,13 +519,13 @@ typedef struct CPUARMState {
 static inline target_ulong __RR_env_raw(CPUARMState* cpuState,
                                         unsigned offset, unsigned size) {
     target_ulong result = 0;
-    s2e_read_register_concrete(g_s2e, g_s2e_state, cpuState,
+    S2EExecutionState_ReadRegisterConcrete(g_s2e_state, cpuState,
                                offset, (uint8_t*) &result, size);
     return result;
 }
 static inline void __WR_env_raw(CPUARMState* cpuState, unsigned offset,
                                 target_ulong value, unsigned size) {
-    s2e_write_register_concrete(g_s2e, g_s2e_state, cpuState,
+    S2EExecutionState_WriteRegisterConcrete(g_s2e_state, cpuState,
                                 offset, (uint8_t*) &value, size);
 }
 #define RR_cpu(cpu, reg) ((typeof(cpu->reg)) \

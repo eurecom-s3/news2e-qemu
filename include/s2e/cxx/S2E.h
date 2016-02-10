@@ -33,21 +33,27 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_H
-#define S2E_H
+#ifndef _S2E_CXX_S2E_H
+#define _S2E_CXX_S2E_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
+
+//First include C declarations, as name mangling will be C++ otherwise
+#include "s2e/S2E.h"
 
 #undef NDEBUG
 
 #include <fstream>
 #include <string>
 #include <vector>
-//#include <tr1/unordered_map>
 #include <map>
 #include <llvm/Support/raw_ostream.h>
 
-#include "s2e_config.h"
-#include "Plugin.h"
-#include "Synchronization.h"
+#include "s2e/s2e_config.h"
+#include "s2e/cxx/Plugin.h"
+#include "s2e/cxx/Synchronization.h"
 
 namespace klee {
     class Interpreter;
@@ -245,4 +251,4 @@ public:
 
 } // namespace s2e
 
-#endif // S2E_H
+#endif // _S2E_CXX_S2E_H

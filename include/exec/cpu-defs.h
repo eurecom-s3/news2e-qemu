@@ -32,7 +32,7 @@
 #include "exec/hwaddr.h"
 #endif
 #include "exec/memattrs.h"
-#include "s2e/S2ESJLJ.h"
+#include "s2e/s2e_setjmp.h"
 #include "s2e/s2e_config.h"
 
 

@@ -41,16 +41,16 @@ extern "C" {
 #include "monitor/monitor.h"
 }
 
-#include "CorePlugin.h"
-#include <s2e/S2E.h>
-#include <s2e/Utils.h>
+#include "s2e/Plugins/CorePlugin.h"
+#include "s2e/cxx/S2E.h"
+#include <s2e/cxx/Utils.h>
 
-#include <s2e/S2EExecutionState.h>
-#include <s2e/S2EExecutor.h>
+#include "s2e/cxx/S2EExecutionState.h"
+#include "s2e/cxx/S2EExecutor.h"
 
 #include <s2e/s2e_qemu.h>
 #include <s2e/s2e_config.h>
-#include <s2e/S2ESJLJ.h>
+#include <s2e/s2e_setjmp.h>
 
 
 using namespace std;

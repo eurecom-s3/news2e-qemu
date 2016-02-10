@@ -33,76 +33,26 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#include <s2e/cxx/Plugin.h>
-#include "s2e/cxx/S2E.h"
-#include "s2e/cxx/S2EExecutionState.h"
-#include <s2e/cxx/Utils.h>
+#ifndef _S2E_CXX_SELECT_REMOVE_PASS_H_
+#define _S2E_CXX_SELECT_REMOVE_PASS_H_
 
-#include <algorithm>
-#include <assert.h>
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
-namespace s2e {
+#include "llvm/Pass.h"
+#include "llvm/Function.h"
 
-using namespace std;
 
-CompiledPlugin::CompiledPlugins* CompiledPlugin::s_compiledPlugins = NULL;
+  struct SelectRemovalPass : public llvm::FunctionPass {
+     static char ID;
+     SelectRemovalPass() : FunctionPass(ID) {}
 
-void Plugin::initialize()
-{
-}
+     virtual bool runOnFunction(llvm::Function &F);
+     
 
-PluginState *Plugin::getPluginState(S2EExecutionState *s, PluginStateFactory f) const
-{
-    if (m_CachedPluginS2EState == s) {
-        return m_CachedPluginState;
-    }
-    m_CachedPluginState = s->getPluginState(const_cast<Plugin*>(this), f);
-    m_CachedPluginS2EState = s;
-    return m_CachedPluginState;
-}
+  };
 
-PluginsFactory::PluginsFactory()
-{
-    CompiledPlugin::CompiledPlugins *plugins = CompiledPlugin::getPlugins();
 
-    foreach2(it, plugins->begin(), plugins->end()) {
-        registerPlugin(*it);
-    }
-}
 
-void PluginsFactory::registerPlugin(const PluginInfo* pluginInfo)
-{
-    assert(m_pluginsMap.find(pluginInfo->name) == m_pluginsMap.end());
-    //assert(find(pluginInfo, m_pluginsList.begin(), m_pluginsList.end()) ==
-      //                                              m_pluginsList.end());
-
-    m_pluginsList.push_back(pluginInfo);
-    m_pluginsMap.insert(make_pair(pluginInfo->name, pluginInfo));
-}
-
-const vector<const PluginInfo*>& PluginsFactory::getPluginInfoList() const
-{
-    return m_pluginsList;
-}
-
-const PluginInfo* PluginsFactory::getPluginInfo(const string& name) const
-{
-    PluginsMap::const_iterator it = m_pluginsMap.find(name);
-
-    if(it != m_pluginsMap.end())
-        return it->second;
-    else
-        return NULL;
-}
-
-Plugin* PluginsFactory::createPlugin(S2E* s2e, const string& name) const
-{
-    const PluginInfo* pluginInfo = getPluginInfo(name);
-    s2e->getMessagesStream() << "Creating plugin " << name << "\n";
-    if(pluginInfo)
-        return pluginInfo->instanceCreator(s2e);
-    else
-        return NULL;
-}
-
-} // namespace s2e
+#endif /* _S2E_CXX_SELECT_REMOVE_PASS_H_ */

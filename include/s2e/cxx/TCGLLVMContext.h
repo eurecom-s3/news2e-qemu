@@ -33,23 +33,58 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef _SELECT_REMOVE_PASS_H_
+#ifndef _S2E_CXX_TCG_LLVM_H
+#define _S2E_CXX_TCG_LLVM_H
 
-#define _SELECT_REMOVE_PASS_H_
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
 
-#include "llvm/Pass.h"
-#include "llvm/Function.h"
+#include <inttypes.h>
 
-
-  struct SelectRemovalPass : public llvm::FunctionPass {
-     static char ID;
-     SelectRemovalPass() : FunctionPass(ID) {}
-
-     virtual bool runOnFunction(llvm::Function &F);
-     
-
-  };
+/*****************************/
+/* Functions for QEMU c code */
 
 
+/***********************************/
+/* External interface for C++ code */
 
-#endif
+namespace llvm {
+    class Function;
+    class LLVMContext;
+    class Module;
+    class ModuleProvider;
+    class ExecutionEngine;
+    class FunctionPassManager;
+}
+
+class TCGLLVMContextPrivate;
+class TCGLLVMContext
+{
+private:
+    TCGLLVMContextPrivate* m_private;
+
+public:
+    TCGLLVMContext();
+    ~TCGLLVMContext();
+
+    llvm::LLVMContext& getLLVMContext();
+
+    llvm::Module* getModule();
+    llvm::ModuleProvider* getModuleProvider();
+
+    llvm::ExecutionEngine* getExecutionEngine();
+
+    void deleteExecutionEngine();
+    llvm::FunctionPassManager* getFunctionPassManager() const;
+
+    /** Called after linking all helper libraries */
+    void initializeHelpers();
+
+    void generateCode(struct TCGContext *s,
+                      struct TranslationBlock *tb);
+};
+
+
+#endif /* _S2E_CXX_TCG_LLVM_H */
+

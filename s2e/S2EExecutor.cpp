@@ -42,7 +42,6 @@ extern "C" {
 #include <qemu-common.h>
 #include "exec/cpu-all.h"
 #include <tcg.h>
-#include <tcg-llvm.h>
 #include "exec/exec-all.h"
 #include "exec/ioport.h"
 #include "sysemu/sysemu.h"
@@ -77,17 +76,19 @@ uint64_t helper_set_cc_op_eflags(void);
 #endif
 
 #include "exec/s2e.h"
-#include "S2EExecutor.h"
+#include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/TCGLLVMContext.h"
+#include "s2e/TCGLLVMRuntime.h"
 #include <s2e/s2e_config.h>
-#include <s2e/S2E.h>
-#include <s2e/S2EExecutionState.h>
-#include <s2e/Utils.h>
+#include "s2e/cxx/S2E.h"
+#include "s2e/cxx/S2EExecutionState.h"
+#include <s2e/cxx/Utils.h>
 #include <s2e/Plugins/CorePlugin.h>
-#include <s2e/ConfigFile.h>
+#include <s2e/cxx/ConfigFile.h>
 
-#include <s2e/S2EDeviceState.h>
-#include <s2e/SelectRemovalPass.h>
-#include <s2e/S2EStatsTracker.h>
+#include <s2e/cxx/S2EDeviceState.h>
+#include <s2e/cxx/SelectRemovalPass.h>
+#include <s2e/cxx/S2EStatsTracker.h>
 
 //XXX: Remove this from executor
 #include <s2e/Plugins/ModuleExecutionDetector.h>

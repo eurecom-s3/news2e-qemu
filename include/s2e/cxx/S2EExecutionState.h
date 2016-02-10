@@ -33,16 +33,23 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_EXECUTIONSTATE_H
-#define S2E_EXECUTIONSTATE_H
+#ifndef S2E_CXX_EXECUTIONSTATE_H
+#define S2E_CXX_EXECUTIONSTATE_H
+
+#if !defined(__cplusplus)
+#error This file is not supposed to be included from C!
+#endif /* !defined(__cplusplus) */
+
+//First include C declarations, as name mangling will be C++ otherwise
+#include "s2e/S2EExecutionState.h"
 
 #include <klee/ExecutionState.h>
 #include <klee/Memory.h>
 #include <cpu.h>
-#include "S2EDeviceState.h"
-#include "S2EStatsTracker.h"
+#include "s2e/cxx/S2EDeviceState.h"
+#include "s2e/cxx/S2EStatsTracker.h"
 #include "MemoryCache.h"
-#include "s2e_config.h"
+#include "s2e/s2e_config.h"
 
 /** S2E_TARGET_CONC_LIMIT defines the border between concrete and symbolic area.
  *  Eg. regs[15] is in concrete-only-area for ARM targets.
@@ -471,4 +478,4 @@ public:
 
 }
 
-#endif // S2E_EXECUTIONSTATE_H
+#endif // S2E_CXX_EXECUTIONSTATE_H
