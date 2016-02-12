@@ -1,1 +1,3 @@
-obj-y += cpu.o translate.o helper.o simd_helper.o
+obj-helper-y = helper.o simd_helper.o
+obj-y += cpu.o translate.o 
+obj-y += $(obj-helper-y)

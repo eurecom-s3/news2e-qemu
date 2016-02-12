@@ -773,24 +773,6 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
 
     ModuleOptions MOpts = ModuleOptions(vector<string>(),
                                         /* Optimize= */ true, /* CheckDivZero= */ false);
-    /* Set module for the executor */
-
-
-    /**
-     * When execute_llvm is true, all code is translated to LLVM, then JITed to x86.
-     * This is basically a debug mode that allows reusing all S2E's plugin infrastructure
-     * while testing the LLVM backend.
-     * Symolic execution IS NOT SUPPORTED when running in LLVM mode!
-     */
-    if (!execute_llvm) {
-        char* filename =  qemu_find_file(QEMU_FILE_TYPE_LIB, "op_helper.bc");
-        assert(filename);
-        MOpts = ModuleOptions(vector<string>(1, filename),
-                /* Optimize= */ true, /* CheckDivZero= */ false,
-                m_tcgLLVMContext->getFunctionPassManager());
-
-        g_free(filename);
-    }
 
     /* This catches obvious LLVM misconfigurations */
     Module *M = m_tcgLLVMContext->getModule();

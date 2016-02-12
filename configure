@@ -421,6 +421,7 @@ ar="${AR-${cross_prefix}ar}"
 as="${AS-${cross_prefix}as}"
 cpp="${CPP-$cc -E}"
 objcopy="${OBJCOPY-${cross_prefix}objcopy}"
+objdump="${OBJDUMP-${cross_prefix}objdump}"
 ld="${LD-${cross_prefix}ld}"
 libtool="${LIBTOOL-${cross_prefix}libtool}"
 nm="${NM-${cross_prefix}nm}"
@@ -433,6 +434,9 @@ query_pkg_config() {
 pkg_config=query_pkg_config
 sdl_config="${SDL_CONFIG-${cross_prefix}sdl-config}"
 sdl2_config="${SDL2_CONFIG-${cross_prefix}sdl2-config}"
+clang="${CLANG-clang}"
+clangxx="${CLANGXX-clang++}"
+llvm_config="${LLVM_CONFIG-llvm-config}"
 
 # If the user hasn't specified ARFLAGS, default to 'rv', just as make does.
 ARFLAGS="${ARFLAGS-rv}"
@@ -793,6 +797,10 @@ for opt do
   ;;
   --cxx=*)
   ;;
+  --clang=*) clang="$optarg"
+  ;;
+  --clangxx=*) clangxx="$optarg"
+  ;;
   --asancc=*)
   ;;
   --asancxx=*)
@@ -967,8 +975,6 @@ for opt do
   --enable-bluez) bluez="yes"
   ;;
   --enable-llvm) llvm="yes"
-  ;;
-  --with-llvm=*) llvmdir="$optarg"
   ;;
   --enable-s2e) s2e="yes"
   ;;
@@ -1214,6 +1220,8 @@ for opt do
   ;;
   --enable-jemalloc) jemalloc="yes"
   ;;
+  --with-llvm-config=*) llvm_config="$optarg"
+  ;;
   *)
       echo "ERROR: unknown option $opt"
       echo "Try '$0 --help' for more information"
@@ -1324,6 +1332,9 @@ Advanced options (experts only):
   --host-cc=CC             use C compiler CC [$host_cc] for code run at
                            build time
   --cxx=CXX                use C++ compiler CXX [$cxx]
+  --clang=CLANG            use clang compiler CLANG [$clang]
+  --clangxx=CLANGXX        use clang compiler CLANGXX [$clangxx]
+  --with-llvm-config=LLVM_CONFIG use llvm-config LLVM_CONFIG [$llvm_config]
   --objcc=OBJCC            use Objective-C compiler OBJCC [$objcc]
   --extra-cflags=CFLAGS    append extra C compiler flags QEMU_CFLAGS
   --extra-ldflags=LDFLAGS  append extra linker flags LDFLAGS
@@ -3055,30 +3066,52 @@ fi
 ##########################################
 # llvm support probe
 
-if test "$llvm" = "yes" -o "$s2e" = "yes" ; then
+llvm_version_major_required=3
+llvm_version_minor_required=2
+
+llvm_required=no
+llvm_components="jit asmparser bitreader bitwriter ipo linker engine"
+for target in $target_list; do
+  case $target in
+    *-s2e-softmmu)
+      llvm_required=yes
+    ;;
+  esac
+done
+
+llvm=no
+if test "$llvm_required" = "yes"; then
   cat > $TMPCXX << EOF
 #include <llvm/LLVMContext.h>
-int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); return 0; }
+int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); c.getInlineAsmDiagnosticContext(); return 0;}
 EOF
-  if test "$llvmdir" != ""; then
-      llvm_config="$llvmdir/bin/llvm-config"
-  else
-      llvm_config="llvm-config"
+  llvm_version=$( $llvm_config --version 2> /dev/null | grep -o '^[0-9].[0-9]' )
+  if test -z "$llvm_version"; then
+    error_exit "LLVM is required for building, but no llvm-config " \
+      "executable is found. Specify one with --with-llvm-config=..."
   fi
-  llvm_components="jit bitreader bitwriter ipo linker engine"
-  llvm_cxxflags=`$llvm_config $llvm_components --cflags 2> /dev/null`
 
+  if test "$llvm_version" != "${llvm_version_major_required}.${llvm_version_minor_required}"; then
+    error_exit "$llvm_config points to LLVM version $llvm_version, " \
+      "but version $llvm_version_major_required.$llvm_version_minor_required is required. Specify a " \
+      "different llvm-config executable with --with-llvm-config=..."
+  fi
+  llvm_cxxflags=`$llvm_config $llvm_components --cflags 2> /dev/null`
   llvm_ldflags=`$llvm_config $llvm_components --ldflags 2> /dev/null`
   llvm_libs=`$llvm_config $llvm_components --libs 2> /dev/null`
+  llvm_link=$( $llvm_config --bindir )/llvm-link
 
   if compile_prog_cxx "$llvm_cxxflags" "$llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then
-    : LLVM found
+    llvm="yes"
   else
-    feature_not_found "llvm (required for --enable-llvm and --enable-s2e)"
-    exit 1
+    error_exit "feature llvm not found (required for --enable-llvm and --enable-s2e)"
   fi
-  #Set LLVM feature in case only S2E was chosen before
-  llvm="yes"
+  if $llvm_link --version | grep LLVM 2> /dev/null 1> /dev/null ; then
+    : llvm-link is ok
+  else
+    error_exit "llvm-link does not work. Check that $llvm_config --bindir " \
+	    "is pointing to a directory containing llvm-link."
+  fi
 fi
 
 if test "$llvm" = "yes" ; then
@@ -3183,6 +3216,45 @@ EOF
   fi
 fi
 
+
+##########################################
+# clang probe
+if test "$llvm_required" = "yes"; then
+cat > $TMPC << EOF
+#if __clang__ != 1
+#error Compiler must be clang
+#endif
+
+#if __clang_major__ != $llvm_version_major_required || __clang_minor__ != $llvm_version_minor_required
+#error Wrong Clang/LLVM version
+#endif
+int main(void) {return 0;}
+EOF
+  if $clang -c -o /dev/null $TMPC 2> /dev/null 1> /dev/null; then
+    : Clang is good
+  else
+    error_exit "Clang is required by LLVM, but does not work." \
+      "Pass a clang with --clang=... to configure, and make sure that " \
+      "its version corresponds to the required LLVM version (${llvm_version_major_required}.${llvm_version_minor_required})."
+  fi
+
+  
+fi  
+
+##########################################
+# binutils output format probe
+cat > $TMPC << EOF
+int main(void) {return 0;}
+EOF
+if compile_prog "" "" ; then
+  #TODO: get the objdump program from somewhere better
+  binutils_binfmt=$( $objdump -f $TMPE | sed "s/^.*file format \(.*\)$/\1/;t;d" )
+  binutils_arch=$( $objdump -f $TMPE | sed "s/^architecture: \([^,]*\),.*$/\1/;t;d" )
+  if test -z "$binutils_binfmt" -o -z "$binutils_arch" ; then
+    echo "WARNING: Cannot get binutils binary format and architecture. " \
+      "Building libqemu will fail."
+  fi
+fi
 
 ##########################################
 # SHA command probe for modules
@@ -5616,6 +5688,8 @@ echo "CC_I386=$cc_i386" >> $config_host_mak
 echo "HOST_CC=$host_cc" >> $config_host_mak
 echo "CXX=$cxx" >> $config_host_mak
 echo "OBJCC=$objcc" >> $config_host_mak
+echo "CLANG=$clang" >> $config_host_mak
+echo "LLVM_LINK=$llvm_link" >> $config_host_mak
 echo "AR=$ar" >> $config_host_mak
 echo "ARFLAGS=$ARFLAGS" >> $config_host_mak
 echo "AS=$as" >> $config_host_mak
@@ -5660,6 +5734,8 @@ if test "$gcov" = "yes" ; then
   echo "CONFIG_GCOV=y" >> $config_host_mak
   echo "GCOV=$gcov_tool" >> $config_host_mak
 fi
+echo "BINUTILS_BINFMT=$binutils_binfmt" >> $config_host_mak
+echo "BINUTILS_ARCH=$binutils_arch" >> $config_host_mak
 
 # use included Linux headers
 if test "$linux" = "yes" ; then

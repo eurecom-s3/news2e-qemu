@@ -1,4 +1,5 @@
-obj-y += translate.o op_helper.o helper.o cpu.o
-obj-y += ucf64_helper.o
+obj-helper-y = op_helper.o helper.o ucf64_helper.o
+obj-y += translate.o cpu.o
 
 obj-$(CONFIG_SOFTMMU) += softmmu.o
+obj-y += $(obj-helper-y)

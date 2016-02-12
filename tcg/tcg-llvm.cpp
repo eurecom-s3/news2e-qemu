@@ -82,6 +82,7 @@ static void *qemu_st_helpers[5] = {
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/IRBuilder.h>
 #include <llvm/Support/Threading.h>
+#include <llvm/Support/IRReader.h>
 
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/raw_ostream.h>
@@ -344,6 +345,9 @@ public:
     unsigned GetNumStubSlabs() { return m_base->GetNumStubSlabs(); }
 };
 
+extern "C" const char _binary_op_helpers_bca_start;
+extern "C" const char _binary_op_helpers_bca_end;
+
 TCGLLVMContextPrivate::TCGLLVMContextPrivate()
     : m_context(getGlobalContext()), m_builder(m_context), m_tbCount(0),
       m_tcgContext(NULL), m_tbFunction(NULL)
@@ -354,7 +358,12 @@ TCGLLVMContextPrivate::TCGLLVMContextPrivate()
 
     InitializeNativeTarget();
 
-    m_module = new Module("tcg-llvm", m_context);
+    llvm::SMDiagnostic smerror;
+    m_module = llvm::ParseIR( 
+        llvm::MemoryBuffer::getMemBuffer( 
+            StringRef(&_binary_op_helpers_bca_start, &_binary_op_helpers_bca_end - &_binary_op_helpers_bca_start)),
+            smerror,
+            m_context);
 
     m_jitMemoryManager = new TJITMemoryManager();
 

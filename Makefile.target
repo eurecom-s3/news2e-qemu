@@ -159,11 +159,17 @@ GENERATED_HEADERS += hmp-commands.h hmp-commands-info.h qmp-commands-old.h
 
 endif # CONFIG_SOFTMMU
 
+#############################################################
+# S2E target
 ifdef CONFIG_S2E
-s2e-obj-y =  s2e/ tcg/tcg-llvm.o
+s2e-obj-y :=  s2e/ tcg/tcg-llvm.o op_helpers.o
 dummy := $(call unnest-vars,,s2e-obj-y)
 
 $(s2e-obj-y): QEMU_CXXFLAGS += $(LLVM_CXXFLAGS) $(S2E_CXXFLAGS)
+
+obj-helper-y := 
+dummy := $(call unnest-vars,,obj-helper-y)
+
 endif
 
 
@@ -205,6 +211,9 @@ ifdef CONFIG_DARWIN
 	$(call quiet-command,SetFile -a C $@,"  SETFILE $(TARGET_DIR)$@")
 endif
 
+op_helpers.bca: $(addprefix target-$(TARGET_BASE_ARCH)/, $(patsubst  %.o,%.bc,$(obj-helper-y)))
+	$(call LLVMLINK, $^)
+
 gdbstub-xml.c: $(TARGET_XML_FILES) $(SRC_PATH)/scripts/feature_to_c.sh
 	$(call quiet-command,rm -f $@ && $(SHELL) $(SRC_PATH)/scripts/feature_to_c.sh $@ $(TARGET_XML_FILES),"  GEN   $(TARGET_DIR)$@")
 
@@ -221,6 +230,7 @@ clean:
 	rm -f *.a *~ $(PROGS)
 	rm -f $(shell find . -name '*.[od]')
 	rm -f hmp-commands.h qmp-commands-old.h gdbstub-xml.c
+	rm -f $(shell find . -name '*.bc')
 ifdef CONFIG_TRACE_SYSTEMTAP
 	rm -f *.stp
 endif

@@ -66,6 +66,7 @@ ifeq ($(LIBTOOL),)
 LINK = $(call quiet-command, $(LINKPROG) $(QEMU_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ \
        $(call process-archive-undefs, $1) \
        $(version-obj-y) $(call extract-libs,$1) $(LIBS),"  LINK  $(TARGET_DIR)$@")
+
 else
 LIBTOOL += $(if $(V),,--quiet)
 %.lo: %.c
@@ -83,6 +84,9 @@ LINK = $(call quiet-command,\
        $(if $(filter %.lo %.la,$1),$(LIBTOOLFLAGS)) \
        $(call extract-libs,$(1:.lo=.o)) $(LIBS),$(if $(filter %.lo %.la,$1),"lt LINK ", "  LINK  ")"$(TARGET_DIR)$@")
 endif
+
+LLVMLINK = $(call quiet-command,$(LLVM_LINK) -o $@ $1," LLVMAR    $(TARGET_DIR)$@")
+
 
 %.asm: %.S
 	$(call quiet-command,$(CPP) $(QEMU_INCLUDES) $(QEMU_CFLAGS) $(QEMU_DGFLAGS) $(CFLAGS) -o $@ $<,"  CPP   $(TARGET_DIR)$@")
@@ -124,6 +128,12 @@ modules:
 
 %.a:
 	$(call quiet-command,rm -f $@ && $(AR) rcs $@ $^,"  AR    $(TARGET_DIR)$@")
+
+%.bc: %.c 
+	$(call quiet-command,$(CLANG) $(filter-out -g -Wold-style-declaration, $(QEMU_INCLUDES) $(QEMU_CFLAGS) $(QEMU_DGFLAGS) $(CFLAGS)) -c -g -emit-llvm -o $@ $<,"  LLVMCC    $(TARGET_DIR)$@")
+
+%.o: %.bca
+	    $(call quiet-command,$(OBJCOPY) --input binary --output $(BINUTILS_BINFMT) --binary-architecture $(BINUTILS_ARCH) $< $@, "  OBJCOPY   $(TARGET_DIR)$@")
 
 quiet-command = $(if $(V),$1,$(if $(2),@echo $2 && $1, @$1))
 

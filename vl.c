@@ -2307,13 +2307,6 @@ char *qemu_find_file(int type, const char *name)
     }
 
     switch (type) {
-    case QEMU_FILE_TYPE_LIB:
-		assert(false && "This is a bad hack and should be removed immediately");
-        #define TARGET_NAME "arm"
-        /* XXX: Terrible hack. Redo it properly! */
-        subdir="../" TARGET_NAME "-s2e-softmmu/";
-        #undef TARGET_NAME
-        break;
     case QEMU_FILE_TYPE_BIOS:
         subdir = "";
         break;
