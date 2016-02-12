@@ -47,12 +47,6 @@ DEF("s2e-verbose", 0, QEMU_OPTION_s2e_verbose,
 DEF("execute-always-klee", 0, QEMU_OPTION_always_klee,
     "-execute-always-klee    execute everything using KLEE interpreter\n", QEMU_ARCH_ALL)
 
-DEF("execute-llvm", 0, QEMU_OPTION_execute_llvm,
-    "-execute-llvm           execute code using LLVM JIT\n", QEMU_ARCH_ALL)
-
-DEF("generate-llvm", 0, QEMU_OPTION_generate_llvm,
-    "-generate-llvm  translate code into LLVM but don't execute it\n", QEMU_ARCH_ALL)
-
 DEF("fake-pci-name", HAS_ARG, QEMU_OPTION_fake_pci_name,
     "fake-pci-name name        Name of the fake PCI device (used in snapshots)\n", QEMU_ARCH_ALL)
 

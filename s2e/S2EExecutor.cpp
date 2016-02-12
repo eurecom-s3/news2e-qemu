@@ -819,51 +819,49 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     kmodule->updateModuleWithFunction(dummyMain);
     m_dummyMain = kmodule->functionMap[dummyMain];
 
-    if (!execute_llvm) {
-        llvm::Function* function;
+    llvm::Function* function;
 
-        function = kmodule->module->getFunction("tcg_llvm_trace_memory_access");
-        assert(function);
-        addSpecialFunctionHandler(function, handlerTraceMemoryAccess);
+    function = kmodule->module->getFunction("tcg_llvm_trace_memory_access");
+    assert(function);
+    addSpecialFunctionHandler(function, handlerTraceMemoryAccess);
 
 // TODO: Find a way to bypass i/o access (when I/O adress is symbolic) for ARM
 #ifndef TARGET_ARM
-        function = kmodule->module->getFunction("tcg_llvm_trace_port_access");
-        assert(function);
-        addSpecialFunctionHandler(function, handlerTracePortAccess);
+    function = kmodule->module->getFunction("tcg_llvm_trace_port_access");
+    assert(function);
+    addSpecialFunctionHandler(function, handlerTracePortAccess);
 #endif
 
-        function = kmodule->module->getFunction("s2e_on_tlb_miss");
-        assert(function);
-        addSpecialFunctionHandler(function, handlerOnTlbMiss);
+    function = kmodule->module->getFunction("s2e_on_tlb_miss");
+    assert(function);
+    addSpecialFunctionHandler(function, handlerOnTlbMiss);
 
-        function = kmodule->module->getFunction("tcg_llvm_fork_and_concretize");
-        assert(function);
-        addSpecialFunctionHandler(function, handleForkAndConcretize);
+    function = kmodule->module->getFunction("tcg_llvm_fork_and_concretize");
+    assert(function);
+    addSpecialFunctionHandler(function, handleForkAndConcretize);
 
 // XXX: is this really not needed on ARM?
 #ifndef TARGET_ARM
-        function = kmodule->module->getFunction("tcg_llvm_make_symbolic");
-        assert(function);
-        addSpecialFunctionHandler(function, handleMakeSymbolic);
+    function = kmodule->module->getFunction("tcg_llvm_make_symbolic");
+    assert(function);
+    addSpecialFunctionHandler(function, handleMakeSymbolic);
 #endif
 
-        function = kmodule->module->getFunction("tcg_llvm_get_value");
-        assert(function);
-        addSpecialFunctionHandler(function, handleGetValue);
+    function = kmodule->module->getFunction("tcg_llvm_get_value");
+    assert(function);
+    addSpecialFunctionHandler(function, handleGetValue);
 
 
-        llvm::FunctionType *traceInstTy = llvm::FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
-        function = dynamic_cast<llvm::Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
-        assert(function);
-        addSpecialFunctionHandler(function, handlerTraceInstruction);
+    llvm::FunctionType *traceInstTy = llvm::FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
+    function = dynamic_cast<llvm::Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
+    assert(function);
+    addSpecialFunctionHandler(function, handlerTraceInstruction);
 
-        if (UseFastHelpers) {
-            replaceExternalFunctionsWithSpecialHandlers();
-        }
-
-        m_tcgLLVMContext->initializeHelpers();
+    if (UseFastHelpers) {
+        replaceExternalFunctionsWithSpecialHandlers();
     }
+
+    m_tcgLLVMContext->initializeHelpers();
 
     initializeStatistics();
 
@@ -1767,11 +1765,7 @@ uintptr_t S2EExecutor::executeTranslationBlockConcrete(S2EExecutionState *state,
 //        throw CpuExitException();
 //    } else {
 //
-//        if(execute_llvm) {
-//            ret = tcg_llvm_qemu_tb_exec(env, tb);
-//        } else {
-//            ret = tcg_qemu_tb_exec(env, tb->tc_ptr);
-//        }
+//        ret = tcg_qemu_tb_exec(env, tb->tc_ptr);
 //    }
 //
 //    memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));

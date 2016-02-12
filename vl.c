@@ -4094,13 +4094,6 @@ int main(int argc, char **argv, char **envp)
 					s2e_cmdline_opts.max_processes = 1;
 				}
                 break;
-            case QEMU_OPTION_execute_llvm:
-                s2e_cmdline_opts.always_generate_llvm = true;
-                s2e_cmdline_opts.execute_llvm = true;
-                break;
-            case QEMU_OPTION_generate_llvm:
-                s2e_cmdline_opts.always_generate_llvm = true;
-                break;
             case QEMU_OPTION_qtest:
                 qtest_chrdev = optarg;
                 break;
@@ -4261,10 +4254,6 @@ int main(int argc, char **argv, char **envp)
         if (!trace_init_backends(trace_events, trace_file)) {
             exit(1);
         }
-    }
-    if (s2e_cmdline_opts.always_execute_klee && s2e_cmdline_opts.execute_llvm) {
-        error_report("Cannot execute both in KLEE and LLVM mode");
-        exit(1);
     }
 
 	TCGLLVMContext *tcg_llvm_ctx = TCGLLVM_Initialize();

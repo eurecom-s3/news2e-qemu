@@ -35,15 +35,6 @@ struct S2ECommandLineOptions
      * during symbolic execution.
      */
     unsigned max_processes;
-
-	/** Always generate LLVM code, even if it is not executed. */
-	bool always_generate_llvm;
-
-    /** 
-     * Generate binary code from translated LLVM code and execute this.
-     * This ia a debug mode for the LLVM translator and currently not working.
-     */  
-	bool execute_llvm;
 };
 
 #define S2ECommandLineOptions_DefaultValues() \
@@ -53,8 +44,6 @@ struct S2ECommandLineOptions
         .always_execute_klee = false,         \
         .verbose = false,                     \
         .max_processes = 1,                   \
-		.always_generate_llvm = false,        \
-		.execute_llvm = false,                \
     }
 
 #if defined(__cplusplus)

@@ -1574,21 +1574,7 @@ static TranslationBlock *tb_find_pc(uintptr_t tc_ptr)
     if (tcg_ctx.tb_ctx.nb_tbs <= 0) {
         return NULL;
     }
-#if defined(CONFIG_LLVM) && !defined(CONFIG_S2E)
-    if(execute_llvm) {
-        for(m=0; m<nb_tbs; m++) {
-            tb = &tbs[m];
-            if(tb->llvm_function) {
-                if(tc_ptr >= (uintptr_t) tb->llvm_tc_ptr &&
-                    tc_ptr <  (uintptr_t) tb->llvm_tc_end) 
-                {
-                    return tb;
-                }
-            }
-        }
-        return NULL;
-    }
-#endif
+
     if (tc_ptr < (uintptr_t)tcg_ctx.code_gen_buffer ||
         tc_ptr >= (uintptr_t)tcg_ctx.code_gen_ptr) {
         return NULL;

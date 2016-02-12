@@ -60,7 +60,6 @@ void *s2e_qemu_get_next_se(void *se);
 const char *s2e_qemu_get_se_idstr(void *se);
 void s2e_qemu_save_state(QEMUFile *f, void *se);
 void s2e_qemu_load_state(QEMUFile *f, void *se);
-extern int execute_llvm; /* defined in cpu-exec.c */
 int cpu_gen_llvm(CPUArchState *env, TranslationBlock *tb); /* defined in translate-all.c */
 
 #endif

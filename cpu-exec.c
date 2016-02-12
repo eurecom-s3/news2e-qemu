@@ -51,10 +51,6 @@
 
 #include "s2e/target/tcg-llvm.h"
 
-int generate_llvm = 0;
-int execute_llvm = 0;
-
-
 /* -icount align implementation. */
 
 typedef struct SyncClocks {
@@ -548,15 +544,8 @@ int cpu_exec(CPUState *cpu)
                     cpu->current_tb = tb;
 #if defined(CONFIG_S2E)
                     next_tb = s2e_qemu_tb_exec(cpu->env_ptr, tb);
-#elif defined(CONFIG_LLVM)
-                    if(execute_llvm) {
-                        next_tb = tcg_llvm_qemu_tb_exec(cpu->env_ptr, tb);
-                    } else {
-                        next_tb = cpu_tb_exec(cpu, tc_ptr);
-                    }
 #else
                     next_tb = cpu_tb_exec(cpu, tc_ptr);
-
 #endif
                     cpu->current_tb = NULL;
                     switch (next_tb & TB_EXIT_MASK) {
