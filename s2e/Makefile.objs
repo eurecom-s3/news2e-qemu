@@ -3,7 +3,6 @@ s2e-obj-y += ConfigFile.o ExprInterface.o \
 	S2E.o S2EDeviceState.o \
 	S2EExecutionState.o S2EExecutor.o S2EStatsTracker.o \
 	SelectRemovalPass.o Slab.o Synchronization.o \
-	x64_assembler_helpers.o \
 	S2EInternal.o S2EExecutionStateInternal.o TCGLLVMContext.o \
 
 s2e-obj-y += Plugins/
