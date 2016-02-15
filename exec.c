@@ -71,15 +71,11 @@
 #include "qemu/mmap-alloc.h"
 #endif
 
-#ifdef CONFIG_LLVM
-//#include "tcg-llvm.h"
-void tcg_llvm_tb_alloc(TranslationBlock *tb);
-void tcg_llvm_tb_free(struct TranslationBlock *tb);
-#endif
-
 #ifdef CONFIG_S2E
 #include <exec/cpu-all.h>
 #include <s2e/s2e_qemu.h>
+void tcg_llvm_tb_alloc(TranslationBlock *tb);
+void tcg_llvm_tb_free(struct TranslationBlock *tb);
 #endif
 #include "exec/s2e.h"
 

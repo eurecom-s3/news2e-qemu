@@ -6027,7 +6027,6 @@ if test "$target_s2e" = "yes" ; then
   fi
 
   echo "CONFIG_S2E=y" >> $config_target_mak
-  echo "CONFIG_LLVM=y" >> $config_target_mak
   echo "LLVM_CXXFLAGS:=\$(filter-out $FILTERFLAGS,$llvm_cxxflags)" >> $config_target_mak
   echo "S2E_CXXFLAGS:=\$(filter-out $llvm_cxxflags $FILTERFLAGS, $klee_cxxflags)" >> $config_target_mak
   echo "S2E_CXXFLAGS+=$lua_cxxflags $sigcxx2_cxxflags" >> $config_target_mak
@@ -6037,14 +6036,7 @@ if test "$target_s2e" = "yes" ; then
   if test "$boost" = "yes"; then
       echo "LIBS+=-lboost_serialization" >> $config_target_mak
   fi
-fi
-
-if [ "$llvm" = "yes" ]; then
-   echo "ifdef CONFIG_S2E" >> $config_target_mak
-   echo "LIBS+=$llvm_ldflags" >> $config_target_mak
-   echo "else" >> $config_target_mak
-   echo "LIBS:=$llvm_libs $llvm_ldflags \$(LIBS)" >> $config_target_mak
-   echo "endif" >> $config_target_mak
+  echo "LIBS+=$llvm_libs $llvm_ldflags" >> $config_target_mak
 fi
 
 

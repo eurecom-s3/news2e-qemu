@@ -23,6 +23,7 @@
 #include "qemu-common.h"
 #include "exec/s2e.h"
 #include "s2e/S2ETranslationBlock.h"
+#include "s2e/llvm.h"
 
 /* allow to see translation results - the slowdown should be negligible, so we leave it */
 #define DEBUG_DISAS
@@ -74,7 +75,7 @@ bool cpu_restore_state(CPUState *cpu, uintptr_t searched_pc);
 
 void QEMU_NORETURN cpu_resume_from_signal(CPUState *cpu, void *puc);
 void QEMU_NORETURN cpu_io_recompile(CPUState *cpu, uintptr_t retaddr);
-TranslationBlock *tb_gen_code(CPUState *cpu,
+struct TranslationBlock *tb_gen_code(CPUState *cpu,
                               target_ulong pc, target_ulong cs_base, int flags,
                               int cflags);
 void cpu_exec_init(CPUState *cpu, Error **errp);
@@ -176,20 +177,6 @@ static inline void tlb_flush_by_mmuidx(CPUState *cpu, ...)
 #define USE_DIRECT_JUMP
 #endif
 
-#if defined(CONFIG_LLVM) && !defined(CONFIG_S2E)
-struct TCGLLVMTranslationBlock;
-struct TCGLLVMContext;
-#ifdef __cplusplus
-namespace llvm { class Function; }
-namespace s2e { class S2ETranslationBlock; }
-using llvm::Function;
-using s2e::S2ETranslationBlock;
-#else
-typedef struct Function Function;
-typedef struct S2ETranslationBlock S2ETranslationBlock;
-#endif
-#endif
-
 enum ETranslationBlockType
 {
     TB_DEFAULT=0,
@@ -207,6 +194,8 @@ enum JumpType
     JT_RET, JT_LRET
 };
 #endif
+
+typedef struct TranslationBlock TranslationBlock;
 
 struct TranslationBlock {
     target_ulong pc;   /* simulated PC corresponding to this block (EIP + CS base) */
@@ -248,16 +237,14 @@ struct TranslationBlock {
     struct TranslationBlock *jmp_next[2];
     struct TranslationBlock *jmp_first;
 
-#ifdef CONFIG_LLVM
+#ifdef CONFIG_S2E
     /* pointer to LLVM translated code */
     TCGLLVMContext *tcg_llvm_context;
     Function *llvm_function;
     uint8_t *llvm_tc_ptr;
     uint8_t *llvm_tc_end;
     struct TranslationBlock* llvm_tb_next[2];
-#endif
 
-#ifdef CONFIG_S2E
     uint64_t reg_rmask; /* Registers that TB reads (before overwritting) */
     uint64_t reg_wmask; /* Registers that TB writes */
     uint64_t helper_accesses_mem; /* True if contains helpers that access mem */

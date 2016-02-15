@@ -789,12 +789,10 @@ static TranslationBlock *tb_alloc(target_ulong pc)
     tb->pc = pc;
     tb->cflags = 0;
 
-#ifdef CONFIG_S2E
+#if defined(CONFIG_S2E)
     s2e_tb_alloc(g_s2e, tb);
-#endif
-#ifdef CONFIG_LLVM
-	TCGLLVM_TbAlloc(tb);
-#endif
+    TCGLLVM_TbAlloc(tb);
+#endif /* defined(CONFIG_S2E) */
 
     return tb;
 }
@@ -808,12 +806,11 @@ void tb_free(TranslationBlock *tb)
             tb == &tcg_ctx.tb_ctx.tbs[tcg_ctx.tb_ctx.nb_tbs - 1]) {
         tcg_ctx.code_gen_ptr = tb->tc_ptr;
         tcg_ctx.tb_ctx.nb_tbs--;
-        
+    
 #if defined(CONFIG_S2E)
         s2e_tb_free(g_s2e, tb);
-#elif defined(CONFIG_LLVM)
-        tcg_llvm_tb_free(tb);
-#endif
+        TCGLLVM_TbFree(tb);
+#endif /* defined(CONFIG_S2E) */
     }
 }
 
@@ -880,11 +877,6 @@ void tb_flush(CPUState *cpu)
     int i1;
     for(i1 = 0; i1 < tcg_ctx.tb_ctx.nb_tbs; ++i1) {
         s2e_tb_free(g_s2e, &tcg_ctx.tb_ctx.tbs[i1]);
-    }
-#elif defined(CONFIG_LLVM)
-    int i2;
-    for(i2 = 0; i2 < nb_tbs; ++i2) {
-        tcg_llvm_tb_free(&tcg_ctx.tb_ctx.tbs[i2]);
     }
 #endif
 
@@ -1012,8 +1004,6 @@ static inline void tb_reset_jump(TranslationBlock *tb, int n)
 
 #ifdef CONFIG_S2E
     tb->s2e_tb_next[n] = NULL;
-#endif
-#ifdef CONFIG_LLVM
     tb->llvm_tb_next[n] = NULL;
 #endif
 

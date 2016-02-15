@@ -1427,7 +1427,7 @@ void TCGLLVM_TbAlloc(TranslationBlock *tb)
     tb->llvm_function = NULL;
 }
 
-void tcg_llvm_tb_free(TranslationBlock *tb)
+void TCGLLVM_TbFree(TranslationBlock *tb)
 {
     if(tb->llvm_function) {
         tb->llvm_function->eraseFromParent();
