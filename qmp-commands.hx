@@ -3779,7 +3779,7 @@ EQMP
     {
         .name       = "s2e-exec",
         .args_type  = "command:O",
-        .mhandler.cmd_new = qmp_s2e_exec,
+        .mhandler.cmd_new = S2E_ExecuteQMPCommand,
     },
     {
         .name       = "device-list-properties",

@@ -3,29 +3,39 @@
 
 #include <llvm/Support/raw_ostream.h>
 
+extern "C" {
+#include "qemu/error-report.h"
+}
+
 #include "s2e/target/S2E.h"
 #include "s2e/cxx/S2E.h"
 #include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/TCGLLVMContext.h"
 
 S2E *g_s2e = NULL;
 
-
-S2E* S2E_New(int argc, char * argv[], TCGLLVMContext *tcg_llvm_ctx, S2ECommandLineOptions *cmdline_opts)
+void S2E_Initialize(int argc, char * argv[], S2ECommandLineOptions *cmdline_opts)
 {
-    if (g_s2e != NULL) {
-        llvm::errs() << "ERROR - " << __FILE__ << ":" << __LINE__ << ": g_s2e is already initialized" << '\n';
-        exit(1);
-    }
-    
-	S2E *self = new S2E(argc, argv, tcg_llvm_ctx,
+    assert(g_s2e == NULL && "S2E is already initialized");
+    assert(g_s2e_state == NULL && "Initial execution state already exists");
+
+	if (!cmdline_opts->config_file) {
+		error_report("S2E configuration file was not specified, "
+							"Running S2E without a configuration does not make sense. Terminating.");
+			exit(1);
+	}
+
+	TCGLLVMContext *tcg_llvm_ctx = TCGLLVMContext::getInstance();
+	llvm::outs() << "Initializing S2E" << '\n';
+	g_s2e = new S2E(argc, argv, tcg_llvm_ctx,
 			cmdline_opts->config_file ? cmdline_opts->config_file : "",
 			cmdline_opts->output_dir ? cmdline_opts->output_dir : "",
 			cmdline_opts->verbose, cmdline_opts->max_processes);
-    
-    g_s2e = self;
+	g_s2e_state = g_s2e->getExecutor()->createInitialState();
 
-	return self; 
+	atexit(S2E_Destroy);
 }
+
 
 S2EExecutionState *S2E_CreateInitialState(S2E* self)
 {
@@ -94,4 +104,13 @@ bool S2E_IsForking(S2E *self)
 {
 	llvm::errs() << "TODO: implement " << __func__ << '\n';
 	return false;
+}
+
+
+void S2E_Destroy(void)
+{
+	if (g_s2e) {
+		delete g_s2e;
+		g_s2e = NULL;
+	}
 }

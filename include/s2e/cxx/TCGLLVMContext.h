@@ -42,6 +42,8 @@
 
 #include <inttypes.h>
 
+#include "s2e/target/TCGLLVMContext.h"
+
 /*****************************/
 /* Functions for QEMU c code */
 
@@ -62,10 +64,12 @@ class TCGLLVMContextPrivate;
 class TCGLLVMContext
 {
 private:
+	TCGLLVMContext();
+
     TCGLLVMContextPrivate* m_private;
 
+
 public:
-    TCGLLVMContext();
     ~TCGLLVMContext();
 
     llvm::LLVMContext& getLLVMContext();
@@ -83,6 +87,8 @@ public:
 
     void generateCode(struct TCGContext *s,
                       struct TranslationBlock *tb);
+
+    static TCGLLVMContext* getInstance(void);
 };
 
 

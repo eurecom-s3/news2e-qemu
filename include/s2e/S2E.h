@@ -9,6 +9,9 @@
 #include <stdbool.h>
 #endif /* !defined(__cplusplus) */
 
+#include "qapi/qmp/qdict.h"
+#include "qapi/error.h"
+
 #include "s2e/S2EExecutionState.h"
 #include "s2e/S2ECommandLineOptions.h"
 #include "s2e/TCGLLVMContext.h"
@@ -42,13 +45,12 @@ extern S2E *g_s2e;
  ********************************************/
 
 /**
- * Create a new S2E instance.
- * @param argc Command line argument count
- * @param argv Command line argument strings
- * @param tcg_llvm_ctx TCGLLVMContext object
- * @param cmdline_opts Command line options for S2E parsed by Qemu
+ * Do a first initialization of S2E.
+ * @param argc Command line argument count.
+ * @param argv Command line argument strings.
+ * @param cmdline_opts Command line options for S2E already parsed by Qemu.
  */
-S2E* S2E_New(int argc, char * argv[], TCGLLVMContext *tcg_llvm_ctx, S2ECommandLineOptions *cmdline_opts);
+void S2E_Initialize(int argc, char * argv[], S2ECommandLineOptions *cmdline_opts);
 
 /**
  * Create an initial execution state.
@@ -104,6 +106,19 @@ void S2E_CallOnPrivilegeChangeHandlers(S2E *self, unsigned from, unsigned to);
  * @return <b>true</b> if forking is enabled
  */
 bool S2E_IsForking(S2E *self);
+
+/**
+ * Execute a QMP subcommand of "s2e".
+ * @param qdict Parsed input subcommand in form of a QDict.
+ * @param ret To be assigned with pointer to response QDict.
+ * @param err To be assigned with pointer to Error struct in case of error.
+ */
+void S2E_ExecuteQMPCommand(QDict *qdict, QObject **ret, Error **err);
+
+/**
+ * Delete the global S2E object.
+ */
+void S2E_Destroy(void);
 
 #if defined(__cplusplus)
 }

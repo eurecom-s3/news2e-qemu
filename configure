@@ -5782,6 +5782,7 @@ target_softmmu="no"
 target_user_only="no"
 target_linux_user="no"
 target_bsd_user="no"
+target_s2e="no"
 case "$target" in
   ${target_name}-softmmu)
     target_softmmu="yes"
@@ -5957,6 +5958,8 @@ if test "$target_s2e" = "yes"; then
   for dir in $S2E_DIRS ; do
     mkdir -p $target_dir/$dir
   done
+else
+  mkdir -p $target_dir/s2e
 fi
 
 

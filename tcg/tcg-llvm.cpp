@@ -1397,6 +1397,15 @@ void TCGLLVMContext::generateCode(TCGContext *s, TranslationBlock *tb)
     m_private->generateCode(s, tb);
 }
 
+TCGLLVMContext* TCGLLVMContext::getInstance(void)
+{
+    static TCGLLVMContext* instance = NULL;
+    if (!instance) {
+        instance = new TCGLLVMContext();
+    }
+    return instance;
+}
+
 /*****************************/
 /* Functions for QEMU c code */
 
@@ -1408,7 +1417,7 @@ TCGLLVMContext* TCGLLVM_Initialize(void)
     llvm::InitializeAllAsmParsers();
     llvm::InitializeAllDisassemblers();
 
-    return TCGLLVMContext_GetInstance();
+    return TCGLLVMContext::getInstance();
 }
 
 void TCGLLVMContext_Close(TCGLLVMContext *self)

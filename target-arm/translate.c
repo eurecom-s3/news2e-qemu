@@ -52,7 +52,7 @@
 #ifdef CONFIG_S2E
 #include <s2e/s2e_qemu.h>
 #endif
-#include "s2e/S2E.h"
+#include "s2e/target/S2E.h"
 
 #define ENABLE_ARCH_4T    arm_dc_feature(s, ARM_FEATURE_V4T)
 #define ENABLE_ARCH_5     arm_dc_feature(s, ARM_FEATURE_V5)

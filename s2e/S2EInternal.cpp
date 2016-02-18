@@ -48,12 +48,13 @@ extern CPUArchState *env;
 
 #include "s2e/cxx/S2E.h"
 
-#include <s2e/cxx/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/cxx/ConfigFile.h>
-#include <s2e/cxx/Utils.h>
+#include "s2e/cxx/Plugin.h"
+#include "s2e/Plugins/CorePlugin.h"
+#include "s2e/cxx/ConfigFile.h"
+#include "s2e/cxx/Utils.h"
 #include "s2e/cxx/S2EExecutor.h"
 #include "s2e/cxx/S2EExecutionState.h"
+#include "s2e/cxx/TCGLLVMContext.h"
 
 #include <s2e/s2e_qemu.h>
 #include <llvm/Support/FileSystem.h>
@@ -327,6 +328,11 @@ S2E::~S2E()
     delete m_warningsFileRaw;
     delete m_messagesFileRaw;
     delete m_debugFileRaw;
+
+    if (tcg_llvm_ctx) {
+    	delete tcg_llvm_ctx;
+    	tcg_llvm_ctx = NULL;
+    }
 }
 
 Plugin* S2E::getPlugin(const std::string& name) const
@@ -777,15 +783,6 @@ bool S2E::checkDeadProcesses()
 
 /******************************/
 /* Functions called from QEMU */
-
-void s2e_close(S2E *s2e)
-{
-    print_stacktrace();
-
-    delete s2e;
-    TCGLLVMContext_Close(tcg_llvm_ctx);
-    tcg_llvm_ctx = NULL;
-}
 
 int s2e_is_forking()
 {

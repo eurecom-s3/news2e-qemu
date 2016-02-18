@@ -169,12 +169,17 @@ typedef struct S2ETLBEntry {
 #endif
 
 #if defined(CONFIG_S2E)
+
 #define CPU_S2E                                                         \
     s2e_jmp_buf jmp_env;                                                \
     uint64_t s2e_icount; /* total icount for this CPU */                \
     uint64_t s2e_icount_before_tb; /* icount before starting current TB */ \
     uint64_t s2e_icount_after_tb; /* icount after starting current TB */  \
     struct TranslationBlock *s2e_current_tb; /* currently executing TB  */  \
+
+#else /* defined(CONFIG_S2E) */
+
+#define CPU_S2E
 
 #endif /* defined(CONFIG_S2E) */
 

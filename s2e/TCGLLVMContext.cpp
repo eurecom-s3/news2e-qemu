@@ -12,11 +12,5 @@ using llvm::llvm_is_multithreaded;
 
 TCGLLVMContext* TCGLLVMContext_GetInstance(void)
 {
-	static TCGLLVMContext *self = NULL;
-
-	if (self == NULL) {
-		self = new TCGLLVMContext;
-	}
-
-	return self;
+	return TCGLLVMContext::getInstance();
 }

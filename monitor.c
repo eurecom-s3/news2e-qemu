@@ -87,6 +87,8 @@
 #include "hw/s390x/storage-keys.h"
 #endif
 
+#include "s2e/S2E.h"
+
 /*
  * Supported types:
  *

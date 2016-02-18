@@ -128,8 +128,6 @@ int main(int argc, char **argv)
 #include "sysemu/arch_init.h"
 #include "qemu/osdep.h"
 
-#include <hw/pci/fakepci.h>
-
 #include "ui/qemu-spice.h"
 #include "qapi/string-input-visitor.h"
 #include "qapi/opts-visitor.h"
@@ -206,7 +204,6 @@ uint8_t qemu_extra_params_fw[2];
 
 int icount_align_option;
 
-fake_pci_t g_fake_pci;
 typedef struct FWBootEntry FWBootEntry;
 
 struct FWBootEntry {
@@ -926,28 +923,6 @@ static void configure_rtc(QemuOpts *opts)
             exit(1);
         }
     }
-}
-
-static void s2e_cleanup(void)
-{
-	assert(false && "stubbed");
-  /*
-    if(g_s2e) {
-        s2e_close(g_s2e);
-        g_s2e = NULL;
-    }
-  */
-}
-
-static void tcg_llvm_cleanup(void)
-{
-	assert(false && "stubbed");
-    /*
-    if(tcg_llvm_ctx) {
-        tcg_llvm_close(tcg_llvm_ctx);
-        tcg_llvm_ctx = NULL;
-    }
-    */
 }
 
 /***********************************************************/
@@ -3180,69 +3155,6 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_s2e_output_dir:
               s2e_cmdline_opts.output_dir = optarg;
               break;
-            case QEMU_OPTION_fake_pci_name:
-              g_fake_pci.name = optarg;
-              break;
-            case QEMU_OPTION_fake_pci_vendor_id:
-              g_fake_pci.vendor_id = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_device_id:
-              g_fake_pci.device_id = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_revision_id:
-              g_fake_pci.revision_id = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_class_code:
-              g_fake_pci.class_code = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_ss_vendor_id:
-              g_fake_pci.ss_vendor_id = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_ss_id:
-              g_fake_pci.ss_id = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_resource_io:
-              {
-                PCIIORegion region =
-                  { -1, strtol(optarg, NULL, 0), PCI_BASE_ADDRESS_SPACE_IO, NULL, NULL};
-                if (g_fake_pci.num_resources < PCI_NUM_REGIONS)
-                  g_fake_pci.resources[g_fake_pci.num_resources++] = region;
-              }
-              break;
-            case QEMU_OPTION_fake_pci_resource_mem:
-              {
-                PCIIORegion region =
-                  { -1, strtol(optarg, NULL, 0), PCI_BASE_ADDRESS_SPACE_MEMORY, NULL, NULL };
-                if (g_fake_pci.num_resources < PCI_NUM_REGIONS)
-                  g_fake_pci.resources[g_fake_pci.num_resources++] = region;
-              }
-              break;
-            case QEMU_OPTION_fake_pci_resource_mem_prefetch:
-              {
-                PCIIORegion region =
-                  { -1, strtol(optarg, NULL, 0), PCI_BASE_ADDRESS_MEM_PREFETCH, NULL, NULL };
-                if (g_fake_pci.num_resources < PCI_NUM_REGIONS)
-                  g_fake_pci.resources[g_fake_pci.num_resources++] = region;
-              }
-              break;
-            case QEMU_OPTION_fake_pci_resource_rom:
-              {
-                PCIIORegion region =
-                  { -1, strtol(optarg, NULL, 0), PCI_ROM_ADDRESS, NULL, NULL};
-                g_fake_pci.num_resources = PCI_NUM_REGIONS;
-                g_fake_pci.resources[PCI_ROM_SLOT] = region;
-              }
-              break;
-
-            case QEMU_OPTION_fake_pci_cap_pm: // PM support
-              g_fake_pci.cap_pm = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_cap_msi: // MSI support
-              g_fake_pci.cap_msi = strtol(optarg, NULL, 0);
-              break;
-            case QEMU_OPTION_fake_pci_cap_pcie: // PCI-E support
-              g_fake_pci.cap_pcie = strtol(optarg, NULL, 0);
-              break;
 
             case QEMU_OPTION_hda:
                 {
@@ -4256,19 +4168,7 @@ int main(int argc, char **argv, char **envp)
         }
     }
 
-	TCGLLVMContext *tcg_llvm_ctx = TCGLLVM_Initialize();
-
-    if (!s2e_cmdline_opts.config_file) {
-    	error_report("S2E configuration file was not specified, "
-                        "Running S2E without a configuration does not make sense. Terminating.");
-		exit(1);
-    }
-	printf("Initializing s2e\n");
-	S2E* g_s2e = S2E_New(argc, argv, tcg_llvm_ctx, &s2e_cmdline_opts);
-	S2EExecutionState *g_s2e_state = S2E_CreateInitialState(g_s2e);
-
-
-    atexit(s2e_cleanup);;
+    S2E_Initialize(argc, argv, &s2e_cmdline_opts);
     
     /* If no data_dir is specified then try to find it relative to the
        executable path.  */
@@ -4661,10 +4561,6 @@ int main(int argc, char **argv, char **envp)
 
 	S2E_CallOnDeviceRegistrationHandlers(g_s2e);
 
-//#elif defined(TARGET_I386)
-//    fakepci_register_device(&g_fake_pci);
-// TODO: fakepci for ARM?
-
     if (qemu_opts_foreach(qemu_find_opts("device"), device_help_func, NULL, 0) != 0) {
         exit(0);
     }
@@ -4796,13 +4692,15 @@ int main(int argc, char **argv, char **envp)
      * when bus is created by qdev.c */
     qemu_register_reset(qbus_reset_all_fn, sysbus_get_default());
     qemu_run_machine_init_done_notifiers();
-   
-	S2EExecutionState_InitDeviceState(g_s2e_state);
-	S2E_InitTimers(g_s2e);	
-	
-	S2E_InitExecution(g_s2e, g_s2e_state);
-	S2E_RegisterDirtyMask(g_s2e, g_s2e_state);
-	S2E_CallOnInitializationCompleteHandlers(g_s2e);
+
+    if (s2e_cmdline_opts.config_file) {
+		S2EExecutionState_InitDeviceState(g_s2e_state);
+		S2E_InitTimers(g_s2e);
+
+		S2E_InitExecution(g_s2e, g_s2e_state);
+		S2E_RegisterDirtyMask(g_s2e, g_s2e_state);
+		S2E_CallOnInitializationCompleteHandlers(g_s2e);
+    }
 
     if (rom_check_and_register_reset() != 0) {
         error_report("rom check and register reset failed");
@@ -4861,8 +4759,7 @@ int main(int argc, char **argv, char **envp)
     tpm_cleanup();
 #endif
 
-    s2e_cleanup();
-    tcg_llvm_cleanup();
+    S2E_Destroy();
 
     return 0;
 }

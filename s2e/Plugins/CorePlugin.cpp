@@ -47,10 +47,11 @@ extern "C" {
 
 #include "s2e/cxx/S2EExecutionState.h"
 #include "s2e/cxx/S2EExecutor.h"
+#include "s2e/monitor.h"
 
-#include <s2e/s2e_qemu.h>
-#include <s2e/s2e_config.h>
-#include <s2e/s2e_setjmp.h>
+#include "s2e/s2e_qemu.h"
+#include "s2e/s2e_config.h"
+#include "s2e/s2e_setjmp.h"
 
 
 using namespace std;
@@ -524,7 +525,7 @@ void s2e_on_initialization_complete(void)
     }
 }
 
-void qmp_s2e_exec(QDict *qdict, QObject **ret, Error **err)
+void S2E_ExecuteQMPCommand(QDict *qdict, QObject **ret, Error **err)
 {
     QDict *retDict = qdict_new();
 

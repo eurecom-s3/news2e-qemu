@@ -54,9 +54,4 @@ int monitor_fdset_dup_fd_add(int64_t fdset_id, int dup_fd);
 void monitor_fdset_dup_fd_remove(int dup_fd);
 int monitor_fdset_dup_fd_find(int dup_fd);
 
-/* TODO: Hackish, should not be here */
-#ifdef CONFIG_S2E
-void qmp_s2e_exec(QDict *qdict, QObject **ret, Error **err);
-#endif
-
 #endif /* !MONITOR_H */
