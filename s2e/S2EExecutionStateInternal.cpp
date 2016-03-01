@@ -65,6 +65,7 @@ extern "C" {
 #include "s2e/cxx/S2E.h"
 #include <s2e/cxx/Utils.h>
 #include <s2e/s2e_qemu.h>
+#include "s2e/cxx/CpuArchStateInfo.h"
 
 #include <llvm/Support/CommandLine.h>
 
@@ -111,7 +112,7 @@ S2EExecutionState::S2EExecutionState(klee::KFunction *kf) :
         m_needFinalizeTBExec(false), m_nextSymbVarId(0), m_runningExceptionEmulationCode(false)
 {
     //XXX: make this a struct, not a pointer...
-    assert(false && "stubbed");
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
 //    m_timersState = new TimersState;
     m_dirtyMaskObject = NULL;
 }
@@ -852,80 +853,16 @@ uint64_t S2EExecutionState::getPid() const
 
 uint64_t S2EExecutionState::getSymbolicRegistersMask() const
 {
-    assert(false && "stubbed");
-    return 0;
-//    const ObjectState* os = m_cpuRegistersObject;
-//    if(os->isAllConcrete())
-//        return 0;
-//
-//    uint64_t mask = 0;
-//
-//#ifdef TARGET_I386
-//    uint64_t offset = 0;
-//    /* XXX: x86-specific */
-//    for (int i = 0; i < CPU_NB_REGS; ++i) { /* regs */
-//        if (!os->isConcrete(offset, sizeof(*env->regs) << 3)) {
-//            mask |= (1 << (i+5));
-//        }
-//        offset += sizeof (*env->regs);
-//    }
-//
-//    if (!os->isConcrete(offsetof(CPUX86State, cc_op),
-//                        sizeof(env->cc_op) << 3)) {
-//        mask |= _M_CC_OP;
-//    }
-//    if (!os->isConcrete(offsetof(CPUX86State, cc_src),
-//                        sizeof(env->cc_src) << 3)) {
-//        mask |= _M_CC_SRC;
-//    }
-//    if (!os->isConcrete(offsetof(CPUX86State, cc_dst),
-//                        sizeof(env->cc_dst) << 3)) {
-//        mask |= _M_CC_DST;
-//    }
-//    if (!os->isConcrete(offsetof(CPUX86State, cc_tmp),
-//                        sizeof(env->cc_tmp) << 3)) {
-//        mask |= _M_CC_TMP;
-//    }
-//#elif defined(TARGET_ARM)
-//    if(!os->isConcrete( 29*4, 4*8)) // CF
-//        mask |= (1 << 1);
-//    if(!os->isConcrete( 30*4, 4*8)) // VF
-//        mask |= (1 << 2);
-//    if(!os->isConcrete(31*4, 4*8)) // NF
-//        mask |= (1 << 3);
-//    if(!os->isConcrete(32*4, 4*8)) // ZF
-//        mask |= (1 << 4);
-//    for(int i = 0; i < 15; ++i) { /* regs */
-//            if(!os->isConcrete((33+i)*4, 4*8))
-//                mask |= (1 << (i+5));
-//    }
-//    if(!os->isConcrete(0, 4*8)) // spsr
-//        mask |= (1 << 20);
-//    for(int i = 0; i < 6; ++i) { /* banked_spsr */
-//            if(!os->isConcrete((1+i)*4, 4*8))
-//                mask |= (1 << (i+21));
-//    }
-//    for(int i = 0; i < 6; ++i) { /* banked r13 */
-//            if(!os->isConcrete((7+i)*4, 4*8))
-//                mask |= (1 << (i+27));
-//    }
-//    for(int i = 0; i < 6; ++i) { /* banked r14 */
-//            if(!os->isConcrete((13+i)*4, 4*8))
-//                mask |= (1 << (i+33));
-//    }
-//    for(int i = 0; i < 5; ++i) { /* usr_regs */
-//            if(!os->isConcrete((19+i)*4, 4*8))
-//                mask |= (1 << (i+39));
-//    }
-//    for(int i = 0; i < 5; ++i) { /* fiq_regs */
-//            if(!os->isConcrete((24+i)*4, 4*8))
-//                mask |= (1 << (i+44));
-//    }
-//#else
-//    assert(false & "Update Hardcoded masking of symbolic fields of CPUArchState for your target.");
-//#error "Target architecture not supported"
-//#endif
-//    return mask;
+    const ObjectState* os = m_cpuRegistersObject;
+    if(os->isAllConcrete())
+        return 0;
+
+    uint64_t mask = 0;
+
+	for (CPUArchStateInfo::FieldIndex idx : CPUArchStateInfo::SYMBOLIC_FIELDS) {
+		mask |= os->isConcrete(CPUArchStateInfo::getOffset(idx), CPUArchStateInfo::getSize(idx)) ? 0 : (1 << idx);
+	}
+    return mask;
 }
 
 bool S2EExecutionState::readMemoryConcrete(uint64_t address, void *buf,

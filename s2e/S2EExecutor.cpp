@@ -674,7 +674,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
 
     __DEFINE_EXT_FUNCTION(cpu_io_recompile)
 #ifdef TARGET_ARM
-   llvm::errs() << "TODO: implement " << __func__ << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
     //__DEFINE_EXT_FUNCTION(arm_cpu_handle_mmu_fault)
     __DEFINE_EXT_FUNCTION(cpsr_read)
     __DEFINE_EXT_FUNCTION(cpsr_write)
@@ -687,13 +687,13 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr3)
     __DEFINE_EXT_FUNCTION(cpu_x86_update_cr4)
     __DEFINE_EXT_FUNCTION(cpu_x86_cpuid)
-    llvm::errs() << "TODO: implement " << __func__ << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
 //    __DEFINE_EXT_FUNCTION(cpu_get_apic_base)
 //    __DEFINE_EXT_FUNCTION(cpu_set_apic_base)
 //    __DEFINE_EXT_FUNCTION(cpu_get_apic_tpr)
 //    __DEFINE_EXT_FUNCTION(cpu_set_apic_tpr)
     __DEFINE_EXT_FUNCTION(cpu_smm_update)
-    llvm::errs() << "TODO: implement " << __func__ << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
 //    __DEFINE_EXT_FUNCTION(hw_breakpoint_insert)
 //    __DEFINE_EXT_FUNCTION(hw_breakpoint_remove)
 //    __DEFINE_EXT_FUNCTION(check_hw_breakpoints)
@@ -711,7 +711,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(cpu_abort)
     __DEFINE_EXT_FUNCTION(cpu_loop_exit)
 
-    llvm::errs() << "TODO: implement " << __func__ << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
 //    __DEFINE_EXT_FUNCTION(tb_find_pc)
 
     __DEFINE_EXT_FUNCTION(qemu_system_reset_request)
@@ -719,7 +719,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(tlb_flush_page)
     __DEFINE_EXT_FUNCTION(tlb_flush)
 
-    llvm::errs() << "TODO: implement " << __func__ << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
 //    __DEFINE_EXT_FUNCTION(io_readb_mmu)
 //    __DEFINE_EXT_FUNCTION(io_readw_mmu)
 //    __DEFINE_EXT_FUNCTION(io_readl_mmu)
@@ -751,7 +751,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(s2e_notdirty_mem_write)
 
     __DEFINE_EXT_FUNCTION(cpu_io_recompile)
-    llvm::errs() << "TODO: implement " << __func__ << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
  //   __DEFINE_EXT_FUNCTION(can_do_io)
 
     __DEFINE_EXT_FUNCTION(ldub_phys)
@@ -820,42 +820,44 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     m_dummyMain = kmodule->functionMap[dummyMain];
 
     llvm::Function* function;
+//    llvm::errs() << *kmodule->module << '\n';
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": helper functions stubbed" << '\n';
 
-    function = kmodule->module->getFunction("tcg_llvm_trace_memory_access");
-    assert(function);
-    addSpecialFunctionHandler(function, handlerTraceMemoryAccess);
+//    function = kmodule->module->getFunction("tcg_llvm_trace_memory_access");
+//    assert(function);
+//    addSpecialFunctionHandler(function, handlerTraceMemoryAccess);
 
 // TODO: Find a way to bypass i/o access (when I/O adress is symbolic) for ARM
 #ifndef TARGET_ARM
-    function = kmodule->module->getFunction("tcg_llvm_trace_port_access");
-    assert(function);
-    addSpecialFunctionHandler(function, handlerTracePortAccess);
+//    function = kmodule->module->getFunction("tcg_llvm_trace_port_access");
+//    assert(function);
+//    addSpecialFunctionHandler(function, handlerTracePortAccess);
 #endif
 
-    function = kmodule->module->getFunction("s2e_on_tlb_miss");
-    assert(function);
-    addSpecialFunctionHandler(function, handlerOnTlbMiss);
+//    function = kmodule->module->getFunction("s2e_on_tlb_miss");
+//    assert(function);
+//    addSpecialFunctionHandler(function, handlerOnTlbMiss);
 
-    function = kmodule->module->getFunction("tcg_llvm_fork_and_concretize");
-    assert(function);
-    addSpecialFunctionHandler(function, handleForkAndConcretize);
+//    function = kmodule->module->getFunction("tcg_llvm_fork_and_concretize");
+//    assert(function);
+//    addSpecialFunctionHandler(function, handleForkAndConcretize);
 
 // XXX: is this really not needed on ARM?
 #ifndef TARGET_ARM
-    function = kmodule->module->getFunction("tcg_llvm_make_symbolic");
-    assert(function);
-    addSpecialFunctionHandler(function, handleMakeSymbolic);
+//    function = kmodule->module->getFunction("tcg_llvm_make_symbolic");
+//    assert(function);
+//    addSpecialFunctionHandler(function, handleMakeSymbolic);
 #endif
 
-    function = kmodule->module->getFunction("tcg_llvm_get_value");
-    assert(function);
-    addSpecialFunctionHandler(function, handleGetValue);
+//    function = kmodule->module->getFunction("tcg_llvm_get_value");
+//    assert(function);
+//    addSpecialFunctionHandler(function, handleGetValue);
 
 
-    llvm::FunctionType *traceInstTy = llvm::FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
-    function = dynamic_cast<llvm::Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
-    assert(function);
-    addSpecialFunctionHandler(function, handlerTraceInstruction);
+//    llvm::FunctionType *traceInstTy = llvm::FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
+//    function = dynamic_cast<llvm::Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
+//    assert(function);
+//    addSpecialFunctionHandler(function, handlerTraceInstruction);
 
     if (UseFastHelpers) {
         replaceExternalFunctionsWithSpecialHandlers();
@@ -959,10 +961,10 @@ S2EExecutionState* S2EExecutor::createInitialState()
     addExternalObject(*state, (void*) &name, sizeof(name), \
                       true, true, false)->setName(#name);
 
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
     __DEFINE_EXT_OBJECT_RO(g_s2e)
     __DEFINE_EXT_OBJECT_RO(g_s2e_state)
     //__DEFINE_EXT_OBJECT_RO(g_s2e_exec_ret_addr)
-    assert(false && "stubbed");
 //    __DEFINE_EXT_OBJECT_RO(io_mem_read)
 //    __DEFINE_EXT_OBJECT_RO(io_mem_write)
     //__DEFINE_EXT_OBJECT_RO(io_mem_opaque)
@@ -972,8 +974,8 @@ S2EExecutionState* S2EExecutor::createInitialState()
 //    __DEFINE_EXT_OBJECT_RO(logfile)
 #ifdef TARGET_I386
     __DEFINE_EXT_OBJECT_RO_SYMB(parity_table)
-    __DEFINE_EXT_OBJECT_RO_SYMB(rclw_table)
-    __DEFINE_EXT_OBJECT_RO_SYMB(rclb_table)
+//    __DEFINE_EXT_OBJECT_RO_SYMB(rclw_table)
+//    __DEFINE_EXT_OBJECT_RO_SYMB(rclb_table)
 #endif
 
     m_s2e->getMessagesStream(state)
@@ -2495,23 +2497,21 @@ void s2e_register_dirty_mask(S2E *s2e, S2EExecutionState *initial_state,
 }
 
 
-uintptr_t s2e_qemu_tb_exec(CPUArchState* env1, struct TranslationBlock* tb)
+uintptr_t s2e_qemu_tb_exec(CPUArchState* env, struct TranslationBlock* tb)
 {
-    assert(false && "stubbed");
-    return 0;
 //    /*s2e->getDebugStream() << "icount=" << std::dec << s2e_get_executed_instructions()
 //            << " pc=0x" << std::hex << state->getPc() << std::dec
 //            << '\n';   */
 //    env = env1;
-//    g_s2e_state->setRunningExceptionEmulationCode(false);
-//
-//    try {
-//        uintptr_t ret = g_s2e->getExecutor()->executeTranslationBlock(g_s2e_state, tb);
-//        return ret;
-//    } catch(s2e::CpuExitException&) {
-//        g_s2e->getExecutor()->updateStates(g_s2e_state);
-//        s2e_longjmp(env->jmp_env, 1);
-//    }
+    g_s2e_state->setRunningExceptionEmulationCode(false);
+
+    try {
+        return g_s2e->getExecutor()->executeTranslationBlock(g_s2e_state, tb);
+    } 
+    catch(s2e::CpuExitException&) {
+        g_s2e->getExecutor()->updateStates(g_s2e_state);
+        s2e_longjmp(env->jmp_env, 1);
+    }
 }
 
 int s2e_qemu_finalize_tb_exec(S2E *s2e, S2EExecutionState* state)

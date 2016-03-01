@@ -20,9 +20,8 @@ void S2E_Initialize(int argc, char * argv[], S2ECommandLineOptions *cmdline_opts
     assert(g_s2e_state == NULL && "Initial execution state already exists");
 
 	if (!cmdline_opts->config_file) {
-		error_report("S2E configuration file was not specified, "
-							"Running S2E without a configuration does not make sense. Terminating.");
-			exit(1);
+        error_report("No S2E configuration file specified (with -s2e-config-file)");
+        return;
 	}
 
 	TCGLLVMContext *tcg_llvm_ctx = TCGLLVMContext::getInstance();

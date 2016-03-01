@@ -229,6 +229,14 @@ public:
         return this->cpu;
     }
 
+	/**
+	 * Get the CPU env.
+	 */
+	CPUArchState* getCPUEnv() {
+		assert(this->cpu);
+		return static_cast<CPUArchState*>(this->cpu->env_ptr);
+	}
+
     TranslationBlock *getTb() const;
 
     uint64_t getTotalInstructionCount();
