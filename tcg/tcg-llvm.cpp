@@ -361,9 +361,11 @@ TCGLLVMContextPrivate::TCGLLVMContextPrivate()
     llvm::SMDiagnostic smerror;
     m_module = llvm::ParseIR( 
         llvm::MemoryBuffer::getMemBuffer( 
-            StringRef(&_binary_op_helpers_bca_start, &_binary_op_helpers_bca_end - &_binary_op_helpers_bca_start)),
-            smerror,
-            m_context);
+            StringRef(&_binary_op_helpers_bca_start, &_binary_op_helpers_bca_end - &_binary_op_helpers_bca_start),
+            "op_helpers.bc",
+            false),
+        smerror,
+        m_context);
 
     m_jitMemoryManager = new TJITMemoryManager();
 
@@ -406,42 +408,44 @@ TCGLLVMContextPrivate::~TCGLLVMContextPrivate()
 #ifdef CONFIG_S2E
 void TCGLLVMContextPrivate::initializeHelpers()
 {
-    m_helperTraceMemoryAccess =
-            m_module->getFunction("tcg_llvm_trace_memory_access");
+    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
 
-    m_helperTraceInstruction =
-            m_module->getFunction("tcg_llvm_trace_instruction");
-
-    m_helperForkAndConcretize =
-            m_module->getFunction("tcg_llvm_fork_and_concretize");
-
-    m_helperMakeSymbolic =
-            m_module->getFunction("tcg_llvm_make_symbolic");
-    m_helperGetValue =
-            m_module->getFunction("tcg_llvm_get_value");
-
-    m_qemu_ld_helpers[0] = m_module->getFunction("__ldb_mmu");
-    m_qemu_ld_helpers[1] = m_module->getFunction("__ldw_mmu");
-    m_qemu_ld_helpers[2] = m_module->getFunction("__ldl_mmu");
-    m_qemu_ld_helpers[3] = m_module->getFunction("__ldq_mmu");
-    m_qemu_ld_helpers[4] = m_module->getFunction("__ldq_mmu");
-
-    m_qemu_st_helpers[0] = m_module->getFunction("__stb_mmu");
-    m_qemu_st_helpers[1] = m_module->getFunction("__stw_mmu");
-    m_qemu_st_helpers[2] = m_module->getFunction("__stl_mmu");
-    m_qemu_st_helpers[3] = m_module->getFunction("__stq_mmu");
-    m_qemu_st_helpers[4] = m_module->getFunction("__stq_mmu");
-
-    assert(m_helperTraceMemoryAccess);
-// XXX: is this really not needed on ARM?
-#ifndef TARGET_ARM
-    assert(m_helperMakeSymbolic);
-#endif
-    assert(m_helperGetValue);
-    for(int i = 0; i < 5; ++i) {
-        assert(m_qemu_ld_helpers[i]);
-        assert(m_qemu_st_helpers[i]);
-    }
+//    m_helperTraceMemoryAccess =
+//            m_module->getFunction("tcg_llvm_trace_memory_access");
+//
+//    m_helperTraceInstruction =
+//            m_module->getFunction("tcg_llvm_trace_instruction");
+//
+//    m_helperForkAndConcretize =
+//            m_module->getFunction("tcg_llvm_fork_and_concretize");
+//
+//    m_helperMakeSymbolic =
+//            m_module->getFunction("tcg_llvm_make_symbolic");
+//    m_helperGetValue =
+//            m_module->getFunction("tcg_llvm_get_value");
+//
+//    m_qemu_ld_helpers[0] = m_module->getFunction("__ldb_mmu");
+//    m_qemu_ld_helpers[1] = m_module->getFunction("__ldw_mmu");
+//    m_qemu_ld_helpers[2] = m_module->getFunction("__ldl_mmu");
+//    m_qemu_ld_helpers[3] = m_module->getFunction("__ldq_mmu");
+//    m_qemu_ld_helpers[4] = m_module->getFunction("__ldq_mmu");
+//
+//    m_qemu_st_helpers[0] = m_module->getFunction("__stb_mmu");
+//    m_qemu_st_helpers[1] = m_module->getFunction("__stw_mmu");
+//    m_qemu_st_helpers[2] = m_module->getFunction("__stl_mmu");
+//    m_qemu_st_helpers[3] = m_module->getFunction("__stq_mmu");
+//    m_qemu_st_helpers[4] = m_module->getFunction("__stq_mmu");
+//
+//    assert(m_helperTraceMemoryAccess);
+//// XXX: is this really not needed on ARM?
+//#ifndef TARGET_ARM
+//    assert(m_helperMakeSymbolic);
+//#endif
+//    assert(m_helperGetValue);
+//    for(int i = 0; i < 5; ++i) {
+//        assert(m_qemu_ld_helpers[i]);
+//        assert(m_qemu_st_helpers[i]);
+//    }
 }
 #endif
 
