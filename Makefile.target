@@ -163,13 +163,11 @@ endif # CONFIG_SOFTMMU
 # S2E target
 ifdef CONFIG_S2E
 
+obj-helper-y := 
 s2e-obj-y :=  s2e/ tcg/tcg-llvm.o op_helpers.o
 dummy := $(call unnest-vars,,s2e-obj-y)
 
 $(s2e-obj-y): QEMU_CXXFLAGS += $(LLVM_CXXFLAGS) $(S2E_CXXFLAGS)
-
-obj-helper-y := 
-dummy := $(call unnest-vars,,obj-helper-y)
 
 else #CONFIG_S2E
 
