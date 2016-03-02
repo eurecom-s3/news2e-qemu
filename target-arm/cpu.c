@@ -501,7 +501,7 @@ static void arm_cpu_initfn(Object *obj)
     }
 #if defined(CONFIG_S2E)
 	S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
-	S2EExecutor_InitCpu(executor, S2EExecutor_GetInitialState(executor), cs);
+	S2EExecutor_InitCpu(executor, S2EExecutor_GetCurrentState(executor), cs);
 #endif /* defined(CONFIG_S2E) */
 }
 

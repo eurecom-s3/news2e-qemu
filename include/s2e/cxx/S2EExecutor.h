@@ -172,7 +172,8 @@ public:
     klee::ExecutionState* selectNonSpeculativeState(S2EExecutionState *state);
 
     uintptr_t executeTranslationBlock(S2EExecutionState *state,
-                                      TranslationBlock *tb);
+                                      TranslationBlock *tb,
+									  CPUState* cpu);
 
     /* Returns true if the CPU loop must be exited */
     bool finalizeTranslationBlockExec(S2EExecutionState *state);
@@ -283,8 +284,9 @@ protected:
     uintptr_t executeTranslationBlockKlee(S2EExecutionState *state,
                                           TranslationBlock *tb);
 
-    uintptr_t executeTranslationBlockConcrete(S2EExecutionState *state,
-                                              TranslationBlock *tb);
+    tcg_target_ulong executeTranslationBlockConcrete(S2EExecutionState *state,
+                                              TranslationBlock *tb,
+											  CPUState* cpu);
 
     void deleteState(klee::ExecutionState *state);
 

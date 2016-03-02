@@ -48,6 +48,7 @@
 #ifdef CONFIG_S2E
 #include "s2e/s2e_qemu.h"
 #endif
+#include "s2e/target/S2EExecutor.h"
 
 #include "s2e/target/tcg-llvm.h"
 
@@ -222,7 +223,7 @@ static void cpu_exec_nocache(CPUState *cpu, int max_cycles,
     
     trace_exec_tb_nocache(tb, tb->pc);
 #ifdef CONFIG_S2E
-    s2e_qemu_tb_exec(cpu->env_ptr, tb);
+	S2EExecutor_ExecuteTranslationBlock(S2E_GetExecutor(S2E_GetInstance()), cpu, tb);
 #else
     cpu_tb_exec(cpu, tb->tc_ptr);
 #endif
@@ -543,7 +544,7 @@ int cpu_exec(CPUState *cpu)
                     /* execute the generated code */
                     cpu->current_tb = tb;
 #if defined(CONFIG_S2E)
-                    next_tb = s2e_qemu_tb_exec(cpu->env_ptr, tb);
+					next_tb = S2EExecutor_ExecuteTranslationBlock(S2E_GetExecutor(S2E_GetInstance()), cpu, tb);
 #else
                     next_tb = cpu_tb_exec(cpu, tc_ptr);
 #endif

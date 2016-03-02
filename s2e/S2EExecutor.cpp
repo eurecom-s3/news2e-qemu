@@ -46,6 +46,7 @@ extern "C" {
 #include "exec/ioport.h"
 #include "sysemu/sysemu.h"
 #include "sysemu/cpus.h"
+#include "qom/cpu.h"
 
 extern CPUArchState *env;
 void QEMU_NORETURN raise_exception(CPUArchState *env, int exception_index);
@@ -1752,26 +1753,25 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
     return cast<klee::ConstantExpr>(resExpr)->getZExtValue();
 }
 
-uintptr_t S2EExecutor::executeTranslationBlockConcrete(S2EExecutionState *state,
-                                                       TranslationBlock *tb)
+tcg_target_ulong S2EExecutor::executeTranslationBlockConcrete(S2EExecutionState *state,
+                                                       TranslationBlock *tb,
+                                                       CPUState* cpu)
 {
-    assert(false && "stubbed");
-//    assert(state->m_active && state->m_runningConcrete);
-//    ++state->m_stats.m_statTranslationBlockConcrete;
-//
-//    uintptr_t ret = 0;
-//    memcpy(s2e_cpuExitJmpBuf, env->jmp_env, sizeof(env->jmp_env));
-//
-//    if(s2e_setjmp(env->jmp_env)) {
-//        memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
-//        throw CpuExitException();
-//    } else {
-//
-//        ret = tcg_qemu_tb_exec(env, tb->tc_ptr);
-//    }
-//
-//    memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
-//    return ret;
+    assert(state->m_active && state->m_runningConcrete);
+    ++state->m_stats.m_statTranslationBlockConcrete;
+
+    tcg_target_ulong ret = 0;
+    memcpy(s2e_cpuExitJmpBuf, cpu->jmp_env, sizeof(cpu->jmp_env));
+
+    if(s2e_setjmp(cpu->jmp_env)) {
+        memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
+        throw CpuExitException();
+    } else {
+        ret = tcg_qemu_tb_exec(cpu, tb->tc_ptr);
+    }
+
+    memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
+    return ret;
 }
 
 static inline void s2e_tb_reset_jump(TranslationBlock *tb, unsigned int n)
@@ -1839,7 +1839,8 @@ static void s2e_tb_reset_jump_smask(TranslationBlock* tb, unsigned int n,
 
 uintptr_t S2EExecutor::executeTranslationBlock(
         S2EExecutionState* state,
-        TranslationBlock* tb)
+        TranslationBlock* tb,
+        CPUState* cpu)
 {
     //Avoid incrementing stats every time, very expensive.
     static unsigned doStatsIncrementCount= 0;
@@ -1925,14 +1926,14 @@ uintptr_t S2EExecutor::executeTranslationBlock(
             TimerStatIncrementer t(stats::concreteModeTime);
         }
 
-        assert(false && "stubbed");
+        llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": CPU timer scaling stubbed" << '\n';
 //        int new_scaling = timers_state.clock_scale / 2;
 //        if (new_scaling == 0) {
 //            new_scaling = 1;
 //        }
 //        cpu_enable_scaling(new_scaling);
 
-        return executeTranslationBlockConcrete(state, tb);
+        return executeTranslationBlockConcrete(state, tb, cpu);
     }
 }
 
@@ -2497,23 +2498,6 @@ void s2e_register_dirty_mask(S2E *s2e, S2EExecutionState *initial_state,
 }
 
 
-uintptr_t s2e_qemu_tb_exec(CPUArchState* env, struct TranslationBlock* tb)
-{
-//    /*s2e->getDebugStream() << "icount=" << std::dec << s2e_get_executed_instructions()
-//            << " pc=0x" << std::hex << state->getPc() << std::dec
-//            << '\n';   */
-//    env = env1;
-    g_s2e_state->setRunningExceptionEmulationCode(false);
-
-    try {
-        return g_s2e->getExecutor()->executeTranslationBlock(g_s2e_state, tb);
-    } 
-    catch(s2e::CpuExitException&) {
-        g_s2e->getExecutor()->updateStates(g_s2e_state);
-        s2e_longjmp(env->jmp_env, 1);
-    }
-}
-
 int s2e_qemu_finalize_tb_exec(S2E *s2e, S2EExecutionState* state)
 {
     return s2e->getExecutor()->finalizeTranslationBlockExec(state);
@@ -2703,7 +2687,7 @@ S2EExecutionState* S2EExecutor_CreateInitialState(S2EExecutor* self)
     return state;
 }
 
-S2EExecutionState* S2EExecutor_GetInitialState(S2EExecutor* self)
+S2EExecutionState* S2EExecutor_GetCurrentState(S2EExecutor* self)
 {
     assert(g_s2e_state && "Initial state should have been initialized by now");
     return g_s2e_state;
@@ -2718,4 +2702,19 @@ void S2EExecutor_InitCpu(S2EExecutor* self, S2EExecutionState* initial_state, st
 #else
 #error Unknown Architecture
 #endif
+}
+
+
+uintptr_t S2EExecutor_ExecuteTranslationBlock(S2EExecutor* self, struct CPUState* cpu, struct TranslationBlock* tb)
+{
+    S2EExecutionState* cur_state = S2EExecutor_GetCurrentState(self);
+    cur_state->setRunningExceptionEmulationCode(false);
+
+    try {
+        return self->executeTranslationBlock(cur_state, tb, cpu);
+    } 
+    catch(s2e::CpuExitException&) {
+        self->updateStates(cur_state);
+        s2e_longjmp(cpu->jmp_env, 1);
+    }
 }

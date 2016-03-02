@@ -63,7 +63,7 @@ S2EExecutionState* S2EExecutor_CreateInitialState(S2EExecutor* self);
  * @param self S2EExecutor instance pointer
  * @return Initial state instance pointer
  */
-S2EExecutionState* S2EExecutor_GetInitialState(S2EExecutor* self);
+S2EExecutionState* S2EExecutor_GetCurrentState(S2EExecutor* self);
 
 
 /** 
@@ -73,7 +73,6 @@ S2EExecutionState* S2EExecutor_GetInitialState(S2EExecutor* self);
  * @param cpu CPUState object pointer
  */
 void S2EExecutor_InitCpu(S2EExecutor* self, S2EExecutionState* initial_state, struct CPUState* cpu);
-
 
 #if defined(__cplusplus)
 }
