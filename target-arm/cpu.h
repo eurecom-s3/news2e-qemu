@@ -128,7 +128,27 @@ typedef struct {
 } TCR;
 
 typedef struct CPUARMState {
+	/* TODO: There is no support for ARMv8 in S2E!!!!! */
+	/* Registers moved here for S2E because they are in the symbolic region */
+    uint32_t spsr;
+
+    /* Banked registers.  */
+    uint64_t banked_spsr[8];
+    uint32_t banked_r13[8];
+    uint32_t banked_r14[8];
+
+    /* These hold r8-r12.  */
+    uint32_t usr_regs[5];
+    uint32_t fiq_regs[5];
+
+    /* cpsr flag cache for faster execution */
+    uint32_t CF; /* 0 or 1 */
+    uint32_t VF; /* V is the bit 31. All other bits are undefined */
+    uint32_t NF; /* N is bit 31. All other bits are undefined.  */
+    uint32_t ZF; /* Z set if zero.  */
+
     /* Regs for current mode.  */
+	/* regs[15] is the boundary between symbolic and concrete-only values */
     uint32_t regs[16];
 
     /* 32/64 switch only happens when taking and returning from
@@ -156,22 +176,7 @@ typedef struct CPUARMState {
        This contains all the other bits.  Use cpsr_{read,write} to access
        the whole CPSR.  */
     uint32_t uncached_cpsr;
-    uint32_t spsr;
 
-    /* Banked registers.  */
-    uint64_t banked_spsr[8];
-    uint32_t banked_r13[8];
-    uint32_t banked_r14[8];
-
-    /* These hold r8-r12.  */
-    uint32_t usr_regs[5];
-    uint32_t fiq_regs[5];
-
-    /* cpsr flag cache for faster execution */
-    uint32_t CF; /* 0 or 1 */
-    uint32_t VF; /* V is the bit 31. All other bits are undefined */
-    uint32_t NF; /* N is bit 31. All other bits are undefined.  */
-    uint32_t ZF; /* Z set if zero.  */
     uint32_t QF; /* 0 or 1 */
     uint32_t GE; /* cpsr[19:16] */
     uint32_t thumb; /* cpsr[5]. 0 = arm mode, 1 = thumb mode. */
