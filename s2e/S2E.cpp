@@ -35,17 +35,16 @@ void S2E_Initialize(int argc, char * argv[], S2ECommandLineOptions *cmdline_opts
 	atexit(S2E_Destroy);
 }
 
-
-S2EExecutionState *S2E_CreateInitialState(S2E* self)
+S2E* S2E_GetInstance(void) 
 {
-	if (g_s2e_state != NULL) {
-        llvm::errs() << "ERROR - " << __FILE__ << ":" << __LINE__ << ": g_s2e_state is already initialized" << '\n';
-        exit(1);
-    }
-    
-    S2EExecutionState *state = self->getExecutor()->createInitialState();
-    g_s2e_state = state;
-    return state;
+    assert(g_s2e && "S2E instance should be initialized by now");
+    return g_s2e;
+}
+
+
+S2EExecutor* S2E_GetExecutor(S2E* self)
+{
+    return self->getExecutor();
 }
 
 

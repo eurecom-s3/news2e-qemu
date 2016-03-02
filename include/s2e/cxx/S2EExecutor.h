@@ -44,6 +44,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <cpu.h>
 
+#include "s2e/target/S2EExecutor.h"
+
 class TCGLLVMContext;
 
 struct TranslationBlock;

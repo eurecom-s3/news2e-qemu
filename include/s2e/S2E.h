@@ -15,6 +15,7 @@
 #include "s2e/S2EExecutionState.h"
 #include "s2e/S2ECommandLineOptions.h"
 #include "s2e/TCGLLVMContext.h"
+#include "s2e/S2EExecutor.h"
 
 
 /********************************************
@@ -51,14 +52,6 @@ extern S2E *g_s2e;
  * @param cmdline_opts Command line options for S2E already parsed by Qemu.
  */
 void S2E_Initialize(int argc, char * argv[], S2ECommandLineOptions *cmdline_opts);
-
-/**
- * Create an initial execution state.
- * @param self S2E instance pointer
- * @return An initial execution state
- */
-S2EExecutionState *S2E_CreateInitialState(S2E* self);
-
 
 /**
  * Initialize timers.
@@ -119,6 +112,19 @@ void S2E_ExecuteQMPCommand(QDict *qdict, QObject **ret, Error **err);
  * Delete the global S2E object.
  */
 void S2E_Destroy(void);
+
+/**
+ * Get the singleton instance of the S2E object.
+ * @return S2E instance
+ */
+S2E* S2E_GetInstance(void);
+
+/**
+ * Get the S2EExecutor from the S2E object.
+ * @param self S2E instance pointer
+ * @return S2EExecutor instance pointer
+ */
+S2EExecutor* S2E_GetExecutor(S2E* self);
 
 #if defined(__cplusplus)
 }

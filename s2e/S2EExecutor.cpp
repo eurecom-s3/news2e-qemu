@@ -2687,6 +2687,35 @@ void operator delete[](void *pvMem) throw()
     memset(pvMem, 0xBB, s);
     free(pvMem);
 }
-#endif
+#endif /* defined(__linux__) */
 
+#endif /* defined(S2E_DEBUG_MEMORY) */
+
+S2EExecutionState* S2EExecutor_CreateInitialState(S2EExecutor* self)
+{
+	if (g_s2e_state != NULL) {
+        llvm::errs() << "ERROR - " << __FILE__ << ":" << __LINE__ << ": g_s2e_state is already initialized" << '\n';
+        exit(1);
+    }
+    
+    S2EExecutionState *state = self->createInitialState();
+    g_s2e_state = state;
+    return state;
+}
+
+S2EExecutionState* S2EExecutor_GetInitialState(S2EExecutor* self)
+{
+    assert(g_s2e_state && "Initial state should have been initialized by now");
+    return g_s2e_state;
+}
+
+void S2EExecutor_InitCpu(S2EExecutor* self, S2EExecutionState* initial_state, struct CPUState* cpu)
+{
+#if defined(TARGET_ARM)
+    self->registerCpu(initial_state, &ARM_CPU(cpu)->env);
+#elif defined(TARGET_I386) || defined(TARGET_X86_64)
+    self->registerCpu(initial_state, &X86_CPU(cpu)->env);
+#else
+#error Unknown Architecture
 #endif
+}

@@ -69,6 +69,8 @@ public:
 	 */
 	static const FieldIndex SYMBOLIC_FIELDS[];
 
+	static const size_t SYMBOLIC_BOUNDARY;
+
 		
 	/**
 	 * Get the offset of a CPUARMState field from its index.
@@ -227,7 +229,7 @@ public:
 };
 
 
-CPUArchStateInfo::FieldIndex CPUArchStateInfo::SYMBOLIC_FIELDS[] = {
+const CPUArchStateInfo::FieldIndex CPUArchStateInfo::SYMBOLIC_FIELDS[] = {
 		CF, VF, NF, ZF,
 		R0, R1, R2, R3, R4, R5, R6, R7, R8, R9,
 		R10, R11, R12, SP, LR,
@@ -246,6 +248,8 @@ CPUArchStateInfo::FieldIndex CPUArchStateInfo::SYMBOLIC_FIELDS[] = {
 		BANKED_R8_FIQ, BANKED_R9_FIQ,
 		BANKED_R10_FIQ, BANKED_R11_FIQ,
 		BANKED_R12_FIQ};
+
+const size_t CPUArchStateInfo::SYMBOLIC_BOUNDARY = CPUArchStateInfo::getOffset(CPUArchStateInfo::PC);
 
 #undef ENV_FIELDSIZE
 #undef ENV_FIELDOFFSET

@@ -30,6 +30,9 @@
 #include "sysemu/kvm.h"
 #include "kvm_arm.h"
 
+#include "s2e/S2EExecutor.h"
+#include "s2e/S2E.h"
+
 static void arm_cpu_set_pc(CPUState *cs, vaddr value)
 {
     ARMCPU *cpu = ARM_CPU(cs);
@@ -496,6 +499,10 @@ static void arm_cpu_initfn(Object *obj)
             arm_translate_init();
         }
     }
+#if defined(CONFIG_S2E)
+	S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
+	S2EExecutor_InitCpu(executor, S2EExecutor_GetInitialState(executor), cs);
+#endif /* defined(CONFIG_S2E) */
 }
 
 static Property arm_cpu_reset_cbar_property =
