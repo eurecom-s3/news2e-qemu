@@ -1767,7 +1767,7 @@ tcg_target_ulong S2EExecutor::executeTranslationBlockConcrete(S2EExecutionState 
         memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
         throw CpuExitException();
     } else {
-        ret = tcg_qemu_tb_exec(cpu, tb->tc_ptr);
+        ret = tcg_qemu_tb_exec(cpu->env_ptr, tb->tc_ptr);
     }
 
     memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
