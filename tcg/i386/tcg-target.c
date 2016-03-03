@@ -1559,7 +1559,7 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
 #if defined(CONFIG_SOFTMMU)
     int mem_index;
     tcg_insn_unit *label_ptr[2];
-#endif
+#endif /* defined(CONFIG_SOFTMMU) */
 
     datalo = *args++;
     datahi = (TCG_TARGET_REG_BITS == 32 && is64 ? *args++ : 0);
@@ -1584,7 +1584,7 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
 #else /* !defined(CONFIG_S2E) */
     assert(0 && "To implment");
 #endif /* !defined(CONFIG_S2E) */
-#else
+#else /* defined(CONFIG_SOFTMMU) */
     {
         int32_t offset = guest_base;
         TCGReg base = addrlo;
@@ -1616,7 +1616,7 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
         tcg_out_qemu_ld_direct(s, datalo, datahi,
                                base, index, offset, seg, opc);
     }
-#endif
+#endif /* defined(CONFIG_SOFTMMU) */
 }
 
 static void tcg_out_qemu_st_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
