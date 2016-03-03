@@ -26,6 +26,7 @@ dh_ctype(ret) HELPER(name) (dh_ctype(t1), dh_ctype(t2), dh_ctype(t3), \
 dh_ctype(ret) HELPER(name) (dh_ctype(t1), dh_ctype(t2), dh_ctype(t3), \
                             dh_ctype(t4), dh_ctype(t5));
 
+#include "s2e/helper.h"
 #include "helper.h"
 #include "trace/generated-helpers.h"
 #include "tcg-runtime.h"

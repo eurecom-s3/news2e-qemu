@@ -1,5 +1,6 @@
 #include "s2e/target/S2E.h"
 #include "s2e/target/S2EExecutionState.h"
+#include "exec/helper-proto.h"
 
 struct S2E {};
 struct S2EExecutionState {};
@@ -27,5 +28,6 @@ void S2E_Destroy(void) { }
 
 void S2EExecutionState_InitDeviceState(S2EExecutionState *self) { }
 
+uint64_t helper_s2e_ld(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t idx) {abort();}
 
-
+void helper_s2e_st(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t idx, uint64_t val) {abort();}

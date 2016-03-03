@@ -35,6 +35,7 @@
     | dh_sizemask(t2, 2) | dh_sizemask(t3, 3) | dh_sizemask(t4, 4) \
     | dh_sizemask(t5, 5) },
 
+#include "s2e/helper.h"
 #include "helper.h"
 #include "trace/generated-helpers.h"
 #include "tcg-runtime.h"
