@@ -304,6 +304,10 @@ typedef enum TCGMemOp {
     MO_TEQ   = MO_TE | MO_Q,
 
     MO_SSIZE = MO_SIZE | MO_SIGN,
+
+#if defined(CONFIG_S2E)
+	MO_CODE = (1 << 31),
+#endif /* defined(CONFIG_S2E) */
 } TCGMemOp;
 
 typedef tcg_target_ulong TCGArg;

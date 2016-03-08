@@ -6,11 +6,6 @@ extern "C" {
 #include "qemu/bswap.h"
 }
 
-#if defined(CONFIG_SOFTMMU)
-#else /* defined(CONFIG_SOFTMMU) */
-#error Code only valid for Softmmu
-#endif /* defined(CONFIG_SOFTMMU) */
-
 static uint64_t sign_extend(uint64_t val, unsigned size)
 {
 	switch (size) {
