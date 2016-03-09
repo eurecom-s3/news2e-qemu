@@ -53,3 +53,5 @@ void S2EExecutor_InitializeExecution(S2EExecutor* self, S2EExecutionState* initi
 uint64_t helper_s2e_ld(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t idx) {abort();}
 
 void helper_s2e_st(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t idx, uint64_t val) {abort();}
+
+void helper_s2e_base_instruction(CPUArchState* env, uint32_t op_idx) {abort();}

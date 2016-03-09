@@ -1,4 +1,4 @@
-#include "fsigc++.h"
+#include "s2e/Signals/fsigc++.h"
 
 namespace fsigc {
 

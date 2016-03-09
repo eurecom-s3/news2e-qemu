@@ -32,17 +32,68 @@
  *
  * All contributors are listed in the S2E-AUTHORS file.
  */
-#ifndef __S2E_SIGNALS_MAIN__
 
-#define __S2E_SIGNALS_MAIN__
 
-#include <s2e/s2e_config.h>
+/*** Stateless functors ***/
+#define fsigcxx_xglue(x, y) x ## y
+#define fsigcxx_glue(x, y) fsigcxx_xglue(x, y)
 
-//#ifdef S2E_USE_FAST_SIGNALS
-//#define sigc fsigc
-//#include "fsigc++.h"
-//#else
-#include <sigc++/sigc++.h>
-//#endif
+template <class T, typename RET, TYPENAMES>
+class FUNCTOR_NAME : public functor_base <RET, BASE_CLASS_INST>
+{
+public:
+    typedef RET (T::*func_t)(FUNCT_DECL);
+protected:
+    func_t m_func;
+    T* m_obj;
 
-#endif
+public:
+    FUNCTOR_NAME(T* obj, func_t f) {
+        m_obj = obj;
+        m_func = f;
+    };
+
+    virtual ~FUNCTOR_NAME() {}
+
+    virtual RET operator()(OPERATOR_PARAM_DECL) {
+        FASSERT(this->m_refcount > 0);
+        return (*m_obj.*m_func)(CALL_PARAMS);
+    };
+};
+
+template <class T, typename RET, TYPENAMES>
+inline functor_base<RET, BASE_CLASS_INST>*
+mem_fun(T &obj, RET (T::*f)(FUNCT_DECL)) {
+    return new FUNCTOR_NAME<T, RET, FUNCT_DECL>(&obj, f);
+}
+
+
+template <typename RET, TYPENAMES>
+class fsigcxx_glue(FUNCTOR_NAME, _sl) : public functor_base <RET, BASE_CLASS_INST>
+{
+public:
+    typedef RET (*func_t)(FUNCT_DECL);
+protected:
+    func_t m_func;
+
+public:
+    fsigcxx_glue(FUNCTOR_NAME, _sl)(func_t f) {
+        m_func = f;
+    };
+
+    virtual ~fsigcxx_glue(FUNCTOR_NAME, _sl)() {}
+
+    virtual RET operator()(OPERATOR_PARAM_DECL) {
+        FASSERT(this->m_refcount > 0);
+        return (*m_func)(CALL_PARAMS);
+    };
+};
+
+template <typename RET, TYPENAMES>
+inline functor_base<RET, BASE_CLASS_INST>*
+ptr_fun(RET (*f)(FUNCT_DECL)) {
+    return new fsigcxx_glue(FUNCTOR_NAME, _sl)<RET, FUNCT_DECL>(f);
+}
+
+#undef fsigcxx_glue
+#undef fsigcxx_xglue

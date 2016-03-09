@@ -1,6 +1,7 @@
-#include <sigc++/sigc++.h>
+//#include <sigc++/sigc++.h>
 #include <iostream>
-#include "signals.h"
+#include <stdint.h>
+#include "s2e/Signals/Signals.h"
 
 
 class MyPlugin
