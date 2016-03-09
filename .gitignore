@@ -109,3 +109,10 @@ cscope.*
 tags
 TAGS
 *~
+
+# vim temporary files
+*.swp
+
+# Eclipse project files
+.project
+.cproject
