@@ -38,8 +38,6 @@ extern "C" {
 #include <exec/cpu-all.h>
 #include <exec/exec-all.h>
 #include "cpu.h"
-
-extern CPUArchState *env;
 }
 
 
@@ -52,12 +50,6 @@ extern CPUArchState *env;
 #include <ctype.h>
 #include <stdlib.h>
 #include <sstream>
-
-extern "C" {
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-}
 
 namespace s2e {
 using namespace std;
