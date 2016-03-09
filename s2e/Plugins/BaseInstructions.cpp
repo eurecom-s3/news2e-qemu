@@ -36,6 +36,9 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/TimeValue.h>
+
 extern "C" {
 #include "config.h"
 #include "qemu-common.h"
@@ -45,22 +48,20 @@ extern "C" {
 #include <windows.h>
 #endif
 
-#include "BaseInstructions.h"
-#include <s2e/S2E.h>
-#include <s2e/S2EExecutor.h>
-#include <s2e/S2EExecutionState.h>
-#include <s2e/ConfigFile.h>
-#include <s2e/Utils.h>
-#include <s2e/Plugins/Opcodes.h>
+#include "s2e/Plugins/BaseInstructions.h"
+#include "s2e/cxx/S2E.h"
+#include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/S2EExecutionState.h"
+#include "s2e/cxx/ConfigFile.h"
+#include "s2e/cxx/Utils.h"
+#include "s2e/Plugins/Opcodes.h"
 
 #include <iostream>
 #include <sstream>
 
-#include <llvm/Support/TimeValue.h>
 #include <klee/Searcher.h>
 #include <klee/Solver.h>
 
-#include <llvm/Support/CommandLine.h>
 
 extern llvm::cl::opt<bool> ConcolicMode;
 
@@ -481,7 +482,7 @@ void BaseInstructions::assume(S2EExecutionState *state)
 void BaseInstructions::handleBuiltInOps(S2EExecutionState* state, uint64_t opcode)
 {
 
-    switch((opcode>>OPSHIFT) & 0xFF) {
+    switch(opcode) {
         case 0: { /* s2e_check */
                 target_ulong v = 1;
                 state->writeCpuRegisterConcrete(PARAM0, &v,
@@ -592,22 +593,30 @@ void BaseInstructions::handleBuiltInOps(S2EExecutionState* state, uint64_t opcod
 #ifdef TARGET_I386
         case 0x50: { /* disable/enable timer interrupt */
             uint64_t disabled = opcode >> 16;
-            if(disabled)
+            if(disabled) {
                 s2e()->getMessagesStream(state) << "Disabling timer interrupt\n";
-            else
+			}
+			else {
                 s2e()->getMessagesStream(state) << "Enabling timer interrupt\n";
-            state->writeCpuState(CPU_OFFSET(timer_interrupt_disabled),
-                                 disabled, 8);
+			}
+			llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//            state->writeCpuState(CPU_OFFSET(timer_interrupt_disabled),
+//                                 disabled, 8);
+//
             break;
         }
         case 0x51: { /* disable/enable all apic interrupts */
             uint64_t disabled = opcode >> 16;
-            if(disabled)
+            if(disabled) {
                 s2e()->getMessagesStream(state) << "Disabling all apic interrupt\n";
-            else
+			}
+			else {
                 s2e()->getMessagesStream(state) << "Enabling all apic interrupt\n";
-            state->writeCpuState(CPU_OFFSET(all_apic_interrupts_disabled),
-                                 disabled, 8);
+			}
+			
+			llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//            state->writeCpuState(CPU_OFFSET(all_apic_interrupts_disabled),
+//                                 disabled, 8);
             break;
         }
 #endif
@@ -638,10 +647,7 @@ void BaseInstructions::onCustomInstruction(S2EExecutionState* state,
 	                        << hexval(opcode)
 	                        << ") called.\n";
 
-    uint8_t opc = (opcode>>OPSHIFT) & 0xFF;
-    if (opc <= 0x70) {
-        handleBuiltInOps(state, opcode);
-    }
+    handleBuiltInOps(state, opcode);
 }
 
 }

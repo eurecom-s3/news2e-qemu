@@ -901,41 +901,46 @@ bool S2EExecutionState::writeMemoryConcrete(uint64_t address, void *buf,
 
 uint64_t S2EExecutionState::getPhysicalAddress(uint64_t virtualAddress) const
 {
-    assert(false && "stubbed");
-    return 0;
-//    assert(m_active && "Can not use getPhysicalAddress when the state"
-//                       " is not active (TODO: fix it)");
-//    hwaddr physicalAddress =
-//        cpu_get_phys_page_debug(env, virtualAddress & TARGET_PAGE_MASK);
-//    if(physicalAddress == (hwaddr) -1)
-//        return (uint64_t) -1;
-//
-//    return physicalAddress | (virtualAddress & ~TARGET_PAGE_MASK);
+	return CPU_GET_CLASS(m_cpu)->get_phys_page_debug(
+			m_cpu, 
+			virtualAddress & TARGET_PAGE_MASK) | (virtualAddress & ~TARGET_PAGE_MASK);
 }
 
 uint64_t S2EExecutionState::getHostAddress(uint64_t address,
                                            AddressType addressType) const
 {
-    if(addressType != HostAddress) {
-        uint64_t hostAddress = address & TARGET_PAGE_MASK;
-        if(addressType == VirtualAddress) {
-            hostAddress = getPhysicalAddress(hostAddress);
-            if(hostAddress == (uint64_t) -1)
-                return (uint64_t) -1;
-        }
+	//FIXME: This function is not using the right approach.
+	//It's better to ask for the translation of a memory range (address, size),
+	//and then iterate through this range. The here-returned address might not be
+	//coherent for the whole range that is iterated through.
+	//See cpu_physical_memory_write_rom_internal in exec.c for reference.
+	uint64_t physicalAddress = address;
+	hwaddr addr1;
+	hwaddr len = 8;
 
-        /* We can not use qemu_get_ram_ptr directly. Mapping of IO memory
-           can be modified after memory registration and qemu_get_ram_ptr will
-           return incorrect values in such cases */
-        hostAddress = s2e_get_host_address(hostAddress);
-        if(!hostAddress)
-            return (uint64_t) -1;
+	switch (addressType) {
+		case HostAddress: 
+			return address;
+		case VirtualAddress: 
+			physicalAddress = getPhysicalAddress(address);
+			if (physicalAddress == -1) {
+				return -1;
+			}
+			/* no break here */
+		case PhysicalAddress:
+			rcu_read_lock();
+			MemoryRegion* mr = address_space_translate(m_cpu->as, physicalAddress, &addr1, &len, false);
+			if (!mr || !(memory_region_is_ram(mr) || memory_region_is_romd(mr))) {
+				rcu_read_unlock();
+				return -1;
+			}
+			rcu_read_unlock();
+			
+			uint8_t* hostAddr = static_cast<uint8_t*>(memory_region_get_ram_ptr(mr)) + addr1;
+			return reinterpret_cast<uint64_t>(hostAddr);
+	}
 
-        return hostAddress | (address & ~TARGET_PAGE_MASK);
-
-    } else {
-        return address;
-    }
+	abort();
 }
 
 bool S2EExecutionState::readString(uint64_t address, std::string &s, unsigned maxLen)

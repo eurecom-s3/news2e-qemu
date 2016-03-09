@@ -72,7 +72,36 @@ S2EExecutionState* S2EExecutor_GetCurrentState(S2EExecutor* self);
  * @param initial_state Initial S2EExecutionState pointer
  * @param cpu CPUState object pointer
  */
-void S2EExecutor_InitCpu(S2EExecutor* self, S2EExecutionState* initial_state, struct CPUState* cpu);
+void S2EExecutor_RegisterCpu(S2EExecutor* self, S2EExecutionState* initial_state, struct CPUState* cpu);
+
+/**
+ * Register a memory region with S2E.
+ * @param self S2EExecutor instance pointer
+ * @param initial_state Initial S2ExecutionState pointer
+ * @param address Physical address in the guest's address space
+ * @param size Region size
+ * @param hostAddress Host address of this memory region
+ * @param isSharedConcrete
+ * @param saveOnContextSwitch
+ * @param name Region's name
+ */
+void S2EExecutor_RegisterRam(
+        S2EExecutor* self, 
+        S2EExecutionState* initial_state, 
+        uint64_t address, 
+        uint64_t size, 
+        uint64_t hostAddress, 
+        bool isSharedConcrete, 
+        bool saveOnContextSwitch, 
+        const char* name);
+
+/**
+ * Initialize execution.
+ * @param self SEExecutor instance pointer
+ * @param initial_state Initial S2EExecutionState pointer
+ * @param always_execute_klee <b>true</b> to always execute in Klee, or <b>false</b> to execute in mixed Qemu/Klee mode
+ */
+void S2EExecutor_InitializeExecution(S2EExecutor* self, S2EExecutionState* initial_state, bool always_execute_klee);
 
 #if defined(__cplusplus)
 }

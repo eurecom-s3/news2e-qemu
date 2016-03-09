@@ -903,8 +903,9 @@ void S2EExecutor::initializeStatistics()
 
 
 void S2EExecutor::flushTb() {
-    assert(false && "stubbed");
-//    tb_flush(env); // release references to TB functions
+    if (g_s2e_state) {
+        tb_flush(g_s2e_state->getCPUState());
+    }
 }
 
 S2EExecutor::~S2EExecutor()
@@ -1011,17 +1012,21 @@ void S2EExecutor::initializeExecution(S2EExecutionState* state,
 }
 
 void S2EExecutor::registerCpu(S2EExecutionState *initialState,
-                              CPUArchState *cpuEnv)
+                              CPUState* cpu)
 {
+    CPUArchState* env = static_cast<CPUArchState*>(cpu->env_ptr);
+
     std::cout << std::hex
-            << "Adding CPU (addr = " << std::hex << cpuEnv
-              << ", size = 0x" << sizeof(*cpuEnv) << ")"
+            << "Adding CPU (addr = " << std::hex << cpu
+              << ", size = 0x" << sizeof(*env) << ")"
               << std::dec << '\n';
+
+    initialState->m_cpu = cpu;
 
     /* Add registers and eflags area as a true symbolic area */
 
     initialState->m_cpuRegistersState =
-        addExternalObject(*initialState, cpuEnv, CPU_CONC_LIMIT,
+        addExternalObject(*initialState, env, CPU_CONC_LIMIT,
                       /* isReadOnly = */ false,
                       /* isUserSpecified = */ false,
                       /* isSharedConcrete = */ false);
@@ -1032,7 +1037,7 @@ void S2EExecutor::registerCpu(S2EExecutionState *initialState,
     /* Add the rest of the structure as concrete-only area */
     initialState->m_cpuSystemState =
         addExternalObject(*initialState,
-                      ((uint8_t*)cpuEnv) + CPU_CONC_LIMIT,
+                      ((uint8_t*)env) + CPU_CONC_LIMIT,
                       sizeof(CPUArchState) - CPU_CONC_LIMIT,
                       /* isReadOnly = */ false,
                       /* isUserSpecified = */ true,
@@ -1297,15 +1302,13 @@ void S2EExecutor::stateSwitchTimerCallback(void *opaque)
         }
     }
 
-    assert(false && "stubbed");
-//    qemu_mod_timer(c->m_stateSwitchTimer, qemu_get_clock_ms(host_clock) + 100);
+    timer_mod(c->m_stateSwitchTimer, qemu_clock_get_ms(QEMU_CLOCK_HOST) + 100);
 }
 
 void S2EExecutor::initializeStateSwitchTimer()
 {
-    assert(false && "stubbed");
-//    m_stateSwitchTimer = qemu_new_timer_ms(host_clock, &stateSwitchTimerCallback, this);
-//    qemu_mod_timer(m_stateSwitchTimer, qemu_get_clock_ms(host_clock) + 100);
+    m_stateSwitchTimer = timer_new_ms(QEMU_CLOCK_HOST, &stateSwitchTimerCallback, this);
+    timer_mod(m_stateSwitchTimer, qemu_clock_get_ms(QEMU_CLOCK_HOST) + 100);
 }
 
 void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
@@ -2108,7 +2111,7 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
 //    *s2eState->m_timersState = timers_state;
     cpu_enable_ticks();
 
-    foreach(MemoryObject* mo, m_saveOnContextSwitch) {
+    for(MemoryObject* mo : m_saveOnContextSwitch) {
         const ObjectState *os = s2eState->addressSpace.findObject(mo);
         ObjectState *wos = s2eState->addressSpace.getWriteable(mo, os);
         uint8_t *store = wos->getConcreteStore();
@@ -2201,9 +2204,8 @@ void S2EExecutor::terminateState(ExecutionState &s)
 
     //No need for exiting the loop if we kill another state.
     if (!m_inLoadBalancing && (&state == g_s2e_state)) {
-        assert(false && "stubbed");
-//        state.writeCpuState(CPU_OFFSET(exception_index), EXCP_S2E, 8*sizeof(int));
-//        qemu_mod_timer(m_stateSwitchTimer, qemu_get_clock_ms(rt_clock));
+        state.getCPUState()->exception_index = EXCP_S2E;
+        timer_mod(m_stateSwitchTimer, qemu_clock_get_ms(QEMU_CLOCK_HOST));
         throw CpuExitException();
     }
 }
@@ -2406,7 +2408,7 @@ void S2EExecutor::unrefS2ETb(S2ETranslationBlock* s2e_tb)
             s2eDispatcher->removeFunction(s2e_tb->llvm_function);
             kmodule->removeFunction(s2e_tb->llvm_function);
         }
-        foreach(void* s, s2e_tb->executionSignals) {
+        for (void* s : s2e_tb->executionSignals) {
             delete static_cast<ExecutionSignal*>(s);
         }
     }
@@ -2466,29 +2468,9 @@ S2EExecutionState* s2e_create_initial_state(S2E *s2e)
     return s2e->getExecutor()->createInitialState();
 }
 
-void s2e_initialize_execution(S2E *s2e, S2EExecutionState *initial_state,
-                              int execute_always_klee)
+void S2EExecutor_InitializeExecution(S2EExecutor* self, S2EExecutionState* initial_state, bool always_execute_klee)
 {
-    s2e->getExecutor()->initializeExecution(initial_state, execute_always_klee);
-    //XXX: move it to better place (signal handler for this?)
-    tcg_helper_register(&tcg_ctx, (void*)&s2e_tcg_execution_handler, "s2e_tcg_execution_handler");
-    tcg_helper_register(&tcg_ctx, (void*)&s2e_tcg_custom_instruction_handler, "s2e_tcg_custom_instruction_handler");
-}
-
-void s2e_register_cpu(S2E *s2e, S2EExecutionState *initial_state,
-                      CPUArchState *cpu_env)
-{
-    s2e->getExecutor()->registerCpu(initial_state, cpu_env);
-}
-
-void s2e_register_ram(S2E* s2e, S2EExecutionState *initial_state,
-        uint64_t start_address, uint64_t size,
-        uint64_t host_address, int is_shared_concrete,
-        int save_on_context_switch, const char *name)
-{
-    s2e->getExecutor()->registerRam(initial_state,
-        start_address, size, host_address, is_shared_concrete,
-        save_on_context_switch, name);
+    self->initializeExecution(initial_state, always_execute_klee);
 }
 
 void s2e_register_dirty_mask(S2E *s2e, S2EExecutionState *initial_state,
@@ -2693,15 +2675,9 @@ S2EExecutionState* S2EExecutor_GetCurrentState(S2EExecutor* self)
     return g_s2e_state;
 }
 
-void S2EExecutor_InitCpu(S2EExecutor* self, S2EExecutionState* initial_state, struct CPUState* cpu)
+void S2EExecutor_RegisterCpu(S2EExecutor* self, S2EExecutionState* initial_state, struct CPUState* cpu)
 {
-#if defined(TARGET_ARM)
-    self->registerCpu(initial_state, &ARM_CPU(cpu)->env);
-#elif defined(TARGET_I386) || defined(TARGET_X86_64)
-    self->registerCpu(initial_state, &X86_CPU(cpu)->env);
-#else
-#error Unknown Architecture
-#endif
+    self->registerCpu(initial_state, cpu);
 }
 
 
@@ -2717,4 +2693,19 @@ uintptr_t S2EExecutor_ExecuteTranslationBlock(S2EExecutor* self, struct CPUState
         self->updateStates(cur_state);
         s2e_longjmp(cpu->jmp_env, 1);
     }
+}
+
+void S2EExecutor_RegisterRam(
+        S2EExecutor* self, 
+        S2EExecutionState* initial_state, 
+        uint64_t address, 
+        uint64_t size, 
+        uint64_t hostAddress, 
+        bool isSharedConcrete, 
+        bool saveOnContextSwitch, 
+        const char* name)
+{
+    self->registerRam(initial_state,
+        address, size, hostAddress, isSharedConcrete,
+        saveOnContextSwitch, name);
 }

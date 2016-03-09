@@ -779,6 +779,11 @@ bool S2E::checkDeadProcesses()
     return ret;
 }
 
+S2E* S2E::getInstance(void)
+{
+	return S2E_GetInstance();
+}
+
 } // namespace s2e
 
 /******************************/

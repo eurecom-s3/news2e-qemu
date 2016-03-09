@@ -5,6 +5,14 @@ extern "C" {
 #include "tcg/tcg.h"
 #include "qemu/bswap.h"
 }
+#include "s2e/cxx/S2E.h"
+#include "s2e/cxx/Utils.h"
+#include "s2e/Plugins/CorePlugin.h"
+#include "s2e/cxx/S2EExecutor.h"
+
+using s2e::hexval;
+using s2e::CpuExitException;
+
 
 static uint64_t sign_extend(uint64_t val, unsigned size)
 {
@@ -28,6 +36,19 @@ static uint64_t byteswap(uint64_t val, unsigned size)
 	abort();
 }
 */
+
+static uint64_t Env_getPc(CPUArchState* env) 
+{
+#if defined(TARGET_ARM)
+	return env->regs[15];
+#elif defined(TARGET_I386)
+	return env->eip;
+#else /* defined(TARGET_ARM) */
+#error Do not know how to get the PC for architecture 
+#endif /* defined(TARGET_ARM) */
+}
+
+
 uint64_t helper_s2e_ld(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t idx)
 {
 	printf("mem_read(addr = 0x%08" PRIx32 ", size = %d, idx = %d)\n", (uint32_t) addr, (int) (memop & MO_SIZE), (int) idx);
@@ -88,4 +109,21 @@ void helper_s2e_st(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t id
 	}
 }
 
+void helper_s2e_base_instruction(CPUArchState* env, uint32_t op_idx)
+{
+	CPUState* cpu = CPU(ENV_GET_CPU(env));
 
+	if (S2E::getInstance()->getCorePlugin()->onCustomInstruction.empty()) {
+		S2E::getInstance()->getWarningsStream() << "Encountered base instruction at PC 0x"
+			<< hexval(Env_getPc(env))
+			<< ", but no plugin is registered to receive signals about base instructions." << '\n';
+	}
+	else {
+		try {
+			S2E::getInstance()->getCorePlugin()->onCustomInstruction.emit(g_s2e_state, op_idx);
+		} 
+		catch(CpuExitException&) {
+			s2e_longjmp(cpu->jmp_env, 1);
+		}
+	}
+}

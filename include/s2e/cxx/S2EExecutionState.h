@@ -118,7 +118,7 @@ protected:
     friend class S2EExecutor;
 
     /* Pointer to Qemu CPU object */
-    CPUState *cpu;
+    CPUState *m_cpu;
 
     static unsigned s_lastSymbolicId;
 
@@ -226,15 +226,15 @@ public:
      * Get the Qemu CPU object.
      */
     CPUState* getCPUState() {
-        return this->cpu;
+        return this->m_cpu;
     }
 
 	/**
 	 * Get the CPU env.
 	 */
 	CPUArchState* getCPUEnv() {
-		assert(this->cpu);
-		return static_cast<CPUArchState*>(this->cpu->env_ptr);
+		assert(this->m_cpu);
+		return static_cast<CPUArchState*>(this->m_cpu->env_ptr);
 	}
 
     TranslationBlock *getTb() const;

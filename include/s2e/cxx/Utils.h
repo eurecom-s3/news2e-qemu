@@ -70,7 +70,7 @@ inline llvm::raw_ostream& operator<<(llvm::raw_ostream& out, const hexval& h)
 
 inline std::ostream& operator<<(std::ostream& out, const hexval& h)
 {
-    out << std::hex << (h.value);
+    out << "0x" << std::hex << (h.value);
     return out;
 }
 

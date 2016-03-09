@@ -37,9 +37,9 @@
 
 #define S2E_PLUGINS_CUSTINST_H
 
-#include <s2e/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/S2EExecutionState.h>
+#include "s2e/cxx/Plugin.h"
+#include "s2e/Plugins/CorePlugin.h"
+#include "s2e/cxx/S2EExecutionState.h"
 
 namespace s2e {
 namespace plugins {

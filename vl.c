@@ -4697,7 +4697,9 @@ int main(int argc, char **argv, char **envp)
 		S2EExecutionState_InitDeviceState(g_s2e_state);
 		S2E_InitTimers(g_s2e);
 
-		S2E_InitExecution(g_s2e, g_s2e_state);
+        
+        S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
+        S2EExecutor_InitializeExecution(executor, S2EExecutor_GetCurrentState(executor), s2e_cmdline_opts.always_execute_klee);
 		S2E_RegisterDirtyMask(g_s2e, g_s2e_state);
 		S2E_CallOnInitializationCompleteHandlers(g_s2e);
     }

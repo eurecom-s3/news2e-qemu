@@ -246,6 +246,8 @@ public:
     inline uint64_t getStartTime() const {
         return m_startTimeSeconds;
     }
+
+	static S2E* getInstance(void);
 };
 
 } // namespace s2e

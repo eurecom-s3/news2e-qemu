@@ -53,11 +53,6 @@ void S2E_InitTimers(S2E *self)
 	llvm::errs() << "TODO: implement " << __func__ << '\n';
 }
 
-void S2E_InitExecution(S2E *self, S2EExecutionState *state)
-{
-	llvm::errs() << "TODO: implement " << __func__ << '\n';
-}
-
 void S2E_RegisterDirtyMask(S2E *self, S2EExecutionState *state)
 {
 	llvm::errs() << "TODO: implement " << __func__ << '\n';

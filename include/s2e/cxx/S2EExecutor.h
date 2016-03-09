@@ -139,11 +139,7 @@ public:
     void initializeExecution(S2EExecutionState *initialState,
                              bool executeAlwaysKlee);
 
-#ifdef TARGET_ARM
-    void registerCpu(S2EExecutionState *initialState, CPUARMState *cpuEnv);
-#elif defined(TARGET_I386)
-    void registerCpu(S2EExecutionState *initialState, CPUX86State *cpuEnv);
-#endif
+	void registerCpu(S2EExecutionState* initialState, CPUState* cpu);
 
 
 

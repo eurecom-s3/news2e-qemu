@@ -306,7 +306,7 @@ typedef enum TCGMemOp {
     MO_SSIZE = MO_SIZE | MO_SIGN,
 
 #if defined(CONFIG_S2E)
-	MO_CODE = (1 << 31),
+	MO_CODE = 128,
 #endif /* defined(CONFIG_S2E) */
 } TCGMemOp;
 

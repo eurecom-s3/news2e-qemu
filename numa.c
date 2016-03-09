@@ -434,6 +434,18 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
         memory_region_init_ram(mr, owner, name, ram_size, &error_fatal);
     }
     vmstate_register_ram_global(mr);
+
+		
+	S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
+	S2EExecutor_RegisterRam(
+		executor, 
+		S2EExecutor_GetCurrentState(executor),
+		-1 /* Address is used only for debug prints  */,
+		ram_size,
+		(uint64_t)memory_region_get_ram_ptr(mr),
+		true,
+		false,
+		name);
 }
 
 void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
@@ -472,6 +484,17 @@ void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
 
         memory_region_add_subregion(mr, addr, seg);
         vmstate_register_ram_global(seg);
+
+		
+		S2EExecutor_RegisterRam(
+				S2E_GetExecutor(S2E_GetInstance()), 
+				S2EExecutor_GetCurrentState(S2E_GetExecutor(S2E_GetInstance())),
+				addr,
+				size,
+				(uint64_t) memory_region_get_ram_ptr(seg),
+				false,
+				false,
+				name);
         addr += size;
     }
 }

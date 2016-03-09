@@ -7687,6 +7687,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
     if (arm_dc_feature(s, ARM_FEATURE_M)) {
         goto illegal_op;
     }
+
     cond = insn >> 28;
     if (cond == 0xf){
         /* In ARMv3 and v4 the NV condition is UNPREDICTABLE; we
@@ -9124,6 +9125,16 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
             break;
         default:
         illegal_op:
+			if ((insn & 0xff000000) == 0xff000000) {
+				printf("Found base instruction 0x%08" PRIx32 "\n", insn); 
+#if defined(CONFIG_S2E)
+				TCGv_i32 op_idx = tcg_const_i32((insn >> 16) & 0xff);
+				gen_helper_s2e_base_instruction(cpu_env, op_idx);
+				tcg_temp_free_i32(op_idx);
+#endif /* defined(CONFIG_S2E) */
+				break;
+			}
+
             gen_exception_insn(s, 4, EXCP_UDEF, syn_uncategorized(),
                                default_exception_el(s));
             break;
@@ -10493,6 +10504,17 @@ static int disas_thumb2_insn(CPUARMState *env, DisasContext *s, uint16_t insn_hw
     }
     return 0;
 illegal_op:
+	/* Thumb and Thumb2 undefined instructions according to this post: 
+	 * http://stackoverflow.com/questions/16081618/programmatically-cause-undefined-instruction-exception */
+	if ((insn & 0xf000fff0) == 0xa000f7f0) {
+#if defined(CONFIG_S2E)
+		//TCGv_i32 op_idx = tcg_const_i32(((insn >> 4) & 0xf000) | (insn & 0xfff));
+		TCGv_i32 op_idx = tcg_const_i32(((insn << 12) & 0xf000) | ((insn >> 16) & 0xfff));
+		gen_helper_s2e_base_instruction(cpu_env, op_idx);
+		tcg_temp_free_i32(op_idx);
+#endif /* defined(CONFIG_S2E) */
+		return 0;
+	}
     return 1;
 }
 
@@ -11234,6 +11256,14 @@ undef32:
     return;
 illegal_op:
 undef:
+	if ((insn & 0xff00) == 0xde00) {
+#if defined(CONFIG_S2E)
+		TCGv_i32 op_idx = tcg_const_i32(insn & 0xff);
+		gen_helper_s2e_base_instruction(cpu_env, op_idx);
+		tcg_temp_free_i32(op_idx);
+#endif /* defined(CONFIG_S2E) */
+		return;
+	}
     gen_exception_insn(s, 2, EXCP_UDEF, syn_uncategorized(),
                        default_exception_el(s));
 }
