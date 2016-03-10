@@ -65,8 +65,8 @@ PluginsFactory::PluginsFactory()
 {
     CompiledPlugin::CompiledPlugins *plugins = CompiledPlugin::getPlugins();
 
-    foreach2(it, plugins->begin(), plugins->end()) {
-        registerPlugin(*it);
+    for (auto plugin : *plugins) {
+        registerPlugin(plugin);
     }
 }
 

@@ -196,11 +196,10 @@ public:
 
     void print()
     {
-        typeof(m_caches.begin()) it = m_caches.begin();
-        for (it = m_caches.begin(); it != m_caches.end(); ++it) {
+        for (auto cache : m_caches) {
             std::cout << std::hex <<
-                    "Cache start=0x" << (*it)->getStart() <<
-                    " size=0x" << (*it)->getSize() << std::endl << std::endl;
+                    "Cache start=0x" << cache->getStart() <<
+                    " size=0x" << cache->getSize() << std::endl << std::endl;
         }
     }
 
@@ -217,32 +216,30 @@ public:
         }
 
         //Locate the place to insert
-        typeof(m_caches.begin()) it;
-        for (it = m_caches.begin(); it != m_caches.end(); ++it) {
-            if (size > (*it)->getSize()) {
+        auto cache_itr = m_caches.begin(); 
+        for (; cache_itr != m_caches.end(); ++cache_itr) {
+            if (size > (*cache_itr)->getSize()) {
                 break;
             }
         }
 
-        m_caches.insert(it, mc);
+        m_caches.insert(cache_itr, mc);
     }
 
     void put(uint64_t hostAddress, const T &obj)
     {
-        typeof(m_caches.begin()) it;
-        for (it = m_caches.begin(); it != m_caches.end(); ++it) {
-            if ((*it)->contains(hostAddress)) {
-                (*it)->put(hostAddress, obj);
+        for (auto cache : m_caches) {
+            if (cache->contains(hostAddress)) {
+                cache->put(hostAddress, obj);
                 return;
             }
         }
     }
 
     T* getArray(uint64_t hostAddress) {
-        typeof(m_caches.begin()) it;
-        for (it = m_caches.begin(); it != m_caches.end(); ++it) {
-            if ((*it)->contains(hostAddress)) {
-                return (*it)->getArray(hostAddress);
+        for (auto cache : m_caches) {
+            if (cache->contains(hostAddress)) {
+                return cache->getArray(hostAddress);
             }
         }
         return NULL;
@@ -250,10 +247,9 @@ public:
 
     T get(uint64_t hostAddress)
     {
-        typeof(m_caches.begin()) it;
-        for (it = m_caches.begin(); it != m_caches.end(); ++it) {
-            if ((*it)->contains(hostAddress)) {
-                return (*it)->get(hostAddress);
+        for (auto cache : m_caches) {
+            if (cache->contains(hostAddress)) {
+                return cache->get(hostAddress);
             }
         }
         return T();

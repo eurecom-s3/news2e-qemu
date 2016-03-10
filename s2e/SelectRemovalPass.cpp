@@ -80,9 +80,9 @@ bool SelectRemovalPass::runOnFunction(Function &F)
  // std::cout << "SelectRemovalPass: " << F.getName() << std::endl;
   bool modified=false;
   
-  foreach(bbit, F.begin(), F.end()) {
+  for (auto bbit = F.begin(), bbend = F.end(); bbit != bbend; ++bbit) {
    again:
-   foreach(iit, bbit->begin(), bbit->end()) {
+   for (auto iit = bbit->begin(), iend = bbit->end(); iit != iend; ++iit) {
       Instruction &i = *iit;
       if (i.getOpcode() != Instruction::Select)
         continue;

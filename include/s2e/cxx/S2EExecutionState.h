@@ -51,6 +51,8 @@
 #include "MemoryCache.h"
 #include "s2e/s2e_config.h"
 
+#include <tuple>
+
 /** S2E_TARGET_CONC_LIMIT defines the border between concrete and symbolic area.
  *  Eg. regs[15] is in concrete-only-area for ARM targets.
  *  This is often used as a CPUArchState offset, see CPU_CONC_LIMIT below.
@@ -192,7 +194,7 @@ protected:
      * The following optimizes tracks the location of every ObjectState
      * in the TLB in order to optimize TLB updates.
      */
-    typedef std::pair<unsigned int, unsigned int> TlbCoordinates;
+    typedef std::tuple<unsigned, unsigned, unsigned> TlbCoordinates;
     typedef llvm::SmallVector<TlbCoordinates, 8> ObjectStateTlbReferences;
     typedef std::tr1::unordered_map<klee::ObjectState *, ObjectStateTlbReferences> TlbMap;
 

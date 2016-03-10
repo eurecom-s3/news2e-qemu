@@ -81,7 +81,7 @@ extern llvm::cl::opt<bool> DebugLogStateMerge;
 }
 
 namespace {
-CPUTLBEntry s_cputlb_empty_entry = { { {-1, -1, -1, -1} } };
+CPUTLBEntry s_cputlb_empty_entry = { { {static_cast<target_ulong>(-1), static_cast<target_ulong>(-1), static_cast<target_ulong>(-1), static_cast<target_ulong>(-1)} } };
 }
 
 extern llvm::cl::opt<bool> PrintModeSwitch;
@@ -225,17 +225,14 @@ void S2EExecutionState::addressSpaceChange(const klee::MemoryObject *mo,
         TlbMap::iterator it = m_tlbMap.find(const_cast<ObjectState*>(oldState));
         bool found = false;
         if (it != m_tlbMap.end()) {
+            auto vec = it->second;
             found = true;
-            ObjectStateTlbReferences vec = (*it).second;
-            unsigned size = vec.size();
-            assert(size > 0);
-            for (unsigned i = 0; i < size; ++i) {
-                const TlbCoordinates &coords = vec[i];
-#ifdef S2E_DEBUG_TLBCACHE
-                g_s2e->getDebugStream() << "  mmu_idx=" << coords.first<<
-                                           " index=" << coords.second << "\n";
-#endif
-                S2ETLBEntry *entry = &env->s2e_tlb_table[coords.first][coords.second];
+            for (auto coords : vec) {
+                auto mmu_idx = std::get<0>(coords);
+                auto page_idx = std::get<1>(coords);
+                auto memobj_idx = std::get<2>(coords);
+
+                S2ETLBEntry *entry = &env->s2etlb[mmu_idx][page_idx][memobj_idx];
                 assert(entry->objectState == (void*) oldState);
                 assert(newState);
                 entry->objectState = newState;
@@ -294,12 +291,12 @@ ExecutionState* S2EExecutionState::clone()
                           - CPU_CONC_LIMIT);
 
 
-    foreach2(it, m_tlbMap.begin(), m_tlbMap.end()) {
-        ObjectStateTlbReferences &vec = (*it).second;
-        unsigned size = vec.size();
-        for (unsigned i = 0; i < size; ++i) {
-            const TlbCoordinates &coords = vec[i];
-            S2ETLBEntry *entry = &cpu->s2e_tlb_table[coords.first][coords.second];
+    for (auto tlbEntry : m_tlbMap) {
+        for (auto coords : tlbEntry.second) {
+            auto mmu_idx = std::get<0>(coords);
+            auto page_idx = std::get<1>(coords);
+            auto memobj_idx = std::get<2>(coords);
+            S2ETLBEntry *entry = &cpu->s2etlb[mmu_idx][page_idx][memobj_idx];
             ObjectState* os = static_cast<ObjectState*>(entry->objectState);
             if(os && !os->getObject()->isSharedConcrete) {
                 entry->addend &= ~1;
@@ -1982,8 +1979,10 @@ void S2EExecutionState::flushTlbCachePage(klee::ObjectState *objectState, int mm
     assert(tlbIt != m_tlbMap.end());
 
     ObjectStateTlbReferences &vec = (*tlbIt).second;
-    foreach2(vit, vec.begin(), vec.end()) {
-        if ((*vit).first == (unsigned)mmu_idx && (*vit).second == (unsigned)index) {
+    for (auto vit = vec.begin(), vend = vec.end(); vit != vend; ++vit) {
+        auto v_mmu_idx = std::get<0>(*vit);
+        auto v_page_idx = std::get<1>(*vit);
+        if (v_mmu_idx == (unsigned)mmu_idx && v_page_idx == (unsigned)index) {
             vec.erase(vit);
             found = true;
             break;
@@ -2010,14 +2009,14 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
 
     ObjectPair *ops = m_memcache.getArray(hostAddr);
 
-    unsigned int index = (virtAddr >> S2E_RAM_OBJECT_BITS) & (CPU_S2E_TLB_SIZE - 1);
-    for(int i = 0; i < CPU_S2E_TLB_SIZE / CPU_TLB_SIZE; ++i) {
-        S2ETLBEntry* entry = &env->s2e_tlb_table[mmu_idx][index];
+    unsigned page_idx = (virtAddr >> TARGET_PAGE_BITS) & ((1 << TARGET_PAGE_BITS) - 1);
+    for (unsigned memobj_idx = 0; memobj_idx < S2E_NUM_RAM_OBJECTS_PER_PAGE; ++memobj_idx) {
+        S2ETLBEntry* entry = &env->s2etlb[mmu_idx][page_idx][memobj_idx];
         ObjectState *oldObjectState = static_cast<ObjectState *>(entry->objectState);
 
         ObjectPair op;
 
-        if (!ops || !(op = ops[i]).first) {
+        if (!ops || !(op = ops[memobj_idx]).first) {
             op = m_memcache.get(hostAddr);
             if (!op.first) {
                 op = addressSpace.findObject(hostAddr);
@@ -2043,7 +2042,7 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
             m_memcache.put(hostAddr, op);
             ops = m_memcache.getArray(hostAddr & TARGET_PAGE_MASK);
         }
-        ops[i] = op;
+        ops[memobj_idx] = op;
 
 
         /* Store the new mapping in the cache */
@@ -2051,11 +2050,10 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
         g_s2e->getDebugStream() << std::dec << "Storing " << op.second << " (" << mmu_idx << ',' << index << ")\n";
 #endif
         if (oldObjectState != ros) {
-            flushTlbCachePage(oldObjectState, mmu_idx, index);
-            m_tlbMap[const_cast<ObjectState *>(op.second)].push_back(TlbCoordinates(mmu_idx, index));
+            flushTlbCachePage(oldObjectState, mmu_idx, page_idx);
+            m_tlbMap[const_cast<ObjectState *>(op.second)].push_back(TlbCoordinates(mmu_idx, page_idx, memobj_idx));
         }
 
-        index += 1;
         hostAddr += S2E_RAM_OBJECT_SIZE;
         virtAddr += S2E_RAM_OBJECT_SIZE;
     }

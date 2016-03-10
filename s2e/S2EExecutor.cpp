@@ -441,9 +441,9 @@ void S2EExecutor::handlerTraceMemoryAccess(Executor* executor,
         bool isWrite = cast<klee::ConstantExpr>(args[4])->getZExtValue();
         bool isIO    = cast<klee::ConstantExpr>(args[5])->getZExtValue();
 
-        ref<Expr> value = klee::ExtractExpr::create(args[2], 0, width);
+        klee::ref<Expr> value = klee::ExtractExpr::create(args[2], 0, width);
 
-        ref<Expr> result = s2eExecutor->m_s2e->getCorePlugin()->onDataMemoryAccess.emit(
+        klee::ref<Expr> result = s2eExecutor->m_s2e->getCorePlugin()->onDataMemoryAccess.emit(
                 s2eState, args[0], args[1], value, isWrite, isIO);
 
         if (value != result)
@@ -485,7 +485,7 @@ void S2EExecutor::handlerOnTlbMiss(Executor* executor,
     assert(args.size() == 4);
 
     S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
-    ref<Expr> addr = args[2];
+    klee::ref<Expr> addr = args[2];
     bool isWrite = cast<klee::ConstantExpr>(args[3])->getZExtValue();
 
     if(!isa<klee::ConstantExpr>(addr)) {
@@ -521,7 +521,7 @@ void S2EExecutor::handlerTracePortAccess(Executor* executor,
         Expr::Width width = cast<klee::ConstantExpr>(args[2])->getZExtValue();
         bool isWrite = cast<klee::ConstantExpr>(args[3])->getZExtValue();
 
-        ref<Expr> value = klee::ExtractExpr::create(args[1], 0, width);
+        klee::ref<Expr> value = klee::ExtractExpr::create(args[1], 0, width);
 
         s2eExecutor->m_s2e->getCorePlugin()->onPortAccess.emit(
                 s2eState, args[0], value, isWrite);
@@ -531,12 +531,12 @@ void S2EExecutor::handlerTracePortAccess(Executor* executor,
 void S2EExecutor::handleForkAndConcretize(Executor* executor,
                                      ExecutionState* state,
                                      klee::KInstruction* target,
-                                     std::vector< ref<Expr> > &args)
+                                     std::vector< klee::ref<Expr> > &args)
 {
     S2EExecutor* s2eExecutor = static_cast<S2EExecutor*>(executor);
 
     assert(args.size() == 3);
-    ref<Expr> address = args[0];
+    klee::ref<Expr> address = args[0];
 
     address = state->constraints.simplifyExpr(address);
 
@@ -596,7 +596,7 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
 void S2EExecutor::handleMakeSymbolic(Executor* executor,
                                      ExecutionState* state,
                                      klee::KInstruction* target,
-                                     std::vector< ref<Expr> > &args)
+                                     std::vector< klee::ref<Expr> > &args)
 {
     S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
     s2eState->makeSymbolic(args, false);
@@ -611,7 +611,7 @@ void S2EExecutor::handleGetValue(klee::Executor* executor,
            "Expected three args to tcg_llvm_get_value: addr, size, add_constraint");
 
     // KLEE address of variable
-    ref<klee::ConstantExpr> kleeAddress = cast<klee::ConstantExpr>(args[0]);
+    klee::ref<klee::ConstantExpr> kleeAddress = cast<klee::ConstantExpr>(args[0]);
     
     // Size in bytes
     uint64_t sizeInBytes = cast<klee::ConstantExpr>(args[1])->getZExtValue();
@@ -621,7 +621,7 @@ void S2EExecutor::handleGetValue(klee::Executor* executor,
 
     // Read the value and concretize it.
     // The value will be stored at kleeAddress
-    std::vector<ref<Expr> > result;
+    std::vector<klee::ref<Expr> > result;
     s2eState->kleeReadMemory(kleeAddress, sizeInBytes, NULL, false, true, add_constraint);
 }
 
@@ -1076,9 +1076,9 @@ void S2EExecutor::registerRam(S2EExecutionState *initialState,
               << ", isSharedConcrete=" << isSharedConcrete << ", name=" << name << ")\n";
 
 #ifdef DEBUG_TLB
-    qemu_log("ALLOCATE RAM of size=%"PRIu64"\n",size);
-    qemu_log("\t start address: %"PRIx64".\n", startAddress);
-    qemu_log("\t host_address: %"PRIx64".\n", hostAddress);
+    qemu_log("ALLOCATE RAM of size=%" PRIu64 "\n",size);
+    qemu_log("\t start address: %" PRIx64 ".\n", startAddress);
+    qemu_log("\t host_address: %" PRIx64 ".\n", hostAddress);
 #endif
 
     for(uint64_t addr = hostAddress; addr < hostAddress+size;
@@ -1093,14 +1093,14 @@ void S2EExecutor::registerRam(S2EExecutionState *initialState,
                 isSharedConcrete && !saveOnContextSwitch && StateSharedMemory);
 
 #ifdef DEBUG_TLB
-        qemu_log("\t mo address: %"PRIx64".\n", mo);
+        qemu_log("\t mo address: 0x%p.\n", mo);
 
         //get concrete store just for debugging
         ObjectPair op = initialState->addressSpace.findObject(addr);
         ObjectState* wos =
                 initialState->addressSpace.getWriteable(op.first, op.second);
 
-        qemu_log("\t wos->concreteStore  address: %"PRIx64".\n", wos->getConcreteStore());
+        qemu_log("\t wos->concreteStore  address: 0x%p.\n", wos->getConcreteStore());
 #endif
 
         mo->setName(ss.str());
@@ -1239,8 +1239,8 @@ void S2EExecutor::doLoadBalancing()
 
     std::vector<ExecutionState*> allStates;
 
-    foreach2(it, states.begin(), states.end()) {
-        S2EExecutionState *s2estate = static_cast<S2EExecutionState*>(*it);
+    for (auto state : states) {
+        S2EExecutionState *s2estate = static_cast<S2EExecutionState*>(state);
         if (!s2estate->isZombie()) {
             allStates.push_back(s2estate);
         }
@@ -1537,10 +1537,9 @@ void S2EExecutor::prepareFunctionExecution(S2EExecutionState *state,
                             const std::vector<klee::ref<klee::Expr> > &args)
 {
     KFunction *kf;
-    typeof(kmodule->functionMap.begin()) it =
-            kmodule->functionMap.find(function);
-    if(it != kmodule->functionMap.end()) {
-        kf = it->second;
+    auto func_itr = kmodule->functionMap.find(function);
+    if(func_itr != kmodule->functionMap.end()) {
+        kf = func_itr->second;
     } else {
 
         unsigned cIndex = kmodule->constants.size();
@@ -1554,7 +1553,7 @@ void S2EExecutor::prepareFunctionExecution(S2EExecutionState *state,
         for (Module::iterator i = kmodule->module->begin(),
                               ie = kmodule->module->end(); i != ie; ++i) {
             llvm::Function *f = i;
-            ref<klee::ConstantExpr> addr(0);
+            klee::ref<klee::ConstantExpr> addr(0);
 
             // If the symbol has external weak linkage then it is implicitly
             // not defined in this module; if it isn't resolvable then it
@@ -1741,7 +1740,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
 
     /* Prepare function execution */
     prepareFunctionExecution(state,
-            tb->llvm_function, std::vector<ref<Expr> >(1,
+            tb->llvm_function, std::vector<klee::ref<Expr> >(1,
                 Expr::createPointer((uint64_t) tb_function_args)));
 
     if (executeInstructions(state)) {
@@ -1749,7 +1748,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
     }
 
     /* Get return value */
-    ref<Expr> resExpr =
+    klee::ref<Expr> resExpr =
             getDestCell(*state, state->pc).value;
     assert(isa<klee::ConstantExpr>(resExpr));
 
@@ -1992,7 +1991,7 @@ klee::ref<klee::Expr> S2EExecutor::executeFunction(S2EExecutionState *state,
         state->pc = callerPC;
     }
 
-    ref<Expr> resExpr(0);
+    klee::ref<Expr> resExpr(0);
     if(function->getReturnType()->getTypeID() != llvm::Type::VoidTyID)
         resExpr = getDestCell(*state, state->pc).value;
 
@@ -2019,7 +2018,7 @@ void S2EExecutor::deleteState(klee::ExecutionState *state)
 
 void S2EExecutor::doStateFork(S2EExecutionState *originalState,
                  const vector<S2EExecutionState*>& newStates,
-                 const vector<ref<Expr> >& newConditions)
+                 const vector<klee::ref<Expr> >& newConditions)
 {
     assert(originalState->m_active && !originalState->m_runningConcrete);
 
@@ -2053,7 +2052,7 @@ void S2EExecutor::doStateFork(S2EExecutionState *originalState,
 }
 
 S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
-                            ref<Expr> condition, bool isInternal)
+                            klee::ref<Expr> condition, bool isInternal)
 {
     assert(dynamic_cast<S2EExecutionState*>(&current));
     assert(!static_cast<S2EExecutionState*>(&current)->m_runningConcrete);
@@ -2072,7 +2071,7 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
         assert(dynamic_cast<S2EExecutionState*>(res.second));
 
         std::vector<S2EExecutionState*> newStates(2);
-        std::vector<ref<Expr> > newConditions(2);
+        std::vector<klee::ref<Expr> > newConditions(2);
 
         newStates[0] = static_cast<S2EExecutionState*>(res.first);
         newStates[1] = static_cast<S2EExecutionState*>(res.second);
@@ -2121,7 +2120,7 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
 }
 
 void S2EExecutor::branch(klee::ExecutionState &state,
-          const vector<ref<Expr> > &conditions,
+          const vector<klee::ref<Expr> > &conditions,
           vector<ExecutionState*> &result)
 {
     S2EExecutionState *s2eState = dynamic_cast<S2EExecutionState*>(&state);
@@ -2132,7 +2131,7 @@ void S2EExecutor::branch(klee::ExecutionState &state,
     unsigned n = conditions.size();
 
     vector<S2EExecutionState*> newStates;
-    vector<ref<Expr> > newConditions;
+    vector<klee::ref<Expr> > newConditions;
 
     newStates.reserve(n);
     newConditions.reserve(n);

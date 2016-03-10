@@ -815,6 +815,10 @@ typedef enum TPRAccess {
     TPR_ACCESS_WRITE,
 } TPRAccess;
 
+/* Needs to be here for S2E. We need to know the number of S2E ram objects 
+ * in a page. */
+#define TARGET_PAGE_BITS 12
+
 typedef struct CPUX86State {
     /* standard registers */
     target_ulong regs[CPU_NB_REGS];
@@ -1230,8 +1234,6 @@ void cpu_x86_update_dr7(CPUX86State *env, uint32_t new_dr7);
 
 /* hw/pc.c */
 uint64_t cpu_get_tsc(CPUX86State *env);
-
-#define TARGET_PAGE_BITS 12
 
 #ifdef TARGET_X86_64
 #define TARGET_PHYS_ADDR_SPACE_BITS 52

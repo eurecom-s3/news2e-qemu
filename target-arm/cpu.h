@@ -42,6 +42,13 @@
 #include "s2e/TCGLLVMContext.h"
 #include "s2e/S2E.h"
 
+/* FIXME: This is needed to compile this header with C++11 (for S2E), 
+ * but it's ugly and should not be here. 
+ */
+#if defined(__cplusplus)
+#define typeof(x) decltype(x)
+#endif /* defined(__cplusplus) */
+
 
 #define EXCP_UDEF            1   /* undefined instruction */
 #define EXCP_SWI             2   /* software interrupt */
@@ -126,6 +133,17 @@ typedef struct {
     uint32_t mask;
     uint32_t base_mask;
 } TCR;
+
+/* Needs to be here for S2E. We need to know the number of S2E ram objects 
+ * ++ * in a page. */
+#if defined(CONFIG_USER_ONLY)
+#define TARGET_PAGE_BITS 12
+#else
+/* The ARM MMU allows 1k pages.  */
+/* ??? Linux doesn't actually use these, and they're deprecated in recent
+   architecture revisions.  Maybe a configure option to disable them.  */
+#define TARGET_PAGE_BITS 10
+#endif
 
 typedef struct CPUARMState {
 	/* TODO: There is no support for ARMv8 in S2E!!!!! */
@@ -1540,15 +1558,6 @@ bool write_cpustate_to_list(ARMCPU *cpu);
 
 #define ARM_CPUID_TI915T      0x54029152
 #define ARM_CPUID_TI925T      0x54029252
-
-#if defined(CONFIG_USER_ONLY)
-#define TARGET_PAGE_BITS 12
-#else
-/* The ARM MMU allows 1k pages.  */
-/* ??? Linux doesn't actually use these, and they're deprecated in recent
-   architecture revisions.  Maybe a configure option to disable them.  */
-#define TARGET_PAGE_BITS 10
-#endif
 
 #if defined(TARGET_AARCH64)
 #  define TARGET_PHYS_ADDR_SPACE_BITS 48

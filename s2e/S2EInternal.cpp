@@ -41,7 +41,6 @@ extern "C" {
 #include <sysemu/cpus.h>
 #include <qemu/main-loop.h>
 #include <sysemu/sysemu.h>
-extern CPUArchState *env;
 }
 
 #include "s2e/cxx/TCGLLVMContext.h"
@@ -631,8 +630,8 @@ void S2E::printf(llvm::raw_ostream &os, const char *fmt, ...)
 
 void S2E::refreshPlugins()
 {
-    foreach2(it, m_activePluginsList.begin(), m_activePluginsList.end()) {
-        (*it)->refresh();
+    for (auto activePlugin : m_activePluginsList) {
+        activePlugin->refresh();
     }
 }
 

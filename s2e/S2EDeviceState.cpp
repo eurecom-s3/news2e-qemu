@@ -298,8 +298,8 @@ int S2EDeviceState::getBuffer(uint8_t *buf, int64_t pos, int size)
 unsigned S2EDeviceState::getBlockDeviceId(struct BlockDriverState* dev)
 {
     unsigned i = 0;
-    foreach2(it, s_blockDevices.begin(), s_blockDevices.end()) {
-        if ((*it) == dev) {
+    for (auto blockdev : s_blockDevices) {
+        if (blockdev == dev) {
             return i;
         }
         ++i;

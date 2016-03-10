@@ -78,8 +78,8 @@ class ExprManager {
 public:
 
     ~ExprManager() {
-        foreach2(it, expressions.begin(), expressions.end()) {
-            delete *it;
+        for (auto expr : expressions) {
+            delete expr;
         }
     }
 
