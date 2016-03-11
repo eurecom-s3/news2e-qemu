@@ -3190,34 +3190,6 @@ EOF
 fi
 
 ##########################################
-# s2e probe: libsigc++-2
-
-if test "$s2e" = "yes" ; then
-  cat > $TMPCXX << EOF
-#include <sigc++/sigc++.h>
-int main(void) { sigc::signal<void, int> s; s.emit(1); return 0; }
-EOF
-  if [ "$mingw32" = "yes" ]; then
-    if [ "$static" = "yes" ]; then
-        sigcxx2_libs="-lsigc-2.0"
-    else
-        sigcxx2_libs="-lsigc-2.0.dll"
-    fi
-  else
-    sigcxx2_cxxflags=`pkg-config sigc++-2.0 --cflags 2> /dev/null`
-    sigcxx2_libs=`pkg-config sigc++-2.0 --libs 2> /dev/null`
-  fi
-
-  if compile_prog_cxx "$sigcxx2_cxxflags" "$sigcxx2_libs" ; then
-    : libsigc++-2.0 found
-  else
-    feature_not_found "libsigc++ (required for s2e)"
-    exit 1
-  fi
-fi
-
-
-##########################################
 # clang probe
 if test "$llvm_required" = "yes"; then
 cat > $TMPC << EOF
@@ -6032,7 +6004,7 @@ if test "$target_s2e" = "yes" ; then
   echo "CONFIG_S2E=y" >> $config_target_mak
   echo "LLVM_CXXFLAGS:=\$(filter-out $FILTERFLAGS,$llvm_cxxflags)" >> $config_target_mak
   echo "S2E_CXXFLAGS:=\$(filter-out $llvm_cxxflags $FILTERFLAGS, $klee_cxxflags)" >> $config_target_mak
-  echo "S2E_CXXFLAGS+=$lua_cxxflags $sigcxx2_cxxflags" >> $config_target_mak
+  echo "S2E_CXXFLAGS+=$lua_cxxflags" >> $config_target_mak
   echo "S2E_CXXFLAGS+=-DKLEE_LIBRARY_DIR='\"$klee_libdir\"'" >> $config_target_mak
   echo "S2E_CXXFLAGS+=-std=c++11" >> $config_target_mak
   echo "LLVMAR:=$llvmar" >> $config_target_mak
@@ -6146,7 +6118,7 @@ esac
 if test "$target_s2e" = "yes" ; then
   echo "LINKER=$cxx" >> $config_target_mak
   echo "LIBS:=$klee_libs $llvm_libs \$(LIBS)" >> $config_target_mak
-  echo "LIBS+=$lua_libs $sigcxx2_libs" >> $config_target_mak
+  echo "LIBS+=$lua_libs" >> $config_target_mak
   echo "LIBS+=\$(filter-out $llvm_ldflags, $klee_ldflags) $llvm_ldflags" >> $config_target_mak
   echo "KLEE_LIBFILES=$klee_libfiles" >> $config_target_mak
 fi
