@@ -1,3 +1,4 @@
 s2e-obj-y += CorePlugin.o \
-	BaseInstructions.o
+	BaseInstructions.o \
+	test/        
 
