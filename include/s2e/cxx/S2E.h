@@ -53,6 +53,7 @@
 
 #include "s2e/s2e_config.h"
 #include "s2e/cxx/Plugin.h"
+#include "s2e/Plugins/CorePlugin.h"
 #include "s2e/cxx/Synchronization.h"
 
 namespace klee {
@@ -247,7 +248,10 @@ public:
         return m_startTimeSeconds;
     }
 
-	static S2E* getInstance(void);
+    static S2E* getInstance(void);
+
+    void instrumentTCGCode(ExecutionSignal* signal, uint64_t pc, uint64_t next_pc = -1);
+    	
 };
 
 } // namespace s2e

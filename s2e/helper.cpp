@@ -12,6 +12,7 @@ extern "C" {
 
 using s2e::hexval;
 using s2e::CpuExitException;
+using s2e::ExecutionSignal;
 
 
 static uint64_t sign_extend(uint64_t val, unsigned size)
@@ -126,4 +127,10 @@ void helper_s2e_base_instruction(CPUArchState* env, uint32_t op_idx)
 			s2e_longjmp(cpu->jmp_env, 1);
 		}
 	}
+}
+
+void helper_s2e_instrument_code(CPUArchState* env, void* _signal, uint64_t pc)
+{
+    ExecutionSignal* signal = static_cast<ExecutionSignal*>(_signal);
+    assert(false && "TODO: implement");
 }

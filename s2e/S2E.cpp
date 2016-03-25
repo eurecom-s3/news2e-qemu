@@ -10,7 +10,11 @@ extern "C" {
 #include "s2e/target/S2E.h"
 #include "s2e/cxx/S2E.h"
 #include "s2e/cxx/S2EExecutor.h"
+#include "s2e/cxx/S2EExecutionState.h"
 #include "s2e/cxx/TCGLLVMContext.h"
+#include "s2e/Plugins/CorePlugin.h"
+
+using s2e::ExecutionSignal;
 
 S2E *g_s2e = NULL;
 
@@ -75,7 +79,21 @@ void S2E_CallOnPrivilegeChangeHandlers(S2E *self, unsigned from, unsigned to)
 
 void S2E_CallOnTranslateBlockStartHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc)
 {
-	llvm::errs() << "TODO: implement " << __func__ << '\n';
+    assert(state->isActive());
+
+    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+                                    tb->s2e_tb->executionSignals.back());
+    assert(signal->empty());
+
+    try {
+        self->getCorePlugin()->onTranslateBlockStart.emit(signal, state, tb, pc);
+        if(!signal->empty()) {
+            self->instrumentTCGCode(signal, pc);
+            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+        }
+    } catch(s2e::CpuExitException&) {
+        s2e_longjmp(state->getCPUState()->jmp_env, 1);
+    }
 }
 
 void S2E_CallOnTranslateInstructionStartHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc)

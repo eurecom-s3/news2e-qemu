@@ -41,6 +41,9 @@ extern "C" {
 #include <sysemu/cpus.h>
 #include <qemu/main-loop.h>
 #include <sysemu/sysemu.h>
+#include "tcg/tcg.h"
+#include "exec/helper-proto.h"
+#include "exec/helper-gen.h"
 }
 
 #include "s2e/cxx/TCGLLVMContext.h"
@@ -99,6 +102,8 @@ void print_stacktrace(void)
 #include <stdlib.h>
 #include <execinfo.h>
 #include <cxxabi.h>
+
+extern TCGv_ptr cpu_env;
 
 /** Print a demangled stack backtrace of the caller function to FILE* out. */
 void print_stacktrace(void)
@@ -782,6 +787,48 @@ S2E* S2E::getInstance(void)
 {
 	return S2E_GetInstance();
 }
+
+/* Instrument generated code to emit signal on execution */
+/* Next pc, when != -1, indicates with which value to update the program counter
+   before calling the annotation. This is useful when instrumenting instructions
+   that do not explicitely update the program counter by themselves. */
+/* Cool documentation on TCG helper functions: https://fulcronz27.wordpress.com/2014/06/09/qemu-call-a-custom-function-from-tcg/ */
+void S2E::instrumentTCGCode(ExecutionSignal* signal, uint64_t pc, uint64_t next_pc)
+{
+    TCGv_ptr tmp_signal = tcg_const_ptr((uint64_t) signal);
+    TCGv_i64 tmp_pc = tcg_const_i64(pc);
+
+    //TODO: Force store of pc value if next_pc != -1
+
+//    if (nextpc != (uint64_t)-1) {
+//#if TCG_TARGET_REG_BITS == 64 && defined(TARGET_X86_64)
+//        TCGv_i64 tpc = tcg_temp_new_i64();
+//        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
+//        tcg_gen_movi_i64(tpc, (tcg_target_ulong) nextpc);
+//        tcg_gen_st_i64(tpc, cpu_env, offsetof(CPUX86State, eip));
+//        tcg_temp_free_i64(tpc);
+//#else
+//        TCGv_i32 tpc = tcg_temp_new_i32();
+//        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
+//        tcg_gen_movi_i32(tpc, (tcg_target_ulong) nextpc);
+//        tcg_gen_st_i32(tpc, cpu_env, CPU_CONC_LIMIT);
+//
+//        tcg_temp_free_i32(tpc);
+//#endif
+//    }
+//
+//    // XXX: here we rely on CPUState being the first tcg global temp
+//    TCGArg args[2];
+//    args[0] = GET_TCGV_PTR(t0);
+//    args[1] = GET_TCGV_I64(t1);
+    
+
+    gen_helper_s2e_instrument_code(cpu_env, tmp_signal, tmp_pc);
+
+    tcg_temp_free_i64(tmp_pc);
+    tcg_temp_free_ptr(tmp_signal);
+}
+
 
 } // namespace s2e
 
