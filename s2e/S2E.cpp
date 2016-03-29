@@ -98,7 +98,6 @@ void S2E_CallOnTranslateBlockStartHandlers(S2E *self, S2EExecutionState *state, 
 
 void S2E_CallOnTranslateInstructionStartHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc)
 {
-	llvm::errs() << "TODO: implement " << __func__ << '\n';
     ExecutionSignal *signal = static_cast<ExecutionSignal*>(
                                     tb->s2e_tb->executionSignals.back());
     assert(signal->empty());
@@ -116,7 +115,21 @@ void S2E_CallOnTranslateInstructionStartHandlers(S2E *self, S2EExecutionState *s
 
 void S2e_CallOnTranslateInstructionEndHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc, uint64_t nextPc)
 {
-	llvm::errs() << "TODO: implement " << __func__ << '\n';
+    assert(state->isActive());
+
+    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
+                                    tb->s2e_tb->executionSignals.back());
+    assert(signal->empty());
+
+    try {
+        self->getCorePlugin()->onTranslateInstructionEnd.emit(signal, state, tb, pc);
+        if(!signal->empty()) {
+            self->instrumentTCGCode(signal, pc);
+            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+        }
+    } catch(s2e::CpuExitException&) {
+        s2e_longjmp(state->getCPUState()->jmp_env, 1);
+    }
 }
 
 void S2E_CallOnTranslateBlockEndHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc, bool hasNextPc, uint64_t nextPc)
