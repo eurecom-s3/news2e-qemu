@@ -25,7 +25,7 @@ private:
 	void slotTranslateTBEnd(ExecutionSignal* signal, S2EExecutionState* state, TranslationBlock* tb, uint64_t pc, bool hasNextPc, uint64_t nextPc);
 };
 
-S2E_DEFINE_PLUGIN(TestOnTranslateBlockEndPlugin, "Print when the OnTranslateBlockEnd event is received", "TestOnTranslateBlockEnd");
+S2E_DEFINE_PLUGIN(TestOnTranslateBlockEndPlugin, "Print when the OnTranslateBlockEnd event is received", "TestOnTranslateBlockEndPlugin");
 
 void TestOnTranslateBlockEndPlugin::initialize()
 {
@@ -39,7 +39,7 @@ void TestOnTranslateBlockEndPlugin::slotTranslateTBEnd(ExecutionSignal *signal,
                                     bool hasNextPc,
                                     uint64_t nextPc)
 {
-    s2e()->getWarningsStream() << "OnTranslateBlockEnd called at pc 0x" << hexval(pc) << '\n';
+    s2e()->getWarningsStream() << "OnTranslateBlockEnd called at pc " << hexval(pc) << '\n';
 }
 
 } // namespace plugins

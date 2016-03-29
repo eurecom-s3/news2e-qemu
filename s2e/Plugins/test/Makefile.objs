@@ -1,4 +1,4 @@
-s2e-obj-y += TestOnTranslationBlockStart.o \
+s2e-obj-y += TestOnTranslateBlockStart.o \
 	TestOnTranslateBlockEnd.o \
         TestOnTranslateInstructionStart.o \
         TestOnTranslateInstructionEnd.o \

@@ -25,7 +25,7 @@ private:
 	void slotTranslateInsnEnd(ExecutionSignal* signal, S2EExecutionState* state, TranslationBlock* tb, uint64_t pc);
 };
 
-S2E_DEFINE_PLUGIN(TestOnTranslateInstructionEndPlugin, "Print when the OnTranslateInstructionStart event is received", "TestOnTranslateInstructionEnd");
+S2E_DEFINE_PLUGIN(TestOnTranslateInstructionEndPlugin, "Print when the OnTranslateInstructionEnd event is received", "TestOnTranslateInstructionEndPlugin");
 
 void TestOnTranslateInstructionEndPlugin::initialize()
 {
@@ -37,7 +37,7 @@ void TestOnTranslateInstructionEndPlugin::slotTranslateInsnEnd(ExecutionSignal *
                                     TranslationBlock *tb,
                                     uint64_t pc)
 {
-    s2e()->getWarningsStream() << "OnTranslateInstructionEnd called at pc 0x" << hexval(pc) << '\n';
+    s2e()->getWarningsStream() << "OnTranslateInstructionEnd called at pc " << hexval(pc) << '\n';
 }
 
 } // namespace plugins
