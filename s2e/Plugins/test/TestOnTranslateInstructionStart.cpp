@@ -25,7 +25,7 @@ private:
 	void slotTranslateInsnStart(ExecutionSignal* signal, S2EExecutionState* state, TranslationBlock* tb, uint64_t pc);
 };
 
-S2E_DEFINE_PLUGIN(TestOnTranslateInstructionStartPlugin, "Print when the OnTranslateBlockEnd event is received", "TestOnTranslateInstructionStart");
+S2E_DEFINE_PLUGIN(TestOnTranslateInstructionStartPlugin, "Print when the OnTranslateInstructionStart event is received", "TestOnTranslateInstructionStart");
 
 void TestOnTranslateInstructionStartPlugin::initialize()
 {
