@@ -94,21 +94,6 @@ void CorePlugin::initialize()
 /******************************/
 /* Functions called from QEMU */
 
-int g_s2e_enable_signals = true;
-
-void s2e_tcg_execution_handler(void* signal, uint64_t pc)
-{
-    assert(false && "stubbed");
-//    try {
-//        ExecutionSignal *s = (ExecutionSignal*)signal;
-//        if (g_s2e_enable_signals) {
-//            s->emit(g_s2e_state, pc);
-//        }
-//    } catch(s2e::CpuExitException&) {
-//        s2e_longjmp(env->jmp_env, 1);
-//    }
-}
-
 void s2e_tcg_custom_instruction_handler(uint64_t arg)
 {
     assert(false && "stubbed");
@@ -136,125 +121,6 @@ void s2e_tcg_emit_custom_instruction(S2E*, uint64_t arg)
 //    tcg_temp_free_i64(t0);
 }
 
-/* Instrument generated code to emit signal on execution */
-/* Next pc, when != -1, indicates with which value to update the program counter
-   before calling the annotation. This is useful when instrumenting instructions
-   that do not explicitely update the program counter by themselves. */
-static void s2e_tcg_instrument_code(S2E*, ExecutionSignal* signal, uint64_t pc, uint64_t nextpc=-1)
-{
-    assert(false && "stubbed");
-//    TCGv_ptr t0 = tcg_temp_new_ptr();
-//    TCGv_i64 t1 = tcg_temp_new_i64();
-//
-//    if (nextpc != (uint64_t)-1) {
-//#if TCG_TARGET_REG_BITS == 64 && defined(TARGET_X86_64)
-//        TCGv_i64 tpc = tcg_temp_new_i64();
-//        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
-//        tcg_gen_movi_i64(tpc, (tcg_target_ulong) nextpc);
-//        tcg_gen_st_i64(tpc, cpu_env, offsetof(CPUX86State, eip));
-//        tcg_temp_free_i64(tpc);
-//#else
-//        TCGv_i32 tpc = tcg_temp_new_i32();
-//        TCGv_ptr cpu_env = MAKE_TCGV_PTR(0);
-//        tcg_gen_movi_i32(tpc, (tcg_target_ulong) nextpc);
-//        tcg_gen_st_i32(tpc, cpu_env, CPU_CONC_LIMIT);
-//
-//        tcg_temp_free_i32(tpc);
-//#endif
-//    }
-//
-//    // XXX: here we rely on CPUState being the first tcg global temp
-//    TCGArg args[2];
-//    args[0] = GET_TCGV_PTR(t0);
-//    args[1] = GET_TCGV_I64(t1);
-//
-//#if TCG_TARGET_REG_BITS == 64
-//    const int sizemask = 4 | 2;
-//    tcg_gen_movi_i64(TCGV_PTR_TO_NAT(t0), (tcg_target_ulong) signal);
-//#else
-//    const int sizemask = 4;
-//    tcg_gen_movi_i32(TCGV_PTR_TO_NAT(t0), (tcg_target_ulong) signal);
-//#endif
-//
-//    tcg_gen_movi_i64(t1, pc);
-//
-//    tcg_gen_helperN((void*) s2e_tcg_execution_handler,
-//                0, sizemask, TCG_CALL_DUMMY_ARG, 2, args);
-//
-//    tcg_temp_free_i64(t1);
-//    tcg_temp_free_ptr(t0);
-}
-
-void s2e_on_translate_block_start(
-        S2E* s2e, S2EExecutionState* state,
-        TranslationBlock *tb, uint64_t pc)
-{
-    assert(false && "stubbed");
-//    assert(state->isActive());
-//
-//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-//                                    tb->s2e_tb->executionSignals.back());
-//    assert(signal->empty());
-//
-//    try {
-//        s2e->getCorePlugin()->onTranslateBlockStart.emit(signal, state, tb, pc);
-//        if(!signal->empty()) {
-//            s2e_tcg_instrument_code(s2e, signal, pc);
-//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-//        }
-//    } catch(s2e::CpuExitException&) {
-//        s2e_longjmp(env->jmp_env, 1);
-//    }
-}
-
-void s2e_on_translate_block_end(
-        S2E* s2e, S2EExecutionState *state,
-        TranslationBlock *tb,
-        uint64_t insPc, int staticTarget, uint64_t targetPc)
-{
-    assert(false && "stubbed");
-//    assert(state->isActive());
-//
-//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-//                                    tb->s2e_tb->executionSignals.back());
-//    assert(signal->empty());
-//
-//    try {
-//        s2e->getCorePlugin()->onTranslateBlockEnd.emit(
-//                signal, state, tb, insPc,
-//                staticTarget, targetPc);
-//    } catch(s2e::CpuExitException&) {
-//        s2e_longjmp(env->jmp_env, 1);
-//    }
-//
-//    if(!signal->empty()) {
-//        s2e_tcg_instrument_code(s2e, signal, insPc);
-//        tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-//    }
-}
-
-void s2e_on_translate_instruction_start(
-        S2E* s2e, S2EExecutionState* state,
-        TranslationBlock *tb, uint64_t pc)
-{
-    assert(false && "stubbed");
-//    assert(state->isActive());
-//
-//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-//                                    tb->s2e_tb->executionSignals.back());
-//    assert(signal->empty());
-//
-//    try {
-//        s2e->getCorePlugin()->onTranslateInstructionStart.emit(signal, state, tb, pc);
-//        if(!signal->empty()) {
-//            s2e_tcg_instrument_code(s2e, signal, pc);
-//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-//        }
-//    } catch(s2e::CpuExitException&) {
-//        s2e_longjmp(env->jmp_env, 1);
-//    }
-}
-
 void s2e_on_translate_jump_start(
         S2E* s2e, S2EExecutionState* state,
         TranslationBlock *tb, uint64_t pc, int jump_type)
@@ -271,30 +137,6 @@ void s2e_on_translate_jump_start(
 //                                                        pc, jump_type);
 //        if(!signal->empty()) {
 //            s2e_tcg_instrument_code(s2e, signal, pc);
-//            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
-//        }
-//    } catch(s2e::CpuExitException&) {
-//        s2e_longjmp(env->jmp_env, 1);
-//    }
-}
-
-//Nextpc is the program counter of the of the instruction that
-//follows the one at pc, only if it does not change the control flow.
-void s2e_on_translate_instruction_end(
-        S2E* s2e, S2EExecutionState* state,
-        TranslationBlock *tb, uint64_t pc, uint64_t nextpc)
-{
-    assert(false && "stubbed");
-//    assert(state->isActive());
-//
-//    ExecutionSignal *signal = static_cast<ExecutionSignal*>(
-//                                    tb->s2e_tb->executionSignals.back());
-//    assert(signal->empty());
-//
-//    try {
-//        s2e->getCorePlugin()->onTranslateInstructionEnd.emit(signal, state, tb, pc);
-//        if(!signal->empty()) {
-//            s2e_tcg_instrument_code(s2e, signal, pc, nextpc);
 //            tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
 //        }
 //    } catch(s2e::CpuExitException&) {
