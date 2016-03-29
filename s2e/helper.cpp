@@ -14,6 +14,9 @@ using s2e::hexval;
 using s2e::CpuExitException;
 using s2e::ExecutionSignal;
 
+/** TODO: This is a hack, put in a better location */
+static bool g_s2e_enable_signals = true;
+
 
 static uint64_t sign_extend(uint64_t val, unsigned size)
 {
@@ -132,5 +135,13 @@ void helper_s2e_base_instruction(CPUArchState* env, uint32_t op_idx)
 void helper_s2e_instrument_code(CPUArchState* env, void* _signal, uint64_t pc)
 {
     ExecutionSignal* signal = static_cast<ExecutionSignal*>(_signal);
-    assert(false && "TODO: implement");
+    CPUState* cpu = CPU(ENV_GET_CPU(env));
+    
+    try {
+        if (g_s2e_enable_signals) {
+            signal->emit(S2EExecutor_GetCurrentState(S2E::getInstance()->getExecutor()), pc);
+        }
+    } catch(s2e::CpuExitException&) {
+        s2e_longjmp(cpu->jmp_env, 1);
+    }
 }
