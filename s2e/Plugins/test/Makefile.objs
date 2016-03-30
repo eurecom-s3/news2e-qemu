@@ -4,4 +4,5 @@ s2e-obj-y += TestOnTranslateBlockStart.o \
         TestOnTranslateInstructionEnd.o \
         TestOnExecuteBlockStart.o \
         TestOnExecuteBlockEnd.o \
-        TestOnExecuteInstructionStart.o
+        TestOnExecuteInstructionStart.o \
+        TestOnExecuteInstructionEnd.o
