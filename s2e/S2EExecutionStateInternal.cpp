@@ -857,7 +857,7 @@ uint64_t S2EExecutionState::getSymbolicRegistersMask() const
     uint64_t mask = 0;
 
 	for (CPUArchStateInfo::FieldIndex idx : CPUArchStateInfo::SYMBOLIC_FIELDS) {
-		mask |= os->isConcrete(CPUArchStateInfo::getOffset(idx), CPUArchStateInfo::getSize(idx)) ? 0 : (1 << idx);
+		mask |= os->isConcrete(CPUArchStateInfo::getOffset(idx), CPUArchStateInfo::getSize(idx) * 8) ? 0 : (1 << idx);
 	}
     return mask;
 }
