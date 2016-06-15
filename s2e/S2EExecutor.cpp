@@ -1850,59 +1850,57 @@ uintptr_t S2EExecutor::executeTranslationBlock(
 
     bool executeKlee = m_executeAlwaysKlee;
 
-    /* Think how can we optimize if symbex is disabled */
-    if(true/* state->m_symbexEnabled*/) {
-        if(state->m_startSymbexAtPC != (uint64_t) -1) {
-            executeKlee |= (state->getPc() == state->m_startSymbexAtPC);
-            state->m_startSymbexAtPC = (uint64_t) -1;
-        }
+    //m_startSymbexAtPC is set when code jumps to symbolic execution
+    if(state->m_startSymbexAtPC != (uint64_t) -1) {
+        executeKlee |= (state->getPc() == state->m_startSymbexAtPC);
+        state->m_startSymbexAtPC = (uint64_t) -1;
+    }
 
-        //XXX: hack to run code symbolically that may be delayed because of interrupts.
-        //Size check is important to avoid expensive calls to getPc/getPid in the common case
-        if (state->m_toRunSymbolically.size() > 0 &&  state->m_toRunSymbolically.find(std::make_pair(state->getPc(), state->getPid()))
-            != state->m_toRunSymbolically.end()) {
-            executeKlee = true;
-            state->m_toRunSymbolically.erase(std::make_pair(state->getPc(), state->getPid()));
-        }
+    //XXX: hack to run code symbolically that may be delayed because of interrupts.
+    //Size check is important to avoid expensive calls to getPc/getPid in the common case
+    if (state->m_toRunSymbolically.size() > 0 &&  state->m_toRunSymbolically.find(std::make_pair(state->getPc(), state->getPid()))
+        != state->m_toRunSymbolically.end()) {
+        executeKlee = true;
+        state->m_toRunSymbolically.erase(std::make_pair(state->getPc(), state->getPid()));
+    }
 
-        if(!executeKlee) {
-            //XXX: This should be fixed to make sure that helpers do not read/write corrupted data
-            //because they think that execution is concrete while it should be symbolic (see issue #30).
-            if (!m_forceConcretizations) {
+    if(!executeKlee) {
+        //XXX: This should be fixed to make sure that helpers do not read/write corrupted data
+        //because they think that execution is concrete while it should be symbolic (see issue #30).
+        if (!m_forceConcretizations) {
 #if 1
-            /* We can not execute TB natively if it reads any symbolic regs */
-            uint64_t smask = state->getSymbolicRegistersMask();
-            if(smask || (tb->helper_accesses_mem & 4)) {
-                if((smask & tb->reg_rmask) || (smask & tb->reg_wmask)
-                         || (tb->helper_accesses_mem & 4)) {
-                    /* TB reads symbolic variables */
-                    executeKlee = true;
+        /* We can not execute TB natively if it reads any symbolic regs */
+        uint64_t smask = state->getSymbolicRegistersMask();
+        if(smask || (tb->helper_accesses_mem & 4)) {
+            if((smask & tb->reg_rmask) || (smask & tb->reg_wmask)
+                     || (tb->helper_accesses_mem & 4)) {
+                /* TB reads symbolic variables */
+                executeKlee = true;
 
-                } else {
-                    s2e_tb_reset_jump_smask(tb, 0, smask);
-                    s2e_tb_reset_jump_smask(tb, 1, smask);
+            } else {
+                s2e_tb_reset_jump_smask(tb, 0, smask);
+                s2e_tb_reset_jump_smask(tb, 1, smask);
 
-                    /* XXX: check whether we really have to unlink the block */
-                    /*
-                    tb->jmp_first = (TranslationBlock *)((intptr_t)tb | 2);
-                    tb->jmp_next[0] = NULL;
-                    tb->jmp_next[1] = NULL;
-                    if(tb->tb_next_offset[0] != 0xffff)
-                        tb_set_jmp_target(tb, 0,
-                              (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[0]));
-                    if(tb->tb_next_offset[1] != 0xffff)
-                        tb_set_jmp_target(tb, 1,
-                              (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[1]));
-                    tb->s2e_tb_next[0] = NULL;
-                    tb->s2e_tb_next[1] = NULL;
-                    */
-                }
+                /* XXX: check whether we really have to unlink the block */
+                /*
+                tb->jmp_first = (TranslationBlock *)((intptr_t)tb | 2);
+                tb->jmp_next[0] = NULL;
+                tb->jmp_next[1] = NULL;
+                if(tb->tb_next_offset[0] != 0xffff)
+                    tb_set_jmp_target(tb, 0,
+                          (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[0]));
+                if(tb->tb_next_offset[1] != 0xffff)
+                    tb_set_jmp_target(tb, 1,
+                          (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[1]));
+                tb->s2e_tb_next[0] = NULL;
+                tb->s2e_tb_next[1] = NULL;
+                */
             }
-#else
-            executeKlee |= !state->m_cpuRegistersObject->isAllConcrete();
-#endif
-            } //forced concretizations
         }
+#else
+        executeKlee |= !state->m_cpuRegistersObject->isAllConcrete();
+#endif
+        } //forced concretizations
     }
 
     if(executeKlee) {
