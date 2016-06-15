@@ -964,8 +964,6 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr);
 #endif
 
 #ifdef CONFIG_S2E
-void tcg_calc_regmask_ex(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
-                      uint64_t *accesses_mem, uint16_t *opc, TCGArg *opparam);
 void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
                       uint64_t *accesses_mem);
 #endif
@@ -1067,6 +1065,13 @@ uint64_t helper_be_ldq_cmmu(CPUArchState *env, target_ulong addr,
 
 /* Helper function for S2E */
 void tcg_helper_register(TCGContext *s, void *func_ptr, const char *name);
+/* accesses_mem should be set to one if the helper can access symb memory */
+void tcg_register_helper_with_reg_mask(TCGContext *s, void *func_ptr, const char *name,
+                                   uint64_t reg_rmask, uint64_t reg_wmask,
+                                                    bool accesses_mem);
 const char *tcg_helper_get_name(TCGContext *s, void *helper);
+void tcg_helper_get_reg_mask(TCGContext *s, void *func,
+                             uint64_t* reg_rmask, uint64_t* reg_wmask,
+                            uint64_t* accesses_mem);
 
 #endif /* TCG_H */

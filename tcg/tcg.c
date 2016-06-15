@@ -310,6 +310,9 @@ typedef struct TCGHelperInfo {
     const char *name;
     unsigned flags;
     unsigned sizemask;
+    uint64_t reg_rmask; //< S2E: Bitmask of potentially read (symbolic or concrete) registers
+    uint64_t reg_wmask; //< S2E: Bitmask of potentially written (symbolic or concrete) registers
+    bool accesses_mem; //< S2E: If symbolic memory is accessed by this helper
 } TCGHelperInfo;
 
 #include "exec/helper-proto.h"
@@ -364,14 +367,22 @@ void tcg_context_init(TCGContext *s)
 
 void tcg_helper_register(TCGContext *s, void *func_ptr, const char *name)
 {
+    tcg_register_helper_with_reg_mask(s, func_ptr, name, (uint64_t) -1, (uint64_t) -1, true);
+}
+
+void tcg_register_helper_with_reg_mask(TCGContext *s, void *func_ptr, const char *name,
+                                       uint64_t reg_rmask, uint64_t reg_wmask,
+                                       bool accesses_mem)
+{
     TCGHelperInfo *helper_info = (TCGHelperInfo *) g_malloc0(sizeof(TCGHelperInfo));
-    helper_info->name = name;
     helper_info->func = func_ptr;
-    assert(false && "stubbed");
+    helper_info->name = name;
+    helper_info->reg_rmask = reg_rmask;
+    helper_info->reg_wmask = reg_wmask;
+    helper_info->accesses_mem = accesses_mem;
     helper_info->flags = 0;
     helper_info->sizemask = 0;
-    g_hash_table_insert(s->helpers, (gpointer)func_ptr,
-                                                (gpointer)helper_info);
+    g_hash_table_insert(s->helpers, (gpointer) func_ptr, (gpointer) helper_info);
 }
 
 const char *tcg_helper_get_name(TCGContext *s, void *helper)
@@ -383,6 +394,26 @@ const char *tcg_helper_get_name(TCGContext *s, void *helper)
     }
 
     return info->name;
+}
+
+void tcg_helper_get_reg_mask(TCGContext *s, void *func,
+                             uint64_t* reg_rmask, uint64_t* reg_wmask,
+                             uint64_t* accesses_mem)
+{
+    TCGHelperInfo *info = g_hash_table_lookup(s->helpers, func);
+    if(info) {
+        assert(func != NULL);
+        *reg_rmask = info->reg_rmask;
+        *reg_wmask = info->reg_wmask;
+        *accesses_mem = info->accesses_mem;
+    } else {
+        *reg_rmask = (uint64_t) -1;
+        *reg_wmask = (uint64_t) -1;
+#ifdef CONFIG_S2E
+//XXX: Change 0 to 1 here, but register S2E helpers before!
+        *accesses_mem = 0; /* XXX! */
+#endif
+    }
 }
 
 void tcg_prologue_init(TCGContext *s)
@@ -2818,3 +2849,87 @@ void tcg_register_jit(void *buf, size_t buf_size)
 {
 }
 #endif /* ELF_HOST_MACHINE */
+
+#if defined(CONFIG_S2E)
+void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
+                      uint64_t *accesses_mem)
+{
+    const TCGArg *args = s->gen_opparam_buf;
+    const TCGOp *op = NULL;
+    int c, i, nb_oargs, nb_iargs, nb_cargs;
+
+    uint64_t temps[TCG_MAX_TEMPS];
+    memset(temps, 0, sizeof(temps[0])*(s->nb_globals + s->nb_temps));
+
+    *rmask = *wmask = *accesses_mem = 0;
+
+    for ( int opc_idx = s->gen_first_op_idx; opc_idx >= 0; opc_idx = op->next) {
+        op = &s->gen_op_buf[opc_idx];
+        const TCGOpcode opc = op->opc;
+        const TCGOpDef *def = &tcg_op_defs[opc];
+
+        if (opc == INDEX_op_call) {
+            TCGArg arg_count;
+
+            /* variable number of arguments */
+            arg_count = *args++;
+            nb_oargs = arg_count >> 16;
+            nb_iargs = arg_count & 0xffff;
+            nb_cargs = def->nb_cargs;
+
+            /* get information about helper register access mask */
+            TCGArg func_arg = args[nb_oargs + nb_iargs];
+            assert(func_arg < s->nb_globals + s->nb_temps);
+
+            uint64_t func_rmask, func_wmask, func_accesses_mem;
+            tcg_helper_get_reg_mask(s, (void*) temps[func_arg],
+                                    &func_rmask, &func_wmask,
+                                    &func_accesses_mem);
+
+            *rmask |= func_rmask;
+            *wmask |= func_wmask;
+            *accesses_mem |= func_accesses_mem;
+
+            /* access mask of helper arguments will be added later */
+
+        } else {
+
+            nb_oargs = def->nb_oargs;
+            nb_iargs = def->nb_iargs;
+            nb_cargs = def->nb_cargs;
+        }
+
+        /* We want to track movi assignments in order
+           to be able to determine target helper for call
+           instructions */
+        if (opc == INDEX_op_movi_i32
+#if TCG_TARGET_REG_BITS == 64
+                   || opc == INDEX_op_movi_i64
+#endif
+                   ) {
+            assert(args[0] < s->nb_globals + s->nb_temps);
+            temps[args[0]] = args[1];
+        } else {
+            for(i = 0; i < nb_oargs; i++)
+                temps[args[i]] = 0;
+        }
+
+        for(i = 0; i < nb_iargs; i++) {
+            TCGArg idx = args[nb_oargs + i];
+            if (idx < s->nb_globals) {
+                if ((*wmask & (1<<idx)) == 0)
+                    *rmask |= (1<<idx);
+            }
+        }
+
+        for(i = 0; i < nb_oargs; i++) {
+            TCGArg idx = args[i];
+            if (idx < s->nb_globals) {
+                *wmask |= (1<<idx);
+            }
+        }
+
+        args += nb_iargs + nb_oargs + nb_cargs;
+    }
+}
+#endif /* defined(CONFIG_S2E) */
