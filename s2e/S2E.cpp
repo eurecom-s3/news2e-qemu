@@ -134,7 +134,6 @@ void S2e_CallOnTranslateInstructionEndHandlers(S2E *self, S2EExecutionState *sta
 
 void S2E_CallOnTranslateBlockEndHandlers(S2E *self, S2EExecutionState *state, TranslationBlock *tb, uint64_t pc, bool hasNextPc, uint64_t nextPc)
 {
-	llvm::errs() << "TODO: implement " << __func__ << '\n';
     assert(state->isActive());
 
     ExecutionSignal *signal = static_cast<ExecutionSignal*>(
