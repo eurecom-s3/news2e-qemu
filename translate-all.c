@@ -1164,6 +1164,9 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
     tcg_ctx.code_time -= profile_getclock();
 #endif
 
+    /* Do S2E stuff here: The TCG IR buffer is translated, but the host code not yet generated. */
+    tcg_calc_regmask(&tcg_ctx, &tb->accesses);
+
     /* ??? Overflow could be handled better here.  In particular, we
        don't need to re-do gen_intermediate_code, nor should we re-do
        the tcg optimization currently hidden inside tcg_gen_code.  All

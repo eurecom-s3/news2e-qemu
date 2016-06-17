@@ -1,6 +1,7 @@
 #include "s2e/target/S2E.h"
 #include "s2e/target/S2EExecutionState.h"
 #include "exec/helper-proto.h"
+#include "tcg/tcg.h"
 
 struct S2E {};
 struct S2EExecutionState {};
@@ -57,3 +58,5 @@ void helper_s2e_st(CPUArchState* env, uint64_t addr, uint32_t memop, uint32_t id
 void helper_s2e_base_instruction(CPUArchState* env, uint32_t op_idx) {abort();}
 
 void helper_s2e_instrument_code(CPUArchState* env, void* signal, uint64_t pc) {abort();}
+
+void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses) {}
