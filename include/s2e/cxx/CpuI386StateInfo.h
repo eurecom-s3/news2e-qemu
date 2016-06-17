@@ -13,6 +13,8 @@ class CPUArchStateInfo
 {
 public:
 	enum FieldIndex {
+		//Registers XXX _MUST_ have the same number as in tcg/i386/tcg-target.h!!!
+		//Otherwise the bitmask set by tcg_calc_regmask will be wrong.
 	};
 
 	/**

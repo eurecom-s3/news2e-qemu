@@ -2851,8 +2851,7 @@ void tcg_register_jit(void *buf, size_t buf_size)
 #endif /* ELF_HOST_MACHINE */
 
 #if defined(CONFIG_S2E)
-void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
-                      uint64_t *accesses_mem)
+void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
 {
     const TCGArg *args = s->gen_opparam_buf;
     const TCGOp *op = NULL;
@@ -2861,7 +2860,9 @@ void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
     uint64_t temps[TCG_MAX_TEMPS];
     memset(temps, 0, sizeof(temps[0])*(s->nb_globals + s->nb_temps));
 
-    *rmask = *wmask = *accesses_mem = 0;
+    accesses->reg_rmask = 0;
+    accesses->reg_wmask = 0;
+    accesses->accesses_memory = false;
 
     for ( int opc_idx = s->gen_first_op_idx; opc_idx >= 0; opc_idx = op->next) {
         op = &s->gen_op_buf[opc_idx];
@@ -2886,9 +2887,9 @@ void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
                                     &func_rmask, &func_wmask,
                                     &func_accesses_mem);
 
-            *rmask |= func_rmask;
-            *wmask |= func_wmask;
-            *accesses_mem |= func_accesses_mem;
+            accesses->reg_rmask |= func_rmask;
+            accesses->reg_wmask |= func_wmask;
+            accesses->accesses_memory |= func_accesses_mem;
 
             /* access mask of helper arguments will be added later */
 
@@ -2917,15 +2918,15 @@ void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
         for(i = 0; i < nb_iargs; i++) {
             TCGArg idx = args[nb_oargs + i];
             if (idx < s->nb_globals) {
-                if ((*wmask & (1<<idx)) == 0)
-                    *rmask |= (1<<idx);
+                if ((accesses->reg_wmask & (1<<idx)) == 0)
+                    accesses->reg_rmask |= (1<<idx);
             }
         }
 
         for(i = 0; i < nb_oargs; i++) {
             TCGArg idx = args[i];
             if (idx < s->nb_globals) {
-                *wmask |= (1<<idx);
+                accesses->reg_wmask |= (1<<idx);
             }
         }
 

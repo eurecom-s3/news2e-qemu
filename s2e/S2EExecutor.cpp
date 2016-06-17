@@ -1825,8 +1825,8 @@ static void s2e_tb_reset_jump_smask(TranslationBlock* tb, unsigned int n,
     }
 
     if(tb1) {
-        if(depth > 2 || (smask & tb1->reg_rmask) || (smask & tb1->reg_wmask)
-                             || (tb1->helper_accesses_mem & 4)) {
+        if(depth > 2 || (smask & tb1->accesses.reg_rmask) || (smask & tb1->accesses.reg_wmask)
+                             || (tb1->accesses.accesses_memory & 4)) {
             s2e_tb_reset_jump(tb, n);
         } else if(tb1 != tb) {
             s2e_tb_reset_jump_smask(tb1, 0, smask, depth + 1);
@@ -1870,9 +1870,9 @@ uintptr_t S2EExecutor::executeTranslationBlock(
 
         /* We can not execute TB natively if it reads any symbolic regs */
         uint64_t smask = state->getSymbolicRegistersMask();
-        if(smask || tb->helper_accesses_mem) {
-            if((smask & tb->reg_rmask) || (smask & tb->reg_wmask)
-                     || tb->helper_accesses_mem) {
+        if(smask || tb->accesses.accesses_memory) {
+            if((smask & tb->accesses.reg_rmask) || (smask & tb->accesses.reg_wmask)
+                     || tb->accesses.accesses_memory) {
                 /* TB reads symbolic variables */
                 executeKlee = true;
 
@@ -2540,9 +2540,6 @@ void s2e_dma_write(uint64_t hostAddress, uint8_t *buf, unsigned size)
 
 void s2e_tb_alloc(S2E*, TranslationBlock *tb)
 {
-    tb->reg_rmask = 0;
-    tb->reg_wmask = 0;
-    tb->helper_accesses_mem = false;
     tb->s2e_tb = new S2ETranslationBlock;
     tb->s2e_tb->llvm_function = NULL;
     tb->s2e_tb->refCount = 1;

@@ -964,8 +964,7 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr);
 #endif
 
 #ifdef CONFIG_S2E
-void tcg_calc_regmask(TCGContext *s, uint64_t *rmask, uint64_t *wmask,
-                      uint64_t *accesses_mem);
+void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses);
 #endif
 
 void tcg_register_jit(void *buf, size_t buf_size);

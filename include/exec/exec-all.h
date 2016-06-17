@@ -197,6 +197,17 @@ enum JumpType
 
 typedef struct TranslationBlock TranslationBlock;
 
+typedef struct TranslationBlockAccesses TranslationBlockAccesses;
+
+struct TranslationBlockAccesses
+{
+	uint64_t reg_rmask; //< Which registers are potentially read by this TranslationBlock?
+	uint64_t reg_wmask; //< Which registers are potentially written by this TranslationBlock?
+	bool accesses_memory; //< Does this TranslationBlock access memory?
+
+
+};
+
 struct TranslationBlock {
     target_ulong pc;   /* simulated PC corresponding to this block (EIP + CS base) */
     target_ulong cs_base; /* CS base for this block */
@@ -237,6 +248,10 @@ struct TranslationBlock {
     struct TranslationBlock *jmp_next[2];
     struct TranslationBlock *jmp_first;
 
+    /* The following values are obtained from a static analysis of the
+       TCG IR code. */
+    TranslationBlockAccesses accesses;
+
 #ifdef CONFIG_S2E
     /* pointer to LLVM translated code */
     TCGLLVMContext *tcg_llvm_context;
@@ -244,10 +259,6 @@ struct TranslationBlock {
     uint8_t *llvm_tc_ptr;
     uint8_t *llvm_tc_end;
     struct TranslationBlock* llvm_tb_next[2];
-
-    uint64_t reg_rmask; /* Registers that TB reads (before overwritting) */
-    uint64_t reg_wmask; /* Registers that TB writes */
-    bool helper_accesses_mem; /* True if contains helpers that access mem */
 
     enum ETranslationBlockType s2e_tb_type;
     S2ETranslationBlock* s2e_tb;
