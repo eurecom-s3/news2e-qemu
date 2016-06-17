@@ -689,6 +689,7 @@ int tcg_check_temp_count(void);
 
 void tcg_dump_info(FILE *f, fprintf_function cpu_fprintf);
 void tcg_dump_op_count(FILE *f, fprintf_function cpu_fprintf);
+void tcg_dump_op(TCGContext *s, const TCGOp *op, const TCGArg *args, FILE *stream, fprintf_function cpu_fprintf);
 
 #define TCG_CT_ALIAS  0x80
 #define TCG_CT_IALIAS 0x40
