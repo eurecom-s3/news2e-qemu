@@ -1867,40 +1867,20 @@ uintptr_t S2EExecutor::executeTranslationBlock(
     if(!executeKlee) {
         //XXX: This should be fixed to make sure that helpers do not read/write corrupted data
         //because they think that execution is concrete while it should be symbolic (see issue #30).
-        if (!m_forceConcretizations) {
-#if 1
+
         /* We can not execute TB natively if it reads any symbolic regs */
         uint64_t smask = state->getSymbolicRegistersMask();
-        if(smask || (tb->helper_accesses_mem & 4)) {
+        if(smask || tb->helper_accesses_mem) {
             if((smask & tb->reg_rmask) || (smask & tb->reg_wmask)
-                     || (tb->helper_accesses_mem & 4)) {
+                     || tb->helper_accesses_mem) {
                 /* TB reads symbolic variables */
                 executeKlee = true;
 
             } else {
                 s2e_tb_reset_jump_smask(tb, 0, smask);
                 s2e_tb_reset_jump_smask(tb, 1, smask);
-
-                /* XXX: check whether we really have to unlink the block */
-                /*
-                tb->jmp_first = (TranslationBlock *)((intptr_t)tb | 2);
-                tb->jmp_next[0] = NULL;
-                tb->jmp_next[1] = NULL;
-                if(tb->tb_next_offset[0] != 0xffff)
-                    tb_set_jmp_target(tb, 0,
-                          (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[0]));
-                if(tb->tb_next_offset[1] != 0xffff)
-                    tb_set_jmp_target(tb, 1,
-                          (uintptr_t)(tb->tc_ptr + tb->tb_next_offset[1]));
-                tb->s2e_tb_next[0] = NULL;
-                tb->s2e_tb_next[1] = NULL;
-                */
             }
         }
-#else
-        executeKlee |= !state->m_cpuRegistersObject->isAllConcrete();
-#endif
-        } //forced concretizations
     }
 
     if(executeKlee) {
