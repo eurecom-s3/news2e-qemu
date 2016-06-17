@@ -2560,6 +2560,9 @@ void s2e_dma_write(uint64_t hostAddress, uint8_t *buf, unsigned size)
 
 void s2e_tb_alloc(S2E*, TranslationBlock *tb)
 {
+    tb->reg_rmask = 0;
+    tb->reg_wmask = 0;
+    tb->helper_accesses_mem = false;
     tb->s2e_tb = new S2ETranslationBlock;
     tb->s2e_tb->llvm_function = NULL;
     tb->s2e_tb->refCount = 1;
