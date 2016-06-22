@@ -2001,13 +2001,15 @@ void S2EExecutionState::flushTlbCachePage(klee::ObjectState *objectState, int mm
 }
 
 void S2EExecutionState::updateTlbEntry(CPUArchState* env,
-                          int mmu_idx, uint64_t virtAddr, uint64_t hostAddr)
+                          int mmu_idx, uint64_t virtAddr, uintptr_t addend)
 {
 #ifdef S2E_ENABLE_S2E_TLB
-    assert( (hostAddr & ~TARGET_PAGE_MASK) == 0 );
+    assert( (addend & ~TARGET_PAGE_MASK) == 0 );
     assert( (virtAddr & ~TARGET_PAGE_MASK) == 0 );
 
-    ObjectPair *ops = m_memcache.getArray(hostAddr);
+    llvm::errs() << " updateTlbEntry" << '\n';
+
+    ObjectPair *ops = m_memcache.getArray(addend);
 
     unsigned page_idx = (virtAddr >> TARGET_PAGE_BITS) & ((1 << TARGET_PAGE_BITS) - 1);
     for (unsigned memobj_idx = 0; memobj_idx < S2E_NUM_RAM_OBJECTS_PER_PAGE; ++memobj_idx) {
@@ -2017,18 +2019,18 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
         ObjectPair op;
 
         if (!ops || !(op = ops[memobj_idx]).first) {
-            op = m_memcache.get(hostAddr);
+            op = m_memcache.get(addend);
             if (!op.first) {
-                op = addressSpace.findObject(hostAddr);
+                op = addressSpace.findObject(addend);
             }
         }
-        assert(op.first && op.second && op.second->getObject() == op.first && op.first->address == hostAddr);
+        assert(op.first && op.second && op.second->getObject() == op.first && op.first->address == addend);
 
         klee::ObjectState *ros = const_cast<ObjectState*>(op.second);
 
         if(op.first->isSharedConcrete) {
             entry->objectState = const_cast<klee::ObjectState*>(op.second);
-            entry->addend = (hostAddr - virtAddr) | 1;
+            entry->addend = (addend - virtAddr) | 1;
         } else {
             // XXX: for now we always ensure that all pages in TLB are writable
             klee::ObjectState *wos = addressSpace.getWriteable(op.first, op.second);
@@ -2039,8 +2041,8 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
         op = ObjectPair(op.first, (const ObjectState*)entry->objectState);
 
         if (!ops) {
-            m_memcache.put(hostAddr, op);
-            ops = m_memcache.getArray(hostAddr & TARGET_PAGE_MASK);
+            m_memcache.put(addend, op);
+            ops = m_memcache.getArray(addend & TARGET_PAGE_MASK);
         }
         ops[memobj_idx] = op;
 
@@ -2054,7 +2056,7 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
             m_tlbMap[const_cast<ObjectState *>(op.second)].push_back(TlbCoordinates(mmu_idx, page_idx, memobj_idx));
         }
 
-        hostAddr += S2E_RAM_OBJECT_SIZE;
+        addend = addend + S2E_RAM_OBJECT_SIZE;
         virtAddr += S2E_RAM_OBJECT_SIZE;
     }
 #endif

@@ -476,7 +476,7 @@ public:
     bool merge(const ExecutionState &b);
 
     void updateTlbEntry(CPUArchState* env,
-                              int mmu_idx, uint64_t virtAddr, uint64_t hostAddr);
+                              int mmu_idx, uint64_t virtAddr, uintptr_t addend);
     void flushTlbCache();
 
     void flushTlbCachePage(klee::ObjectState *objectState, int mmu_idx, int index);

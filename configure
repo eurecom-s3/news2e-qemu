@@ -3137,7 +3137,8 @@ EOF
   else
       klee_config="klee-config"
   fi
-  klee_cxxflags=`$klee_config --cflags 2> /dev/null`
+  klee_cflags=-I`$klee_config --includedir 2> /dev/null`
+  klee_cxxflags=`$klee_config --cxxflags 2> /dev/null`
   klee_ldflags=`$klee_config --ldflags 2> /dev/null`
   klee_libs=`$klee_config --libs 2> /dev/null`
   klee_libdir=`$klee_config --libdir 2> /dev/null | sed s:Debug/lib$:Release/lib:`
@@ -3151,6 +3152,7 @@ EOF
 
   if compile_prog_cxx "$klee_cxxflags $llvm_cxxflags" "$klee_ldflags $klee_libs $llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then
     s2e="yes"
+    QEMU_CFLAGS="$QEMU_CFLAGS $klee_cflags"
   else
     feature_not_found "klee (required for s2e)"
     exit 1

@@ -2853,7 +2853,6 @@ void tcg_register_jit(void *buf, size_t buf_size)
 #if defined(CONFIG_S2E)
 void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
 {
-    const TCGArg *args = s->gen_opparam_buf;
     const TCGOp *op = NULL;
     int c, i, nb_oargs, nb_iargs, nb_cargs;
 
@@ -2868,6 +2867,10 @@ void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
         op = &s->gen_op_buf[opc_idx];
         const TCGOpcode opc = op->opc;
         const TCGOpDef *def = &tcg_op_defs[opc];
+        const TCGArg *args = &s->gen_opparam_buf[op->args];
+
+        tcg_dump_op(s, op, args, stderr, fprintf);
+        fprintf(stderr, "\n");
 
         if (opc == INDEX_op_call) {
             TCGArg arg_count;
@@ -2908,6 +2911,7 @@ void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
                    || opc == INDEX_op_movi_i64
 #endif
                    ) {
+            printf(" args[0] = %ld, s->nb_globals + s->nb_temps = %d\n", args[0], s->nb_globals + s->nb_temps);
             assert(args[0] < s->nb_globals + s->nb_temps);
             temps[args[0]] = args[1];
         } else {

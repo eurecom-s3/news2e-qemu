@@ -34,6 +34,7 @@
 #include "exec/memattrs.h"
 #include "s2e/s2e_setjmp.h"
 #include "s2e/s2e_config.h"
+#include "klee-c/klee.h"
 
 
 #ifndef TARGET_LONG_BITS
@@ -153,7 +154,7 @@ typedef struct CPUIOTLBEntry {
 
 #if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
 typedef struct S2ETLBEntry {
-    void* objectState;
+    ObjectState* objectState;
     uintptr_t addend;
 } S2ETLBEntry;
 

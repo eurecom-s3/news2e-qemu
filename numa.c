@@ -443,7 +443,7 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
 		-1 /* Address is used only for debug prints  */,
 		ram_size,
 		(uint64_t)memory_region_get_ram_ptr(mr),
-		true,
+		false,
 		false,
 		name);
 }

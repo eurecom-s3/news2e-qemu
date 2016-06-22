@@ -67,6 +67,12 @@ void tlb_flush(CPUState *cpu, int flush_global)
     env->tlb_flush_addr = -1;
     env->tlb_flush_mask = 0;
     tlb_flush_count++;
+
+#if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
+    memset(env->s2etlb, 0, sizeof(env->s2etlb));
+    memset(env->s2etlb_v, 0, sizeof(env->s2etlb_v));
+    S2EExecutionState_FlushTlb(g_s2e_state);
+#endif
 }
 
 static inline void v_tlb_flush_by_mmuidx(CPUState *cpu, va_list argp)
@@ -404,6 +410,17 @@ void tlb_set_page_with_attrs(CPUState *cpu, target_ulong vaddr,
         te->addr_read = -1;
     }
 
+#ifdef CONFIG_S2E
+    if (s2e_is_mmio_symbolic(paddr, 1LL << TARGET_PAGE_BITS)) {
+        //We hijack qemu's dirty page management to redirect
+        //all accesses to MMIO memory through our handlers.
+        //Note: Such ranges can be less than one page long, so we have to
+        //deal with normal memory accesses as well...
+        te->addr_read |= TLB_NOTDIRTY;
+    }
+#endif
+
+
     if (prot & PAGE_EXEC) {
         te->addr_code = code_address;
     } else {
@@ -424,6 +441,14 @@ void tlb_set_page_with_attrs(CPUState *cpu, target_ulong vaddr,
     } else {
         te->addr_write = -1;
     }
+
+#if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
+    if (addend) {
+        //I/O devices don't need to have an S2E TLB entry because
+        //MMIO goes directly to the device handlers.
+        S2EExecutionState_UpdateTlbEntry(g_s2e_state, env, mmu_idx, vaddr, addend);
+    }
+#endif
 }
 
 /* Add a new TLB entry, but without specifying the memory

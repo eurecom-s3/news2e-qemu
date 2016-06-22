@@ -144,10 +144,6 @@ void s2e_on_tlb_miss(S2E *s2e, S2EExecutionState* state, uint64_t addr, int is_w
     executiong helper code from KLEE */
 //extern void* g_s2e_exec_ret_addr;
 
-/** Global variable that determines whether to fork on
-    symbolic memory addresses */
-extern int g_s2e_fork_on_symbolic_address;
-
 /** Global variable that determines whether to make
     symbolic I/O memory addresses concrete */
 extern int g_s2e_concretize_io_addresses;

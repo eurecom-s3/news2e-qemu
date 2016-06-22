@@ -62,6 +62,9 @@ void s2e_qemu_save_state(QEMUFile *f, void *se);
 void s2e_qemu_load_state(QEMUFile *f, void *se);
 int cpu_gen_llvm(CPUArchState *env, struct TranslationBlock *tb); /* defined in translate-all.c */
 
+extern bool g_s2e_fork_on_symbolic_address;
+
+
 #endif
 
 #endif /* _EXEC_S2E_H */

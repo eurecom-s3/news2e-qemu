@@ -262,7 +262,7 @@ DebugConstraints("debug-constraints",
 extern cl::opt<bool> UseExprSimplifier;
 
 extern "C" {
-    int g_s2e_fork_on_symbolic_address = 0;
+    bool g_s2e_fork_on_symbolic_address = 0;
     int g_s2e_concretize_io_addresses = 1;
     int g_s2e_concretize_io_writes = 1;
 
@@ -2520,13 +2520,6 @@ void s2e_ensure_symbolic(S2E *s2e, S2EExecutionState *state)
 }
 
 /** Tlb cache helpers */
-void s2e_update_tlb_entry(S2EExecutionState* state, CPUArchState* env,
-                          int mmu_idx, uint64_t virtAddr, uint64_t hostAddr)
-{
-#ifdef S2E_ENABLE_S2E_TLB
-    state->updateTlbEntry(env, mmu_idx, virtAddr, hostAddr);
-#endif
-}
 
 void s2e_dma_read(uint64_t hostAddress, uint8_t *buf, unsigned size)
 {
