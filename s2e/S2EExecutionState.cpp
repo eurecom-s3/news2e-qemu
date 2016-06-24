@@ -49,5 +49,10 @@ void S2EExecutionState_SwitchToSymbolic(S2EExecutionState *self)
 	assert(false && "Switching to symbolic mode not implemented");
 }
 
+void S2EExecutionState_FlushTlbEntry(S2EExecutionState *self, CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_tlb_entry, uint64_t vaddr)
+{
+	assert(false && "TODO");
+
+
 
 
