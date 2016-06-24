@@ -28,6 +28,12 @@ void S2EExecutionState_ReadRamConcrete(S2EExecutionState *self, uint64_t hostAdd
  * Write concrete RAM.
  */
 void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, uint64_t hostAddress, const uint8_t* buf, uint64_t size);
+
+/**
+ * Flush one TLB entry.
+ */
+void S2EExecutionState_FlushTlbEntry(S2EExecutionState *self, CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_tlb_entry, uint64_t vaddr);
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

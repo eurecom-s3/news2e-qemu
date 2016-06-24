@@ -68,7 +68,7 @@ void tlb_flush(CPUState *cpu, int flush_global)
     env->tlb_flush_mask = 0;
     tlb_flush_count++;
 
-#if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
+#if defined(CONFIG_S2E)
     memset(env->s2etlb, 0, sizeof(env->s2etlb));
     memset(env->s2etlb_v, 0, sizeof(env->s2etlb_v));
     S2EExecutionState_FlushTlb(g_s2e_state);
@@ -97,6 +97,16 @@ static inline void v_tlb_flush_by_mmuidx(CPUState *cpu, va_list argp)
         printf(" %d", mmu_idx);
 #endif
 
+#if defined(CONFIG_S2E)
+        for (int page_index = 0; page_index < CPU_TLB_SIZE; ++page_index) {
+        	S2EExecutionState_FlushTlbEntry(g_s2e_state, &env->tlb_table[mmu_idx][page_index], &env->s2etlb[mmu_idx][page_index], env->tlb_table[mmu_idx][page_index].addr_read);
+        }
+        for (int victim_index = 0; victim_index < CPU_VTLB_SIZE; ++victim_index) {
+			S2EExecutionState_FlushTlbEntry(g_s2e_state, &env->tlb_v_table[mmu_idx][victim_index], &env->s2etlb_v[mmu_idx][victim_index], env->tlb_table[mmu_idx][victim_index].addr_read);
+		}
+        memset(env->s2etlb[mmu_idx], 0, sizeof(env->s2etlb[0]));
+        memset(env->s2etlb_v[mmu_idx], 0, sizeof(env->s2etlb_v[0]));
+#endif
         memset(env->tlb_table[mmu_idx], -1, sizeof(env->tlb_table[0]));
         memset(env->tlb_v_table[mmu_idx], -1, sizeof(env->tlb_v_table[0]));
     }
@@ -116,7 +126,7 @@ void tlb_flush_by_mmuidx(CPUState *cpu, ...)
     va_end(argp);
 }
 
-static inline void tlb_flush_entry(CPUTLBEntry *tlb_entry, target_ulong addr)
+static inline void tlb_flush_entry(CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_tlb_entry, target_ulong addr)
 {
     if (addr == (tlb_entry->addr_read &
                  (TARGET_PAGE_MASK | TLB_INVALID_MASK)) ||
@@ -124,7 +134,9 @@ static inline void tlb_flush_entry(CPUTLBEntry *tlb_entry, target_ulong addr)
                  (TARGET_PAGE_MASK | TLB_INVALID_MASK)) ||
         addr == (tlb_entry->addr_code &
                  (TARGET_PAGE_MASK | TLB_INVALID_MASK))) {
+        S2EExecutionState_FlushTlbEntry(g_s2e_state, tlb_entry, s2e_tlb_entry, addr);
         memset(tlb_entry, -1, sizeof(*tlb_entry));
+        memset(s2e_tlb_entry, -1, sizeof(*s2e_tlb_entry) * S2E_NUM_RAM_OBJECTS_PER_PAGE);
     }
 }
 
@@ -154,14 +166,14 @@ void tlb_flush_page(CPUState *cpu, target_ulong addr)
     addr &= TARGET_PAGE_MASK;
     i = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
     for (mmu_idx = 0; mmu_idx < NB_MMU_MODES; mmu_idx++) {
-        tlb_flush_entry(&env->tlb_table[mmu_idx][i], addr);
+        tlb_flush_entry(&env->tlb_table[mmu_idx][i], &env->s2etlb[mmu_idx][i], addr);
     }
 
     /* check whether there are entries that need to be flushed in the vtlb */
     for (mmu_idx = 0; mmu_idx < NB_MMU_MODES; mmu_idx++) {
         int k;
         for (k = 0; k < CPU_VTLB_SIZE; k++) {
-            tlb_flush_entry(&env->tlb_v_table[mmu_idx][k], addr);
+            tlb_flush_entry(&env->tlb_v_table[mmu_idx][k], &env->s2etlb_v[mmu_idx][k], addr);
         }
     }
 
@@ -208,11 +220,11 @@ void tlb_flush_page_by_mmuidx(CPUState *cpu, target_ulong addr, ...)
         printf(" %d", mmu_idx);
 #endif
 
-        tlb_flush_entry(&env->tlb_table[mmu_idx][i], addr);
+        tlb_flush_entry(&env->tlb_table[mmu_idx][i], &env->s2etlb[mmu_idx][i], addr);
 
         /* check whether there are vltb entries that need to be flushed */
         for (k = 0; k < CPU_VTLB_SIZE; k++) {
-            tlb_flush_entry(&env->tlb_v_table[mmu_idx][k], addr);
+            tlb_flush_entry(&env->tlb_v_table[mmu_idx][k], &env->s2etlb_v[mmu_idx][k], addr);
         }
     }
     va_end(argp);
@@ -443,7 +455,7 @@ void tlb_set_page_with_attrs(CPUState *cpu, target_ulong vaddr,
     }
 
 #if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
-    if (addend) {
+    if (addend /* addend == 0 if MMIO */) {
         //I/O devices don't need to have an S2E TLB entry because
         //MMIO goes directly to the device handlers.
         S2EExecutionState_UpdateTlbEntry(g_s2e_state, env, mmu_idx, vaddr, addend);

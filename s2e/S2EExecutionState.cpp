@@ -44,5 +44,10 @@ void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, uint64_t hostAd
 	self->writeRamConcrete(hostAddress, buf, size);
 }
 
+void S2EExecutionState_SwitchToSymbolic(S2EExecutionState *self)
+{
+	assert(false && "Switching to symbolic mode not implemented");
+}
+
 
 

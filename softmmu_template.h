@@ -118,39 +118,20 @@
 #endif
 
 #if defined(CONFIG_S2E)
-/* macro to check the victim tlb */
-#define VICTIM_TLB_HIT(ty)                                                    \
-({                                                                            \
-    /* we are about to do a page table walk. our last hope is the             \
-     * victim tlb. try to refill from the victim tlb before walking the       \
-     * page table. */                                                         \
-    int vidx;                                                                 \
-    int sidx;                                                                 \
-    CPUIOTLBEntry tmpiotlb;                                                   \
-    CPUTLBEntry tmptlb;                                                       \
-    S2ETLBEntry tmps2etlb;                                                    \
-    for (vidx = CPU_VTLB_SIZE-1; vidx >= 0; --vidx) {                         \
-        if (env->tlb_v_table[mmu_idx][vidx].ty == (addr & TARGET_PAGE_MASK)) {\
-            /* found entry in victim tlb, swap tlb and iotlb */               \
-            tmptlb = env->tlb_table[mmu_idx][index];                          \
-            env->tlb_table[mmu_idx][index] = env->tlb_v_table[mmu_idx][vidx]; \
-            env->tlb_v_table[mmu_idx][vidx] = tmptlb;                         \
-            tmpiotlb = env->iotlb[mmu_idx][index];                            \
-            env->iotlb[mmu_idx][index] = env->iotlb_v[mmu_idx][vidx];         \
-            env->iotlb_v[mmu_idx][vidx] = tmpiotlb;                           \
-            for (sidx = S2E_NUM_RAM_OBJECTS_PER_PAGE; sidx >= 0; --sidx) {    \
-            	tmps2etlb = env->s2etlb[mmu_idx][index][sidx];                \
-            	env->s2etlb[mmu_idx][index][sidx] =                           \
-				    env->s2etlb_v[mmu_idx][vidx][sidx];                       \
-				env->s2etlb_v[mmu_idx][vidx][sidx] = tmps2etlb;               \
-            }                                                                 \
-			break;                                                            \
-        }                                                                     \
-    }                                                                         \
-    /* return true when there is a vtlb hit, i.e. vidx >=0 */                 \
-    vidx >= 0;                                                                \
-})
+/**
+ * Swap one entry of the tlb with the victim tlb.
+ */
+#define SWAP_S2E_TLB(env, mmu_index, page_index, victim_index)                   \
+	do {                                                                         \
+	    CPUS2ETLBEntry tmps2etlb =  env->s2etlb[mmu_idx][page_index];            \
+        env->s2etlb[mmu_idx][page_index] = env->s2etlb_v[mmu_idx][victim_index]; \
+        env->s2etlb_v[mmu_idx][victim_index] = tmps2etlb;                        \
+	} while (0)
+
 #else /* defined(CONFIG_S2E) */
+#define SWAP_S2E_TLB
+#endif /* defined(CONFIG_S2E) */
+
 /* macro to check the victim tlb */
 #define VICTIM_TLB_HIT(ty)                                                    \
 ({                                                                            \
@@ -158,7 +139,6 @@
      * victim tlb. try to refill from the victim tlb before walking the       \
      * page table. */                                                         \
     int vidx;                                                                 \
-    int sidx;                                                                 \
     CPUIOTLBEntry tmpiotlb;                                                   \
     CPUTLBEntry tmptlb;                                                       \
     for (vidx = CPU_VTLB_SIZE-1; vidx >= 0; --vidx) {                         \
@@ -170,13 +150,13 @@
             tmpiotlb = env->iotlb[mmu_idx][index];                            \
             env->iotlb[mmu_idx][index] = env->iotlb_v[mmu_idx][vidx];         \
             env->iotlb_v[mmu_idx][vidx] = tmpiotlb;                           \
+            SWAP_S2E_TLB(env, mmu_idx, index, vidx);                          \
 			break;                                                            \
         }                                                                     \
     }                                                                         \
     /* return true when there is a vtlb hit, i.e. vidx >=0 */                 \
     vidx >= 0;                                                                \
 })
-#endif /* defined(CONFIG_S2E) */
 
 #ifndef SOFTMMU_CODE_ACCESS
 static inline DATA_TYPE glue(io_read, SUFFIX)(CPUArchState *env,
@@ -207,7 +187,6 @@ WORD_TYPE helper_le_ld_name(CPUArchState *env, target_ulong addr,
 {
     unsigned mmu_idx = get_mmuidx(oi);
     int index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
-    target_ulong object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
     target_ulong tlb_addr = env->tlb_table[mmu_idx][index].ADDR_READ;
     uintptr_t haddr;
     DATA_TYPE res;
@@ -279,25 +258,22 @@ WORD_TYPE helper_le_ld_name(CPUArchState *env, target_ulong addr,
 
     haddr = addr + env->tlb_table[mmu_idx][index].addend;
 #if defined(CONFIG_S2E)
-    S2ETLBEntry *e = &env->s2etlb[mmu_idx][index][object_index];
-    haddr = addr + (e->addend & ~1);
-    if (!klee_ObjectState_IsConcrete(e->objectState, addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), DATA_SIZE * 8))
-    {
-    	res = 0;
-    	//TODO: Passing the pointer to res like this will only yield correct results on little endian
-    	//host platforms
-		S2EExecutionState_ReadRamConcrete(g_s2e_state, haddr, &res, DATA_SIZE);
-		//TODO: If host is big endian, do a byteswap here
+    target_ulong object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
+    CPUS2ETLBEntry *e = &env->s2etlb[mmu_idx][index];
+    if (unlikely(!klee_ObjectState_ReadConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (uint8_t *) &res, DATA_SIZE))) {
+    	S2EExecutionState_SwitchToSymbolic(g_s2e_state);
     }
-    else
-#endif /* defined(CONFIG_S2E) */
-    {
+    //TODO: is read data in correct endianness?
+#else /* defined(CONFIG_S2E) */
 #if DATA_SIZE == 1
-    	res = glue(glue(ld, LSUFFIX), _p)((uint8_t *)haddr);
+    res = glue(glue(ld, LSUFFIX), _p)((uint8_t *)haddr);
 #else /* DATA_SIZE == 1 */
-    	res = glue(glue(ld, LSUFFIX), _le_p)((uint8_t *)haddr);
+    res = glue(glue(ld, LSUFFIX), _le_p)((uint8_t *)haddr);
 #endif /* DATA_SIZE == 1 */
-    }
+#endif /* defined(CONFIG_S2E) */
+
+    fprintf(stderr, "softmmu(%s): Loaded value 0x%" PRIx64 " from address 0x%08" PRIx64 ", haddr = 0x%p\n", __func__, (uint64_t) res, (uint64_t) addr, (void *) haddr);
+
 
     return res;
 }
@@ -377,6 +353,7 @@ WORD_TYPE helper_be_ld_name(CPUArchState *env, target_ulong addr,
                              mmu_idx, retaddr);
     }
 
+    assert(false && "TODO: Implement S2E stuff");
     haddr = addr + env->tlb_table[mmu_idx][index].addend;
     res = glue(glue(ld, LSUFFIX), _be_p)((uint8_t *)haddr);
     return res;
@@ -430,7 +407,6 @@ void helper_le_st_name(CPUArchState *env, target_ulong addr, DATA_TYPE val,
     unsigned mmu_idx = get_mmuidx(oi);
     int index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
     target_ulong tlb_addr = env->tlb_table[mmu_idx][index].addr_write;
-    target_ulong object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
     uintptr_t haddr;
 
     /* Adjust the given return address.  */
@@ -499,24 +475,18 @@ void helper_le_st_name(CPUArchState *env, target_ulong addr, DATA_TYPE val,
     haddr = addr + env->tlb_table[mmu_idx][index].addend;
 
 #if defined(CONFIG_S2E)
-    S2ETLBEntry *e = &env->s2etlb[mmu_idx][index][object_index];
-    haddr = addr + (e->addend & ~1);
-    if (!klee_ObjectState_IsConcrete(e->objectState, addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), DATA_SIZE * 8))
-    {
-    	//TODO: Passing the pointer to res like this will only yield correct results on little endian
-    	//host platforms
-		S2EExecutionState_WriteRamConcrete(g_s2e_state, haddr, &val, DATA_SIZE);
-		//TODO: If host is big endian, do a byteswap here
-    }
-    else
-#endif /* defined(CONFIG_S2E) */
-    {
+    target_ulong object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
+    CPUS2ETLBEntry *e = &env->s2etlb[mmu_idx][index];
+
+    //TODO: Endianness?
+    klee_ObjectState_WriteConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (const uint8_t *) &val, DATA_SIZE);
+#else /* defined(CONFIG_S2E) */
 #if DATA_SIZE == 1
-    	glue(glue(st, SUFFIX), _p)((uint8_t *)haddr, val);
+    glue(glue(st, SUFFIX), _p)((uint8_t *)haddr, val);
 #else
-    	glue(glue(st, SUFFIX), _le_p)((uint8_t *)haddr, val);
+    glue(glue(st, SUFFIX), _le_p)((uint8_t *)haddr, val);
 #endif
-    }
+#endif /* defined(CONFIG_S2E) */
 }
 
 #if DATA_SIZE > 1
@@ -591,6 +561,7 @@ void helper_be_st_name(CPUArchState *env, target_ulong addr, DATA_TYPE val,
                              mmu_idx, retaddr);
     }
 
+    assert(false && "TODO: Implement S2E stuff");
     haddr = addr + env->tlb_table[mmu_idx][index].addend;
     glue(glue(st, SUFFIX), _be_p)((uint8_t *)haddr, val);
 }

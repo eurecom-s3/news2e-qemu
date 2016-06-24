@@ -46,6 +46,11 @@ S2EExecutionState* S2EExecutionState_New(void);
  */
 void S2EExecutionState_InitDeviceState(S2EExecutionState *self);
 
+/**
+ * Switch state to symbolic execution.
+ */
+void S2EExecutionState_SwitchToSymbolic(S2EExecutionState *self);
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

@@ -1870,7 +1870,6 @@ static inline TCGMemOp tcg_canonicalize_memop(TCGMemOp op, bool is64, bool st)
     return op;
 }
 
-#if !defined(CONFIG_S2E)
 static void gen_ldst_i32(TCGOpcode opc, TCGv_i32 val, TCGv addr,
                          TCGMemOp memop, TCGArg idx)
 {
@@ -1906,55 +1905,16 @@ static void gen_ldst_i64(TCGOpcode opc, TCGv_i64 val, TCGv addr,
 #endif
 }
 
-#endif /* !defined(CONFIG_S2E) */
-
 void tcg_gen_qemu_ld_i32(TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
     memop = tcg_canonicalize_memop(memop, 0, 0);
-#if defined(CONFIG_S2E)
-	TCGv_i32 tcg_idx = tcg_const_i32(idx);
-	TCGv_i32 tcg_memop = tcg_const_i32(memop);
-	TCGv_i64 tcg_val = tcg_temp_new_i64();
-#if TARGET_LONG_BITS == 32
-	TCGv_i64 tcg_addr = tcg_temp_new_i64();
-	tcg_gen_extu_i32_i64(tcg_addr, addr);
-	gen_helper_s2e_ld(tcg_val, cpu_env, tcg_addr, tcg_memop, tcg_idx);
-	tcg_temp_free_i64(tcg_addr);
-#else /* TARGET_LONG_BITS == 32 */
-	gen_helper_s2e_ld(tcg_val, cpu_env, addr, tcg_memop, tcg_idx);
-#endif /* TARGET_LONG_BITS == 32 */
-	tcg_gen_extrl_i64_i32(val, tcg_val);
-	tcg_temp_free_i64(tcg_val);
-	tcg_temp_free_i32(tcg_idx);
-	tcg_temp_free_i32(tcg_memop);
-#else /* defined(CONFIG_S2E) */
     gen_ldst_i32(INDEX_op_qemu_ld_i32, val, addr, memop, idx);
-#endif /* defined(CONFIG_S2E) */
 }
 
 void tcg_gen_qemu_st_i32(TCGv_i32 val, TCGv addr, TCGArg idx, TCGMemOp memop)
 {
     memop = tcg_canonicalize_memop(memop, 0, 1);
-
-#if defined(CONFIG_S2E)
-	TCGv_i32 tcg_idx = tcg_const_i32(idx);
-	TCGv_i32 tcg_memop = tcg_const_i32(memop);
-	TCGv_i64 tcg_val = tcg_temp_new_i64();
-	tcg_gen_extu_i32_i64(tcg_val, val);
-#if TARGET_LONG_BITS == 32
-	TCGv_i64 tcg_addr = tcg_temp_new_i64();
-	tcg_gen_extu_i32_i64(tcg_addr, addr);
-	gen_helper_s2e_st(cpu_env, tcg_addr, tcg_memop, tcg_idx, tcg_val);
-	tcg_temp_free_i64(tcg_addr);
-#else /* TARGET_LONG_BITS == 32 */
-	gen_helper_s2e_st(cpu_env, addr, tcg_memop, tcg_idx, tcg_val);
-#endif /* TARGET_LONG_BITS == 32 */
-	tcg_temp_free_i64(tcg_val);
-	tcg_temp_free_i32(tcg_idx);
-	tcg_temp_free_i32(tcg_memop);
-#else /* defined(CONFIG_S2E) */
     gen_ldst_i32(INDEX_op_qemu_st_i32, val, addr, memop, idx);
-#endif /* defined(CONFIG_S2E) */
 }
 
 void tcg_gen_qemu_ld_i64(TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
@@ -1970,23 +1930,7 @@ void tcg_gen_qemu_ld_i64(TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
     }
 
     memop = tcg_canonicalize_memop(memop, 1, 0);
-
-#if defined(CONFIG_S2E)
-	TCGv_i32 tcg_idx = tcg_const_i32(idx);
-	TCGv_i32 tcg_memop = tcg_const_i32(memop);
-#if TARGET_LONG_BITS == 32
-	TCGv_i64 tcg_addr = tcg_temp_new_i64();
-	tcg_gen_extu_i32_i64(tcg_addr, addr);
-	gen_helper_s2e_ld(val, cpu_env, tcg_addr, tcg_memop, tcg_idx);
-	tcg_temp_free_i64(tcg_addr);
-#else /* TARGET_LONG_BITS == 32 */
-	gen_helper_s2e_ld(val, cpu_env, addr, tcg_memop, tcg_idx);
-#endif /* TARGET_LONG_BITS == 32 */
-	tcg_temp_free_i32(tcg_idx);
-	tcg_temp_free_i32(tcg_memop);
-#else /* defined(CONFIG_S2E) */
     gen_ldst_i64(INDEX_op_qemu_ld_i64, val, addr, memop, idx);
-#endif /* defined(CONFIG_S2E) */
 }
 
 void tcg_gen_qemu_st_i64(TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
@@ -1997,20 +1941,5 @@ void tcg_gen_qemu_st_i64(TCGv_i64 val, TCGv addr, TCGArg idx, TCGMemOp memop)
     }
 
     memop = tcg_canonicalize_memop(memop, 1, 1);
-#if defined(CONFIG_S2E)
-	TCGv_i32 tcg_idx = tcg_const_i32(idx);
-	TCGv_i32 tcg_memop = tcg_const_i32(memop);
-#if TARGET_LONG_BITS == 32
-	TCGv_i64 tcg_addr = tcg_temp_new_i64();
-	tcg_gen_extu_i32_i64(tcg_addr, addr);
-	gen_helper_s2e_st(cpu_env, tcg_addr, tcg_memop, tcg_idx, val);
-	tcg_temp_free_i64(tcg_addr);
-#else /* TARGET_LONG_BITS == 32 */
-	gen_helper_s2e_st(cpu_env, addr, tcg_memop, tcg_idx, val);
-#endif /* TARGET_LONG_BITS == 32 */
-	tcg_temp_free_i32(tcg_idx);
-	tcg_temp_free_i32(tcg_memop);
-#else /* defined(CONFIG_S2E) */
     gen_ldst_i64(INDEX_op_qemu_st_i64, val, addr, memop, idx);
-#endif /* defined(CONFIG_S2E) */
 }

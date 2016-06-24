@@ -2854,7 +2854,7 @@ void tcg_register_jit(void *buf, size_t buf_size)
 void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
 {
     const TCGOp *op = NULL;
-    int c, i, nb_oargs, nb_iargs, nb_cargs;
+    int i, nb_oargs, nb_iargs, nb_cargs;
 
     uint64_t temps[TCG_MAX_TEMPS];
     memset(temps, 0, sizeof(temps[0])*(s->nb_globals + s->nb_temps));
@@ -2883,10 +2883,9 @@ void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
 
             /* get information about helper register access mask */
             TCGArg func_arg = args[nb_oargs + nb_iargs];
-            assert(func_arg < s->nb_globals + s->nb_temps);
 
             uint64_t func_rmask, func_wmask, func_accesses_mem;
-            tcg_helper_get_reg_mask(s, (void*) temps[func_arg],
+            tcg_helper_get_reg_mask(s, (void*) func_arg,
                                     &func_rmask, &func_wmask,
                                     &func_accesses_mem);
 
@@ -2911,7 +2910,8 @@ void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
                    || opc == INDEX_op_movi_i64
 #endif
                    ) {
-            printf(" args[0] = %ld, s->nb_globals + s->nb_temps = %d\n", args[0], s->nb_globals + s->nb_temps);
+            //TODO: The assertion below hits when this printf gets removed. Heisenbug :(
+        	//printf(" args[0] = %ld, s->nb_globals + s->nb_temps = %d\n", args[0], s->nb_globals + s->nb_temps);
             assert(args[0] < s->nb_globals + s->nb_temps);
             temps[args[0]] = args[1];
         } else {

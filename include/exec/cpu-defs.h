@@ -138,10 +138,10 @@ typedef struct CPUIOTLBEntry {
 #define CPU_COMMON_TLB \
     /* The meaning of the MMU modes is defined in the target code. */   \
     CPUTLBEntry tlb_table[NB_MMU_MODES][CPU_TLB_SIZE];                  \
-    CPU_COMMON_S2E_TLB                                                  \
     CPUTLBEntry tlb_v_table[NB_MMU_MODES][CPU_VTLB_SIZE];               \
     CPUIOTLBEntry iotlb[NB_MMU_MODES][CPU_TLB_SIZE];                    \
     CPUIOTLBEntry iotlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];                 \
+    CPU_S2E_TLB                                                         \
     target_ulong tlb_flush_addr;                                        \
     target_ulong tlb_flush_mask;                                        \
     target_ulong vtlb_index;                                            \
@@ -152,23 +152,9 @@ typedef struct CPUIOTLBEntry {
 
 #endif
 
-#if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
-typedef struct S2ETLBEntry {
-    ObjectState* objectState;
-    uintptr_t addend;
-} S2ETLBEntry;
+#if defined(CONFIG_S2E)
 
 #define S2E_NUM_RAM_OBJECTS_PER_PAGE (1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS))
-
-#define CPU_COMMON_S2E_TLB \
-    S2ETLBEntry s2etlb[NB_MMU_MODES][CPU_TLB_SIZE][S2E_NUM_RAM_OBJECTS_PER_PAGE]; \
-    S2ETLBEntry s2etlb_v[NB_MMU_MODES][CPU_VTLB_SIZE][S2E_NUM_RAM_OBJECTS_PER_PAGE];
-
-#else
-#define CPU_COMMON_S2E_TLB
-#endif
-
-#if defined(CONFIG_S2E)
 
 #define CPU_S2E                                                         \
     s2e_jmp_buf jmp_env;                                                \
@@ -177,9 +163,20 @@ typedef struct S2ETLBEntry {
     uint64_t s2e_icount_after_tb; /* icount after starting current TB */  \
     struct TranslationBlock *s2e_current_tb; /* currently executing TB  */  \
 
+typedef struct CPUS2ETLBEntry
+{
+    ObjectState* object_state[S2E_NUM_RAM_OBJECTS_PER_PAGE];
+} CPUS2ETLBEntry;
+
+#define CPU_S2E_TLB \
+    CPUS2ETLBEntry s2etlb[NB_MMU_MODES][CPU_TLB_SIZE];                 \
+    CPUS2ETLBEntry s2etlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];              \
+
+
 #else /* defined(CONFIG_S2E) */
 
 #define CPU_S2E
+#define CPU_S2E_TLB
 
 #endif /* defined(CONFIG_S2E) */
 

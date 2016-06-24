@@ -61,7 +61,7 @@ void helper_s2e_instrument_code(CPUArchState* env, void* signal, uint64_t pc) {a
 
 void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses) {}
 
-void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, void *hostAddress, const uint8_t* buf, uint64_t size)
+void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, uint64_t hostAddress, const uint8_t* buf, uint64_t size)
 {
-	memcpy(hostAddress, buf, size);
+	memcpy((void *) hostAddress, buf, size);
 }

@@ -1,13 +1,14 @@
 /*
- *  S2E accessor function support
+ *  Software MMU support
  *
- * Generate inline load/store functions for one data size.
+ * Generate inline load/store functions for one MMU mode and data
+ * size.
  *
  * Generate a store function as well as signed and unsigned loads.
  *
  * Not used directly but included from cpu_ldst.h.
  *
- *  Copyright (c) 2015 Linaro Limited
+ *  Copyright (c) 2003 Fabrice Bellard
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,27 +24,27 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 #if DATA_SIZE == 8
-#define SHIFT 3
 #define SUFFIX q
 #define USUFFIX q
 #define DATA_TYPE uint64_t
+#define SHIFT 3
 #elif DATA_SIZE == 4
-#define SHIFT 2
 #define SUFFIX l
 #define USUFFIX l
 #define DATA_TYPE uint32_t
+#define SHIFT 2
 #elif DATA_SIZE == 2
-#define SHIFT 1
 #define SUFFIX w
 #define USUFFIX uw
 #define DATA_TYPE uint16_t
 #define DATA_STYPE int16_t
+#define SHIFT 1
 #elif DATA_SIZE == 1
-#define SHIFT 0
 #define SUFFIX b
 #define USUFFIX ub
 #define DATA_TYPE uint8_t
 #define DATA_STYPE int8_t
+#define SHIFT 0
 #else
 #error unsupported data size
 #endif
@@ -54,61 +55,140 @@
 #define RES_TYPE uint32_t
 #endif
 
-#if defined(CODE_ACCESS)
-#define FLAG_CODE MO_CODE
-#else /* defined(CODE_ACCESS) */
-#define FLAG_CODE 0
-#endif /* defined(CODE_ACCESS) */
+#ifdef SOFTMMU_CODE_ACCESS
+#define ADDR_READ addr_code
+#define MMUSUFFIX _cmmu
+#define URETSUFFIX SUFFIX
+#define SRETSUFFIX SUFFIX
+#else
+#define ADDR_READ addr_read
+#define MMUSUFFIX _mmu
+#define URETSUFFIX USUFFIX
+#define SRETSUFFIX glue(s, SUFFIX)
+#endif
 
-
-static inline RES_TYPE
-glue(glue(cpu_ld, USUFFIX), MEMSUFFIX)(CPUArchState *env, target_ulong ptr)
-{
-	return helper_s2e_ld(env, ptr, SHIFT | FLAG_CODE, CPU_MMU_INDEX);
-}
+/* generic load/store macros */
 
 static inline RES_TYPE
 glue(glue(glue(cpu_ld, USUFFIX), MEMSUFFIX), _ra)(CPUArchState *env,
                                                   target_ulong ptr,
                                                   uintptr_t retaddr)
 {
-	return helper_s2e_ld(env, ptr, SHIFT | FLAG_CODE, CPU_MMU_INDEX);
+    int page_index;
+    target_ulong object_index;
+    RES_TYPE res;
+    target_ulong addr;
+    int mmu_idx;
+    TCGMemOpIdx oi;
+    CPUS2ETLBEntry *e;
+
+    addr = ptr;
+    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
+    object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
+    mmu_idx = CPU_MMU_INDEX;
+    if (unlikely(env->tlb_table[mmu_idx][page_index].ADDR_READ !=
+				 (addr & (TARGET_PAGE_MASK | (DATA_SIZE - 1))))) {
+		oi = make_memop_idx(SHIFT, mmu_idx);
+		res = glue(glue(helper_ret_ld, URETSUFFIX), MMUSUFFIX)(env, addr,
+															oi, retaddr);
+	} else {
+		e = &env->s2etlb[mmu_idx][page_index];
+		//TODO: What about endianness?
+		if (unlikely(!klee_ObjectState_ReadConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (uint8_t *) &res, DATA_SIZE))) {
+			S2EExecutionState_SwitchToSymbolic(g_s2e_state);
+		}
+	}
+
+    fprintf(stderr, "softmmu(%s): Loaded value 0x%" PRIx64 " from address 0x%08" PRIx64 "\n", __func__, (uint64_t) res, (uint64_t) addr);
+    return res;
+}
+
+static inline RES_TYPE
+glue(glue(cpu_ld, USUFFIX), MEMSUFFIX)(CPUArchState *env, target_ulong ptr)
+{
+    return glue(glue(glue(cpu_ld, USUFFIX), MEMSUFFIX), _ra)(env, ptr, 0);
 }
 
 #if DATA_SIZE <= 2
-static inline int
-glue(glue(cpu_lds, SUFFIX), MEMSUFFIX)(CPUArchState *env, target_ulong ptr)
-{
-	return helper_s2e_ld(env, ptr, SHIFT | MO_SIGN | FLAG_CODE, CPU_MMU_INDEX);
-//    return glue(glue(lds, SUFFIX), _p)(ptr);
-}
-
 static inline int
 glue(glue(glue(cpu_lds, SUFFIX), MEMSUFFIX), _ra)(CPUArchState *env,
                                                   target_ulong ptr,
                                                   uintptr_t retaddr)
 {
-	return helper_s2e_ld(env, ptr, SHIFT | MO_SIGN | FLAG_CODE, CPU_MMU_INDEX);
+    int res, page_index;
+    target_ulong addr;
+    int mmu_idx;
+    TCGMemOpIdx oi;
+    target_ulong object_index;
+    CPUS2ETLBEntry *e;
+
+    addr = ptr;
+    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
+    object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
+    mmu_idx = CPU_MMU_INDEX;
+    if (unlikely(env->tlb_table[mmu_idx][page_index].ADDR_READ !=
+                 (addr & (TARGET_PAGE_MASK | (DATA_SIZE - 1))))) {
+        oi = make_memop_idx(SHIFT, mmu_idx);
+        res = (DATA_STYPE)glue(glue(helper_ret_ld, SRETSUFFIX),
+                               MMUSUFFIX)(env, addr, oi, retaddr);
+    } else {
+    	e = &env->s2etlb[mmu_idx][page_index];
+    	//TODO: What about endianness?
+		if (unlikely(!klee_ObjectState_ReadConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (uint8_t *) &res, DATA_SIZE))) {
+			S2EExecutionState_SwitchToSymbolic(g_s2e_state);
+		}
+    }
+    return res;
+}
+
+static inline int
+glue(glue(cpu_lds, SUFFIX), MEMSUFFIX)(CPUArchState *env, target_ulong ptr)
+{
+    return glue(glue(glue(cpu_lds, SUFFIX), MEMSUFFIX), _ra)(env, ptr, 0);
 }
 #endif
 
-#ifndef CODE_ACCESS
+#ifndef SOFTMMU_CODE_ACCESS
+
+/* generic store macro */
+
+static inline void
+glue(glue(glue(cpu_st, SUFFIX), MEMSUFFIX), _ra)(CPUArchState *env,
+                                                 target_ulong ptr,
+                                                 RES_TYPE v, uintptr_t retaddr)
+{
+    int page_index;
+    target_ulong addr;
+    int mmu_idx;
+    TCGMemOpIdx oi;
+    target_ulong object_index;
+    CPUS2ETLBEntry *e;
+
+    addr = ptr;
+    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
+    object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
+    mmu_idx = CPU_MMU_INDEX;
+    if (unlikely(env->tlb_table[mmu_idx][page_index].addr_write !=
+                 (addr & (TARGET_PAGE_MASK | (DATA_SIZE - 1))))) {
+        oi = make_memop_idx(SHIFT, mmu_idx);
+        glue(glue(helper_ret_st, SUFFIX), MMUSUFFIX)(env, addr, v, oi,
+                                                     retaddr);
+    } else {
+    	e = &env->s2etlb[mmu_idx][page_index];
+		//TODO: What about endianness?
+    	/* No need to worry about symbolic values here, since we are in concrete mode and write concrete values */
+		klee_ObjectState_WriteConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (uint8_t *) &v, DATA_SIZE);
+    }
+}
+
 static inline void
 glue(glue(cpu_st, SUFFIX), MEMSUFFIX)(CPUArchState *env, target_ulong ptr,
                                       RES_TYPE v)
 {
-	helper_s2e_st(env, ptr, SHIFT, CPU_MMU_INDEX, v);
+    glue(glue(glue(cpu_st, SUFFIX), MEMSUFFIX), _ra)(env, ptr, v, 0);
 }
 
-static inline void
-glue(glue(glue(cpu_st, SUFFIX), MEMSUFFIX), _ra)(CPUArchState *env,
-                                                  target_ulong ptr,
-                                                  RES_TYPE v,
-                                                  uintptr_t retaddr)
-{
-	helper_s2e_st(env, ptr, SHIFT, CPU_MMU_INDEX, v);
-}
-#endif
+#endif /* !SOFTMMU_CODE_ACCESS */
 
 #undef RES_TYPE
 #undef DATA_TYPE
@@ -116,4 +196,8 @@ glue(glue(glue(cpu_st, SUFFIX), MEMSUFFIX), _ra)(CPUArchState *env,
 #undef SUFFIX
 #undef USUFFIX
 #undef DATA_SIZE
+#undef MMUSUFFIX
+#undef ADDR_READ
+#undef URETSUFFIX
+#undef SRETSUFFIX
 #undef SHIFT

@@ -2775,7 +2775,7 @@ static inline void cpu_physical_memory_write_rom_internal(AddressSpace *as,
             ptr = qemu_get_ram_ptr(addr1);
             switch (type) {
             case WRITE_DATA:
-            	S2EExecutionState_WriteRamConcrete(S2EExecutor_GetCurrentState(S2E_GetExecutor(S2E_GetInstance())), ptr, buf, l);
+            	S2EExecutionState_WriteRamConcrete(g_s2e_state, (uint64_t) ptr, buf, l);
                 invalidate_and_set_dirty(mr, addr1, l);
                 break;
             case FLUSH_CACHE:

@@ -46,6 +46,11 @@
 
 #define CPUArchState struct CPUX86State
 
+/* Needs to be included before exec/cpu-defs.h for S2E.
+ * We need to know the number of S2E ram objects in a page.
+ */
+#define TARGET_PAGE_BITS 12
+
 #include "exec/cpu-defs.h"
 
 
@@ -814,10 +819,6 @@ typedef enum TPRAccess {
     TPR_ACCESS_READ,
     TPR_ACCESS_WRITE,
 } TPRAccess;
-
-/* Needs to be here for S2E. We need to know the number of S2E ram objects 
- * in a page. */
-#define TARGET_PAGE_BITS 12
 
 typedef struct CPUX86State {
     /* standard registers */

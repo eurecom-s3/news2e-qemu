@@ -1577,13 +1577,28 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
 
     /* TLB Hit.  */
     tcg_out_qemu_ld_direct(s, datalo, datahi, TCG_REG_L1, -1, 0, 0, opc);
+#else /* !defined(CONFIG_S2E) */
+    /*
+     * XXX: This is definitely not beautiful. Because I don't want to change the whole
+     * logic here, I simply generate unconditional jumps to the slow path of the load.
+     * The fixup code will insert the jump addresses, just like in the non-S2E case.
+     */
+
+    tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
+    label_ptr[0] = s->code_ptr;
+    s->code_ptr += 4;
+
+    if (TARGET_LONG_BITS > TCG_TARGET_REG_BITS) {
+    	tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
+        label_ptr[1] = s->code_ptr;
+        s->code_ptr += 4;
+    }
+#endif /* !defined(CONFIG_S2E) */
 
     /* Record the current context of a load into ldst label */
     add_qemu_ldst_label(s, true, oi, datalo, datahi, addrlo, addrhi,
                         s->code_ptr, label_ptr);
-#else /* !defined(CONFIG_S2E) */
-    assert(0 && "To implment");
-#endif /* !defined(CONFIG_S2E) */
+
 #else /* defined(CONFIG_SOFTMMU) */
     {
         int32_t offset = guest_base;
@@ -1715,11 +1730,30 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
 #if defined(CONFIG_SOFTMMU)
     mem_index = get_mmuidx(oi);
 
-    tcg_out_tlb_load(s, addrlo, addrhi, mem_index, opc,
-                     label_ptr, offsetof(CPUTLBEntry, addr_write));
 
-    /* TLB Hit.  */
-    tcg_out_qemu_st_direct(s, datalo, datahi, TCG_REG_L1, 0, 0, opc);
+#if !defined(CONFIG_S2E)
+    tcg_out_tlb_load(s, addrlo, addrhi, mem_index, opc,
+					 label_ptr, offsetof(CPUTLBEntry, addr_write));
+
+	/* TLB Hit.  */
+	tcg_out_qemu_st_direct(s, datalo, datahi, TCG_REG_L1, 0, 0, opc);
+#else /* !defined(CONFIG_S2E) */
+    /*
+     * XXX: This is definitely not beautiful. Because I don't want to change the whole
+     * logic here, I simply generate unconditional jumps to the slow path of the load.
+     * The fixup code will insert the jump addresses, just like in the non-S2E case.
+     */
+
+    tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
+    label_ptr[0] = s->code_ptr;
+    s->code_ptr += 4;
+
+    if (TARGET_LONG_BITS > TCG_TARGET_REG_BITS) {
+    	tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
+        label_ptr[1] = s->code_ptr;
+        s->code_ptr += 4;
+    }
+#endif /* !defined(CONFIG_S2E) */
 
     /* Record the current context of a store into ldst label */
     add_qemu_ldst_label(s, false, oi, datalo, datahi, addrlo, addrhi,
@@ -1781,17 +1815,17 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
         tcg_out_jmp(s, tb_ret_addr);
         break;
     case INDEX_op_goto_tb:
-        if (s->tb_jmp_offset) {
-            /* direct jump method */
-            tcg_out8(s, OPC_JMP_long); /* jmp im */
-            s->tb_jmp_offset[args[0]] = tcg_current_code_size(s);
-            tcg_out32(s, 0);
-        } else {
-            /* indirect jump method */
-            tcg_out_modrm_offset(s, OPC_GRP5, EXT5_JMPN_Ev, -1,
-                                 (intptr_t)(s->tb_next + args[0]));
-        }
-        s->tb_next_offset[args[0]] = tcg_current_code_size(s);
+    	if (s->tb_jmp_offset) {
+    	            /* direct jump method */
+    	            tcg_out8(s, OPC_JMP_long); /* jmp im */
+    	            s->tb_jmp_offset[args[0]] = tcg_current_code_size(s);
+    	            tcg_out32(s, 0);
+    	        } else {
+    	            /* indirect jump method */
+    	            tcg_out_modrm_offset(s, OPC_GRP5, EXT5_JMPN_Ev, -1,
+    	                                 (intptr_t)(s->tb_next + args[0]));
+    	        }
+    	        s->tb_next_offset[args[0]] = tcg_current_code_size(s);
         break;
     case INDEX_op_br:
         tcg_out_jxx(s, JCC_JMP, arg_label(args[0]), 0);

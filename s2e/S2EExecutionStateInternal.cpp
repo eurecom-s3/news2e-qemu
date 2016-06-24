@@ -232,18 +232,15 @@ void S2EExecutionState::addressSpaceChange(const klee::MemoryObject *mo,
                 auto page_idx = std::get<1>(coords);
                 auto memobj_idx = std::get<2>(coords);
 
-                S2ETLBEntry *entry = &env->s2etlb[mmu_idx][page_idx][memobj_idx];
-                assert(entry->objectState == (void*) oldState);
+                CPUS2ETLBEntry *entry = &env->s2etlb[mmu_idx][page_idx];
+                assert(entry->object_state[memobj_idx] == (void*) oldState);
                 assert(newState);
-                entry->objectState = newState;
+                entry->object_state[memobj_idx] = newState;
 
-                if(!mo->isSharedConcrete) {
-                    entry->addend =
-                            (entry->addend & ~1)
-                            - (uintptr_t) oldState->getConcreteStore(true)
-                            + (uintptr_t) newState->getConcreteStore(true);
-                    if(addressSpace.isOwnedByUs(newState))
-                        entry->addend |= 1;
+                //TODO: Handle case where MemoryObject is SharedConcrete
+
+                if(mo->isSharedConcrete) {
+                	assert(false && "TODO: Implement");
                 }
             }
 
@@ -296,10 +293,10 @@ ExecutionState* S2EExecutionState::clone()
             auto mmu_idx = std::get<0>(coords);
             auto page_idx = std::get<1>(coords);
             auto memobj_idx = std::get<2>(coords);
-            S2ETLBEntry *entry = &cpu->s2etlb[mmu_idx][page_idx][memobj_idx];
-            ObjectState* os = static_cast<ObjectState*>(entry->objectState);
-            if(os && !os->getObject()->isSharedConcrete) {
-                entry->addend &= ~1;
+            CPUS2ETLBEntry *entry = &cpu->s2etlb[mmu_idx][page_idx];
+            ObjectState* os = static_cast<ObjectState*>(entry->object_state[memobj_idx]);
+            if(os && os->getObject()->isSharedConcrete) {
+            	assert(false && "TODO: implement");
             }
         }
     }
@@ -1278,6 +1275,7 @@ void S2EExecutionState::writeRamConcrete(uint64_t hostAddress, const uint8_t* bu
 {
     assert(m_active);
     uint64_t page_offset = hostAddress & ~S2E_RAM_OBJECT_MASK;
+    fprintf(stderr, "S2EExecutionState::writeRamConcrete(0x%" PRIx64 ", 0x%p, %" PRId64 ")\n", hostAddress, buf, size);
     if(page_offset + size <= S2E_RAM_OBJECT_SIZE) {
         /* Single-object access */
 
@@ -1297,6 +1295,7 @@ void S2EExecutionState::writeRamConcrete(uint64_t hostAddress, const uint8_t* bu
 
         ObjectState* wos =
                 addressSpace.getWriteable(op.first, op.second);
+        fprintf(stderr, "S2EExecutionState::writeRamConcrete: writing RAM object 0x%p\n", wos->getConcreteStore(true));
         for(uint64_t i=0; i<size; ++i) {
             wos->write8(page_offset+i, buf[i]);
         }
@@ -1962,6 +1961,7 @@ void S2EExecutionState::dmaWrite(uint64_t hostAddress, uint8_t *buf, unsigned si
 
 void S2EExecutionState::flushTlbCache()
 {
+	fprintf(stderr, "S2EExecutionState::flushTlbCache()\n");
 #ifdef S2E_DEBUG_TLBCACHE
     g_s2e->getDebugStream(this) << "Flushing TLB cache\n";
 #endif
@@ -2001,52 +2001,52 @@ void S2EExecutionState::flushTlbCachePage(klee::ObjectState *objectState, int mm
 }
 
 void S2EExecutionState::updateTlbEntry(CPUArchState* env,
-                          int mmu_idx, uint64_t virtAddr, uintptr_t addend)
+                          int mmu_idx, uint64_t virtAddr, uintptr_t haddr)
 {
 #ifdef S2E_ENABLE_S2E_TLB
-    assert( (addend & ~TARGET_PAGE_MASK) == 0 );
+    assert( (haddr & ~TARGET_PAGE_MASK) == 0 );
     assert( (virtAddr & ~TARGET_PAGE_MASK) == 0 );
 
-    llvm::errs() << " updateTlbEntry" << '\n';
-
-    ObjectPair *ops = m_memcache.getArray(addend);
+    ObjectPair *ops = m_memcache.getArray(haddr);
 
     unsigned page_idx = (virtAddr >> TARGET_PAGE_BITS) & ((1 << TARGET_PAGE_BITS) - 1);
     for (unsigned memobj_idx = 0; memobj_idx < S2E_NUM_RAM_OBJECTS_PER_PAGE; ++memobj_idx) {
-        S2ETLBEntry* entry = &env->s2etlb[mmu_idx][page_idx][memobj_idx];
-        ObjectState *oldObjectState = static_cast<ObjectState *>(entry->objectState);
+        CPUS2ETLBEntry* entry = &env->s2etlb[mmu_idx][page_idx];
+        ObjectState *oldObjectState = static_cast<ObjectState *>(entry->object_state[memobj_idx]);
 
         ObjectPair op;
 
         if (!ops || !(op = ops[memobj_idx]).first) {
-            op = m_memcache.get(addend);
+            op = m_memcache.get(haddr);
             if (!op.first) {
-                op = addressSpace.findObject(addend);
+                op = addressSpace.findObject(haddr);
             }
         }
-        assert(op.first && op.second && op.second->getObject() == op.first && op.first->address == addend);
+        assert(op.first && op.second && op.second->getObject() == op.first && op.first->address == haddr);
 
         klee::ObjectState *ros = const_cast<ObjectState*>(op.second);
 
         if(op.first->isSharedConcrete) {
-            entry->objectState = const_cast<klee::ObjectState*>(op.second);
-            entry->addend = (addend - virtAddr) | 1;
+        	assert(false && "TODO: implement");
+            //entry->objectState = const_cast<klee::ObjectState*>(op.second);
+            //entry->addend = (haddr - virtAddr) | 1;
         } else {
             // XXX: for now we always ensure that all pages in TLB are writable
             klee::ObjectState *wos = addressSpace.getWriteable(op.first, op.second);
-            entry->objectState = wos;
-            entry->addend = ((uintptr_t) wos->getConcreteStore(true) - virtAddr) | 1;
+            entry->object_state[memobj_idx] = wos;
         }
 
-        op = ObjectPair(op.first, (const ObjectState*)entry->objectState);
+        op = ObjectPair(op.first, (const ObjectState*)entry->object_state[memobj_idx]);
 
         if (!ops) {
-            m_memcache.put(addend, op);
-            ops = m_memcache.getArray(addend & TARGET_PAGE_MASK);
+            m_memcache.put(haddr, op);
+            ops = m_memcache.getArray(haddr & TARGET_PAGE_MASK);
         }
         ops[memobj_idx] = op;
 
 
+
+        fprintf(stderr, "S2EExecutionState::updateTlbEntry: mmu_idx = %d, vaddr = 0x%" PRIx64 ", haddr = 0x%" PRIx64 ", os = %p\n", mmu_idx, (uint64_t) virtAddr, (uint64_t) haddr, entry->object_state[memobj_idx]);
         /* Store the new mapping in the cache */
 #ifdef S2E_DEBUG_TLBCACHE
         g_s2e->getDebugStream() << std::dec << "Storing " << op.second << " (" << mmu_idx << ',' << index << ")\n";
@@ -2056,7 +2056,7 @@ void S2EExecutionState::updateTlbEntry(CPUArchState* env,
             m_tlbMap[const_cast<ObjectState *>(op.second)].push_back(TlbCoordinates(mmu_idx, page_idx, memobj_idx));
         }
 
-        addend = addend + S2E_RAM_OBJECT_SIZE;
+        haddr = haddr + S2E_RAM_OBJECT_SIZE;
         virtAddr += S2E_RAM_OBJECT_SIZE;
     }
 #endif
