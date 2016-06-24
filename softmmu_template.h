@@ -121,12 +121,12 @@
 /**
  * Swap one entry of the tlb with the victim tlb.
  */
-#define SWAP_S2E_TLB(env, mmu_index, page_index, victim_index)                   \
-	do {                                                                         \
-	    CPUS2ETLBEntry tmps2etlb =  env->s2etlb[mmu_idx][page_index];            \
-        env->s2etlb[mmu_idx][page_index] = env->s2etlb_v[mmu_idx][victim_index]; \
-        env->s2etlb_v[mmu_idx][victim_index] = tmps2etlb;                        \
-	} while (0)
+#define SWAP_S2E_TLB                                                             \
+	{                                                                            \
+	    CPUS2ETLBEntry tmps2etlb =  env->s2etlb[mmu_idx][index];                 \
+        env->s2etlb[mmu_idx][index] = env->s2etlb_v[mmu_idx][vidx];              \
+        env->s2etlb_v[mmu_idx][vidx] = tmps2etlb;                                \
+	}
 
 #else /* defined(CONFIG_S2E) */
 #define SWAP_S2E_TLB
@@ -150,7 +150,7 @@
             tmpiotlb = env->iotlb[mmu_idx][index];                            \
             env->iotlb[mmu_idx][index] = env->iotlb_v[mmu_idx][vidx];         \
             env->iotlb_v[mmu_idx][vidx] = tmpiotlb;                           \
-            SWAP_S2E_TLB(env, mmu_idx, index, vidx);                          \
+            SWAP_S2E_TLB                                                      \
 			break;                                                            \
         }                                                                     \
     }                                                                         \

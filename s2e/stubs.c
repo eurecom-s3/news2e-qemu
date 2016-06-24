@@ -1,5 +1,7 @@
+#include "qemu-common.h"
+#include "cpu.h"
+
 #include "s2e/target/S2E.h"
-#include "s2e/target/S2EExecutionState.h"
 #include "exec/helper-proto.h"
 #include "tcg/tcg.h"
 

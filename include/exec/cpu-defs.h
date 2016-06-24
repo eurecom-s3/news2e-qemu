@@ -152,6 +152,14 @@ typedef struct CPUIOTLBEntry {
 
 #endif
 
+/* CPU_S2E_TLB is defined in both the S2E and non-S2E case, as it is 
+   hard to avoid some references to it. In the non-S2E case, CPUS2ETLBEntry
+   is defined as a 0-byte data structure, so no space is actually used.
+   */
+#define CPU_S2E_TLB \
+    CPUS2ETLBEntry s2etlb[NB_MMU_MODES][CPU_TLB_SIZE];                 \
+    CPUS2ETLBEntry s2etlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];              \
+
 #if defined(CONFIG_S2E)
 
 #define S2E_NUM_RAM_OBJECTS_PER_PAGE (1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS))
@@ -168,15 +176,11 @@ typedef struct CPUS2ETLBEntry
     ObjectState* object_state[S2E_NUM_RAM_OBJECTS_PER_PAGE];
 } CPUS2ETLBEntry;
 
-#define CPU_S2E_TLB \
-    CPUS2ETLBEntry s2etlb[NB_MMU_MODES][CPU_TLB_SIZE];                 \
-    CPUS2ETLBEntry s2etlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];              \
-
 
 #else /* defined(CONFIG_S2E) */
 
 #define CPU_S2E
-#define CPU_S2E_TLB
+typedef struct CPUS2ETLBEntry {} CPUS2ETLBEntry;
 
 #endif /* defined(CONFIG_S2E) */
 

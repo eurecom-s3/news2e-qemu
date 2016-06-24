@@ -34,6 +34,17 @@
 
 #define CPUArchState struct CPUARMState
 
+/* Needs to be before include of exec/cpu-defs.h for S2E. We need to know the number of S2E ram objects 
+ * ++ * in a page. */
+#if defined(CONFIG_USER_ONLY)
+#define TARGET_PAGE_BITS 12
+#else
+/* The ARM MMU allows 1k pages.  */
+/* ??? Linux doesn't actually use these, and they're deprecated in recent
+   architecture revisions.  Maybe a configure option to disable them.  */
+#define TARGET_PAGE_BITS 10
+#endif
+
 #include "qemu-common.h"
 #include "exec/cpu-defs.h"
 
@@ -133,17 +144,6 @@ typedef struct {
     uint32_t mask;
     uint32_t base_mask;
 } TCR;
-
-/* Needs to be here for S2E. We need to know the number of S2E ram objects 
- * ++ * in a page. */
-#if defined(CONFIG_USER_ONLY)
-#define TARGET_PAGE_BITS 12
-#else
-/* The ARM MMU allows 1k pages.  */
-/* ??? Linux doesn't actually use these, and they're deprecated in recent
-   architecture revisions.  Maybe a configure option to disable them.  */
-#define TARGET_PAGE_BITS 10
-#endif
 
 typedef struct CPUARMState {
 	/* TODO: There is no support for ARMv8 in S2E!!!!! */

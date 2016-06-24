@@ -134,9 +134,12 @@ static inline void tlb_flush_entry(CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_t
                  (TARGET_PAGE_MASK | TLB_INVALID_MASK)) ||
         addr == (tlb_entry->addr_code &
                  (TARGET_PAGE_MASK | TLB_INVALID_MASK))) {
+#if defined(CONFIG_S2E)
         S2EExecutionState_FlushTlbEntry(g_s2e_state, tlb_entry, s2e_tlb_entry, addr);
-        memset(tlb_entry, -1, sizeof(*tlb_entry));
         memset(s2e_tlb_entry, -1, sizeof(*s2e_tlb_entry) * S2E_NUM_RAM_OBJECTS_PER_PAGE);
+#endif /* defined(CONFIG_S2E) */
+        memset(tlb_entry, -1, sizeof(*tlb_entry));
+
     }
 }
 
