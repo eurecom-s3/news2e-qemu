@@ -2671,7 +2671,11 @@ MemTxResult address_space_rw(AddressSpace *as, hwaddr addr, MemTxAttrs attrs,
                 addr1 += memory_region_get_ram_addr(mr);
                 /* RAM case */
                 ptr = qemu_get_ram_ptr(addr1);
+#if defined(CONFIG_S2E)
+                S2EExecutionState_WriteRamConcrete(g_s2e_state, (uint64_t) ptr, buf, l);
+#else /* defined(CONFIG_S2E) */
                 memcpy(ptr, buf, l);
+#endif /* defined(CONFIG_S2E) */
                 invalidate_and_set_dirty(mr, addr1, l);
             }
         } else {
@@ -2710,7 +2714,11 @@ MemTxResult address_space_rw(AddressSpace *as, hwaddr addr, MemTxAttrs attrs,
             } else {
                 /* RAM case */
                 ptr = qemu_get_ram_ptr(mr->ram_addr + addr1);
+#if defined(CONFIG_S2E)
+                S2EExecutionState_ReadRamConcrete(g_s2e_state, (uint64_t) ptr, buf, l);
+#else /* defined(CONFIG_S2E) */
                 memcpy(buf, ptr, l);
+#endif /* defined(CONFIG_S2E) */
             }
         }
 
