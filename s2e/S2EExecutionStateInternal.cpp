@@ -393,6 +393,21 @@ void S2EExecutionState::writeCpuRegisterSymbolic(unsigned offset,
     m_cpuRegistersObject->write(offset, value);
 }
 
+uint64_t S2EExecutionState::readCpuRegisterConcrete(const unsigned offset, const unsigned size, bool &ok)
+{
+    assert(size <= 8);
+    ref<Expr> expr = readCpuRegister(offset, size * 8);
+    if (!isa<ConstantExpr>(expr)) {
+    	ok = false;
+    	return 0;
+    }
+    else {
+    	ok = true;
+    	return cast<ConstantExpr>(expr)->getZExtValue();
+    }
+}
+
+
 bool S2EExecutionState::readCpuRegisterConcrete(unsigned offset,
                                                 void* buf, unsigned size)
 {

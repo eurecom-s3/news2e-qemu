@@ -284,7 +284,14 @@ public:
     /** Same as writeCpuRegister but also allows writing symbolic values */
     void writeCpuRegisterSymbolic(unsigned offset, klee::ref<klee::Expr> value);
 
-    /** Read concrete value from general purpose CPU register */
+    /**
+     * Read a concrete value from general purpose CPU register.
+     * @param offset Structure offset of the CPU register in the CPU state structure.
+     * @param size Size of the value to read in bytes.
+     * @param ok Set to <b>true</b> if the value was read successfully, and to <b>false</b> otherwise.
+     * @return Register value.
+     */
+    uint64_t readCpuRegisterConcrete(const unsigned offset, const unsigned size, bool &ok);
     bool readCpuRegisterConcrete(unsigned offset, void* buf, unsigned size);
 
     /** Write concrete value to general purpose CPU register */
@@ -475,8 +482,17 @@ public:
     /** Attempt to merge two states */
     bool merge(const ExecutionState &b);
 
+    /**
+     * This method is to be called by Qemu when a new mapping is inserted into the TLB.
+     * It fills the S2E TLB.
+     *
+     * @param env CPU state
+     * @param mmu_idx MMU index
+     * @param virtual_address Virtual address of page being inserted in the TLB
+     * @param host_address Host address of page being inserted in the TLB
+     */
     void updateTlbEntry(CPUArchState* env,
-                              int mmu_idx, uint64_t virtAddr, uintptr_t addend);
+                              int mmu_idx, uint64_t virtual_address, uintptr_t host_address);
     void flushTlbCache();
 
     void flushTlbCachePage(klee::ObjectState *objectState, int mmu_idx, int index);

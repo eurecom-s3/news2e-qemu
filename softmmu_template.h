@@ -195,6 +195,8 @@ WORD_TYPE helper_le_ld_name(CPUArchState *env, target_ulong addr,
     /* Adjust the given return address.  */
     retaddr -= GETPC_ADJ;
 
+    fprintf(stderr, "called %s(env = %p, addr = 0x%08lx, oi = %d, retaddr = 0x%lx)\n", __func__, env, (long) addr, (int) oi, (long) retaddr);
+
     /* If the TLB entry is for a different page, reload and try again.  */
     if ((addr & TARGET_PAGE_MASK)
          != (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK))) {
@@ -222,6 +224,9 @@ WORD_TYPE helper_le_ld_name(CPUArchState *env, target_ulong addr,
            byte ordering.  We should push the LE/BE request down into io.  */
         res = glue(io_read, SUFFIX)(env, iotlbentry, addr, retaddr);
         res = TGT_LE(res);
+
+        fprintf(stderr, "softmmu(%s): Loaded IO value 0x%" PRIx64 " from address 0x%08" PRIx64 "\n", __func__, (uint64_t) res, (uint64_t) addr);
+
         return res;
     }
 

@@ -180,7 +180,7 @@ void BaseInstructions::isSymbolic(S2EExecutionState *state)
 void BaseInstructions::killState(S2EExecutionState *state)
 {
     std::string message;
-    target_ulong messagePtr;
+    uint64_t messagePtr;
 
 #ifdef TARGET_X86_64
     const klee::Expr::Width width = klee::Expr::Int64;
@@ -188,13 +188,12 @@ void BaseInstructions::killState(S2EExecutionState *state)
     const klee::Expr::Width width = klee::Expr::Int32;
 #endif
 
-    bool ok = true;
+    bool ok;
 
     klee::ref<klee::Expr> status =
                                 state->readCpuRegister(PARAM0,
                                                        width);
-    ok &= state->readCpuRegisterConcrete(PARAM1, &messagePtr,
-                                         sizeof messagePtr);
+    messagePtr = state->readCpuRegisterConcrete(PARAM1, sizeof(target_ulong), ok);
 
     if (!ok) {
         s2e()->getWarningsStream(state)
