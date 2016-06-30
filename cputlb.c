@@ -411,6 +411,9 @@ void tlb_set_page_with_attrs(CPUState *cpu, target_ulong vaddr,
     /* do not discard the translation in te, evict it into a victim tlb */
     env->tlb_v_table[mmu_idx][vidx] = *te;
     env->iotlb_v[mmu_idx][vidx] = env->iotlb[mmu_idx][index];
+#if defined(CONFIG_S2E)
+    env->s2etlb_v[mmu_idx][vidx] = env->s2etlb[mmu_idx][index];
+#endif /* defined(CONFIG_S2E) */
 
     /* refill the tlb */
     env->iotlb[mmu_idx][index].addr = iotlb - vaddr;
