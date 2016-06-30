@@ -2869,8 +2869,8 @@ void tcg_calc_regmask(TCGContext *s, TranslationBlockAccesses *accesses)
         const TCGOpDef *def = &tcg_op_defs[opc];
         const TCGArg *args = &s->gen_opparam_buf[op->args];
 
-        tcg_dump_op(s, op, args, stderr, fprintf);
-        fprintf(stderr, "\n");
+//        tcg_dump_op(s, op, args, stderr, fprintf);
+//        fprintf(stderr, "\n");
 
         if (opc == INDEX_op_call) {
             TCGArg arg_count;
