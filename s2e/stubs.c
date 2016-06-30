@@ -65,3 +65,7 @@ void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, uint64_t hostAd
 {
 	memcpy((void *) hostAddress, buf, size);
 }
+
+void S2EExecutionState_FlushTlbEntry(S2EExecutionState *self, CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_tlb_entry, uint64_t vaddr)
+{
+}

@@ -136,7 +136,7 @@ static inline void tlb_flush_entry(CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_t
                  (TARGET_PAGE_MASK | TLB_INVALID_MASK))) {
         S2EExecutionState_FlushTlbEntry(g_s2e_state, tlb_entry, s2e_tlb_entry, addr);
         memset(tlb_entry, -1, sizeof(*tlb_entry));
-        memset(s2e_tlb_entry, -1, sizeof(*s2e_tlb_entry) * S2E_NUM_RAM_OBJECTS_PER_PAGE);
+        memset(s2e_tlb_entry, -1, sizeof(*s2e_tlb_entry));
     }
 }
 
@@ -454,7 +454,7 @@ void tlb_set_page_with_attrs(CPUState *cpu, target_ulong vaddr,
         te->addr_write = -1;
     }
 
-#if defined(CONFIG_S2E) && defined(S2E_ENABLE_S2E_TLB)
+#if defined(CONFIG_S2E)
     if (addend /* addend == 0 if MMIO */) {
         //I/O devices don't need to have an S2E TLB entry because
         //MMIO goes directly to the device handlers.

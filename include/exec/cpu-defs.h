@@ -152,6 +152,10 @@ typedef struct CPUIOTLBEntry {
 
 #endif
 
+#define CPU_S2E_TLB \
+    CPUS2ETLBEntry s2etlb[NB_MMU_MODES][CPU_TLB_SIZE];                 \
+    CPUS2ETLBEntry s2etlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];              \
+
 #if defined(CONFIG_S2E)
 
 #define S2E_NUM_RAM_OBJECTS_PER_PAGE (1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS))
@@ -168,15 +172,18 @@ typedef struct CPUS2ETLBEntry
     ObjectState* object_state[S2E_NUM_RAM_OBJECTS_PER_PAGE];
 } CPUS2ETLBEntry;
 
-#define CPU_S2E_TLB \
-    CPUS2ETLBEntry s2etlb[NB_MMU_MODES][CPU_TLB_SIZE];                 \
-    CPUS2ETLBEntry s2etlb_v[NB_MMU_MODES][CPU_VTLB_SIZE];              \
-
 
 #else /* defined(CONFIG_S2E) */
 
+/**
+ * We need to define this also in the non-S2E case, because the type is used
+ * in Qemu function declarations.
+ */
+typedef struct CPUS2ETLBEntry
+{
+} CPUS2ETLBEntry;
+
 #define CPU_S2E
-#define CPU_S2E_TLB
 
 #endif /* defined(CONFIG_S2E) */
 
