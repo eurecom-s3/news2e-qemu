@@ -862,17 +862,14 @@ uint64_t S2EExecutionState::getSymbolicRegistersMask() const
 bool S2EExecutionState::readMemoryConcrete(uint64_t address, void *buf,
                                    uint64_t size, AddressType addressType)
 {
-    uint8_t *d = (uint8_t*)buf;
-    while (size>0) {
-        ref<Expr> v = readMemory(address, Expr::Int8, addressType);
-        if (v.isNull() || !isa<ConstantExpr>(v)) {
-            return false;
-        }
-        *d = (uint8_t)cast<ConstantExpr>(v)->getZExtValue(8);
-        size--;
-        d++;
-        address++;
-    }
+	for (uint64_t i = 0; i < size; ++i) {
+		ref<Expr> v = readMemory(address + i, Expr::Int8, addressType);
+		if (v.isNull() || !isa<ConstantExpr>(v)) {
+			return false;
+		}
+		static_cast<uint8_t *>(buf)[i] = static_cast<uint8_t>(cast<ConstantExpr>(v)->getZExtValue(8));
+	}
+
     return true;
 }
 
@@ -939,20 +936,17 @@ uint64_t S2EExecutionState::getHostAddress(uint64_t address,
 
 bool S2EExecutionState::readString(uint64_t address, std::string &s, unsigned maxLen)
 {
-    s = "";
-    do {
-        uint8_t c;
-        SREADR(this, address, c);
+	std::stringstream ss;
+	char c;
 
-        if (c) {
-            s = s + (char)c;
-        }else {
-            return true;
-        }
-        address++;
-        maxLen--;
-    }while(maxLen != 0);
-    return true;
+	for (uint64_t i = address; i < address + maxLen; ++i) {
+		if (!readMemoryConcrete(address, &c, sizeof(c))) {
+			return false;
+		}
+	}
+
+	s = ss.str();
+	return true;
 }
 
 bool S2EExecutionState::readUnicodeString(uint64_t address, std::string &s, unsigned maxLen)
@@ -978,9 +972,9 @@ ref<Expr> S2EExecutionState::readMemory(uint64_t address,
                             Expr::Width width, AddressType addressType) const
 {
     assert(width == 1 || (width & 7) == 0);
-    uint64_t size = width / 8;
+    const uint64_t size = width / 8;
 
-    uint64_t pageOffset = address & ~S2E_RAM_OBJECT_MASK;
+    const uint64_t pageOffset = address & ~S2E_RAM_OBJECT_MASK;
     if(pageOffset + size <= S2E_RAM_OBJECT_SIZE) {
         /* Fast path: read belongs to one MemoryObject */
         uint64_t hostAddress = getHostAddress(address, addressType);
@@ -2001,66 +1995,80 @@ void S2EExecutionState::flushTlbCachePage(klee::ObjectState *objectState, int mm
 }
 
 void S2EExecutionState::updateTlbEntry(CPUArchState* env,
-                          int mmu_idx, uint64_t virtAddr, uintptr_t haddr)
+                          int mmu_idx, uint64_t virtual_address, uintptr_t host_address)
 {
-#ifdef S2E_ENABLE_S2E_TLB
-    assert( (haddr & ~TARGET_PAGE_MASK) == 0 );
-    assert( (virtAddr & ~TARGET_PAGE_MASK) == 0 );
+    assert( (host_address & ~TARGET_PAGE_MASK) == 0 && "host address must be multiple of TARGET_PAGE_MASK");
+    assert( (virtual_address & ~TARGET_PAGE_MASK) == 0 && "virtual address must be multiple of TARGET_PAGE_MASK");
 
-    ObjectPair *ops = m_memcache.getArray(haddr);
-
-    unsigned page_idx = (virtAddr >> TARGET_PAGE_BITS) & ((1 << TARGET_PAGE_BITS) - 1);
+    const unsigned page_idx = (virtual_address >> TARGET_PAGE_BITS) & ((1 << TARGET_PAGE_BITS) - 1);
     for (unsigned memobj_idx = 0; memobj_idx < S2E_NUM_RAM_OBJECTS_PER_PAGE; ++memobj_idx) {
         CPUS2ETLBEntry* entry = &env->s2etlb[mmu_idx][page_idx];
-        ObjectState *oldObjectState = static_cast<ObjectState *>(entry->object_state[memobj_idx]);
+        ObjectPair op = addressSpace.findObject(host_address + memobj_idx * S2E_RAM_OBJECT_SIZE);
+        assert(op.first && "MemoryObject for address not found");
+        assert(op.second && "ObjectState for address not found");
+        assert(op.second->getObject() == op.first && "MemoryObject of ObjectState is not the expected one");
+        assert(op.first->address == host_address + memobj_idx * S2E_RAM_OBJECT_SIZE && "MemoryObject has wrong address");
 
-        ObjectPair op;
-
-        if (!ops || !(op = ops[memobj_idx]).first) {
-            op = m_memcache.get(haddr);
-            if (!op.first) {
-                op = addressSpace.findObject(haddr);
-            }
-        }
-        assert(op.first && op.second && op.second->getObject() == op.first && op.first->address == haddr);
-
-        klee::ObjectState *ros = const_cast<ObjectState*>(op.second);
-
-        if(op.first->isSharedConcrete) {
+        if (op.first->isSharedConcrete) {
+        	//The object is a shared concrete memory range
         	assert(false && "TODO: implement");
-            //entry->objectState = const_cast<klee::ObjectState*>(op.second);
-            //entry->addend = (haddr - virtAddr) | 1;
-        } else {
-            // XXX: for now we always ensure that all pages in TLB are writable
-            klee::ObjectState *wos = addressSpace.getWriteable(op.first, op.second);
-            entry->object_state[memobj_idx] = wos;
+
         }
-
-        op = ObjectPair(op.first, (const ObjectState*)entry->object_state[memobj_idx]);
-
-        if (!ops) {
-            m_memcache.put(haddr, op);
-            ops = m_memcache.getArray(haddr & TARGET_PAGE_MASK);
+        else {
+        	//XXX: for now we always ensure that all pages in TLB are writable
+        	entry->object_state[memobj_idx] = addressSpace.getWriteable(op.first, op.second);
         }
-        ops[memobj_idx] = op;
-
-
-
-        fprintf(stderr, "S2EExecutionState::updateTlbEntry: mmu_idx = %d, vaddr = 0x%" PRIx64 ", haddr = 0x%" PRIx64 ", os = %p\n", mmu_idx, (uint64_t) virtAddr, (uint64_t) haddr, entry->object_state[memobj_idx]);
-        /* Store the new mapping in the cache */
-#ifdef S2E_DEBUG_TLBCACHE
-        g_s2e->getDebugStream() << std::dec << "Storing " << op.second << " (" << mmu_idx << ',' << index << ")\n";
-#endif
-        if (oldObjectState != ros) {
-            flushTlbCachePage(oldObjectState, mmu_idx, page_idx);
-            m_tlbMap[const_cast<ObjectState *>(op.second)].push_back(TlbCoordinates(mmu_idx, page_idx, memobj_idx));
-        }
-
-        haddr = haddr + S2E_RAM_OBJECT_SIZE;
-        virtAddr += S2E_RAM_OBJECT_SIZE;
     }
-#endif
 }
+//
+//        ObjectState *oldObjectState = entry->object_state[memobj_idx];
+//
+//        ObjectPair op;
+//
+//        if (!ops || !(op = ops[memobj_idx]).first) {
+//            op = m_memcache.get(host_address);
+//            if (!op.first) {
+//                op = addressSpace.findObject(host_address);
+//            }
+//        }
+//        assert(op.first && op.second && op.second->getObject() == op.first && op.first->address == host_address);
+//
+//        klee::ObjectState *ros = const_cast<ObjectState*>(op.second);
+//
+//        if(op.first->isSharedConcrete) {
+//        	assert(false && "TODO: implement");
+//            //entry->objectState = const_cast<klee::ObjectState*>(op.second);
+//            //entry->addend = (haddr - virtAddr) | 1;
+//        } else {
+//            // XXX: for now we always ensure that all pages in TLB are writable
+//            klee::ObjectState *wos = addressSpace.getWriteable(op.first, op.second);
+//            entry->object_state[memobj_idx] = wos;
+//        }
+//
+//        op = ObjectPair(op.first, (const ObjectState*)entry->object_state[memobj_idx]);
+//
+//        if (!ops) {
+//            m_memcache.put(host_address, op);
+//            ops = m_memcache.getArray(host_address & TARGET_PAGE_MASK);
+//        }
+//        ops[memobj_idx] = op;
+//
+//
+//
+//        fprintf(stderr, "S2EExecutionState::updateTlbEntry: mmu_idx = %d, vaddr = 0x%" PRIx64 ", haddr = 0x%" PRIx64 ", os = %p\n", mmu_idx, (uint64_t) virtual_address, (uint64_t) host_address, entry->object_state[memobj_idx]);
+//        /* Store the new mapping in the cache */
+//#ifdef S2E_DEBUG_TLBCACHE
+//        g_s2e->getDebugStream() << std::dec << "Storing " << op.second << " (" << mmu_idx << ',' << index << ")\n";
+//#endif
+//        if (oldObjectState != ros) {
+//            flushTlbCachePage(oldObjectState, mmu_idx, page_idx);
+//            m_tlbMap[const_cast<ObjectState *>(op.second)].push_back(TlbCoordinates(mmu_idx, page_idx, memobj_idx));
+//        }
+//
+//        host_address = host_address + S2E_RAM_OBJECT_SIZE;
+//        virtual_address += S2E_RAM_OBJECT_SIZE;
+//    }
+//#endif
 
 
 uint8_t S2EExecutionState::readDirtyMask(uint64_t host_address)
