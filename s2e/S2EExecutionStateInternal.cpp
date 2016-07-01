@@ -955,9 +955,14 @@ bool S2EExecutionState::readString(uint64_t address, std::string &s, unsigned ma
 	char c;
 
 	for (uint64_t i = address; i < address + maxLen; ++i) {
-		if (!readMemoryConcrete(address, &c, sizeof(c))) {
+		if (!readMemoryConcrete(i, &c, sizeof(c))) {
 			return false;
 		}
+		if (c == '\0') {
+			break;
+		}
+
+		ss << c;
 	}
 
 	s = ss.str();
