@@ -862,16 +862,12 @@ uint64_t S2EExecutionState::getSymbolicRegistersMask() const
 bool S2EExecutionState::readMemoryConcrete(uint64_t address, void *buf,
                                    uint64_t size, AddressType addressType)
 {
-    uint8_t *d = (uint8_t*)buf;
-    while (size>0) {
-        ref<Expr> v = readMemory(address, Expr::Int8, addressType);
+    for (uint64_t i = 0; i < size; ++i) {
+        ref<Expr> v = readMemory(address + i, Expr::Int8, addressType);
         if (v.isNull() || !isa<ConstantExpr>(v)) {
             return false;
         }
-        *d = (uint8_t)cast<ConstantExpr>(v)->getZExtValue(8);
-        size--;
-        d++;
-        address++;
+        static_cast<uint8_t *>(buf)[i] = static_cast<uint8_t>(cast<ConstantExpr>(v)->getZExtValue(8));
     }
     return true;
 }
@@ -939,19 +935,21 @@ uint64_t S2EExecutionState::getHostAddress(uint64_t address,
 
 bool S2EExecutionState::readString(uint64_t address, std::string &s, unsigned maxLen)
 {
-    s = "";
-    do {
-        uint8_t c;
-        SREADR(this, address, c);
+    std::stringstream ss;
+    for (uint64_t i = address; i < address + maxLen; ++i) {
+        char c;
 
-        if (c) {
-            s = s + (char)c;
-        }else {
-            return true;
+        if (!readMemoryConcrete(address, &c, sizeof(c))) { 
+            return false; 
         }
-        address++;
-        maxLen--;
-    }while(maxLen != 0);
+
+        if (!c) {
+            break;
+        }
+
+        ss << c;
+    }
+    s = ss.str();
     return true;
 }
 
