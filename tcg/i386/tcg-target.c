@@ -1196,7 +1196,7 @@ static inline void tcg_out_tlb_load(TCGContext *s, TCGReg addrlo, TCGReg addrhi,
             }
         }
     }
-
+#if !defined(CONFIG_S2E)
     tcg_out_mov(s, tlbtype, r0, addrlo);
     if (aligned) {
         tcg_out_mov(s, ttype, r1, addrlo);
@@ -1220,6 +1220,7 @@ static inline void tcg_out_tlb_load(TCGContext *s, TCGReg addrlo, TCGReg addrhi,
 
     /* cmp 0(r0), r1 */
     tcg_out_modrm_offset(s, OPC_CMP_GvEv + trexw, r1, r0, 0);
+#endif /* !defined(CONFIG_S2E) */
 
     /* Prepare for both the fast path add of the tlb addend, and the slow
        path function argument setup.  There are two cases worth note:
@@ -1230,7 +1231,11 @@ static inline void tcg_out_tlb_load(TCGContext *s, TCGReg addrlo, TCGReg addrhi,
     tcg_out_mov(s, ttype, r1, addrlo);
 
     /* jne slow_path */
+#if defined(CONFIG_S2E)
+    tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
+#else /* defined(CONFIG_S2E) */
     tcg_out_opc(s, OPC_JCC_long + JCC_JNE, 0, 0, 0);
+#endif  /* defined(CONFIG_S2E) */
     label_ptr[0] = s->code_ptr;
     s->code_ptr += 4;
 
@@ -1239,16 +1244,21 @@ static inline void tcg_out_tlb_load(TCGContext *s, TCGReg addrlo, TCGReg addrhi,
         tcg_out_modrm_offset(s, OPC_CMP_GvEv, addrhi, r0, 4);
 
         /* jne slow_path */
+#if defined(CONFIG_S2E)
+        tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
+#else /* defined(CONFIG_S2E) */
         tcg_out_opc(s, OPC_JCC_long + JCC_JNE, 0, 0, 0);
+#endif  /* defined(CONFIG_S2E) */
         label_ptr[1] = s->code_ptr;
         s->code_ptr += 4;
     }
 
     /* TLB Hit.  */
-
+#if !defined(CONFIG_S2E)
     /* add addend(r0), r1 */
     tcg_out_modrm_offset(s, OPC_ADD_GvEv + hrexw, r1, r0,
                          offsetof(CPUTLBEntry, addend) - which);
+#endif /* !defined(CONFIG_S2E) */
 }
 
 /*
@@ -1571,28 +1581,12 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
 #if defined(CONFIG_SOFTMMU)
     mem_index = get_mmuidx(oi);
 
-#if !defined(CONFIG_S2E)    
     tcg_out_tlb_load(s, addrlo, addrhi, mem_index, opc,
                      label_ptr, offsetof(CPUTLBEntry, addr_read));
 
+#if !defined(CONFIG_S2E)
     /* TLB Hit.  */
     tcg_out_qemu_ld_direct(s, datalo, datahi, TCG_REG_L1, -1, 0, 0, opc);
-#else /* !defined(CONFIG_S2E) */
-    /*
-     * XXX: This is definitely not beautiful. Because I don't want to change the whole
-     * logic here, I simply generate unconditional jumps to the slow path of the load.
-     * The fixup code will insert the jump addresses, just like in the non-S2E case.
-     */
-
-    tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
-    label_ptr[0] = s->code_ptr;
-    s->code_ptr += 4;
-
-    if (TARGET_LONG_BITS > TCG_TARGET_REG_BITS) {
-    	tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
-        label_ptr[1] = s->code_ptr;
-        s->code_ptr += 4;
-    }
 #endif /* !defined(CONFIG_S2E) */
 
     /* Record the current context of a load into ldst label */
@@ -1731,28 +1725,12 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
     mem_index = get_mmuidx(oi);
 
 
-#if !defined(CONFIG_S2E)
     tcg_out_tlb_load(s, addrlo, addrhi, mem_index, opc,
 					 label_ptr, offsetof(CPUTLBEntry, addr_write));
 
+#if !defined(CONFIG_S2E)
 	/* TLB Hit.  */
 	tcg_out_qemu_st_direct(s, datalo, datahi, TCG_REG_L1, 0, 0, opc);
-#else /* !defined(CONFIG_S2E) */
-    /*
-     * XXX: This is definitely not beautiful. Because I don't want to change the whole
-     * logic here, I simply generate unconditional jumps to the slow path of the load.
-     * The fixup code will insert the jump addresses, just like in the non-S2E case.
-     */
-
-    tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
-    label_ptr[0] = s->code_ptr;
-    s->code_ptr += 4;
-
-    if (TARGET_LONG_BITS > TCG_TARGET_REG_BITS) {
-    	tcg_out_opc(s, OPC_JMP_long, 0, 0, 0);
-        label_ptr[1] = s->code_ptr;
-        s->code_ptr += 4;
-    }
 #endif /* !defined(CONFIG_S2E) */
 
     /* Record the current context of a store into ldst label */
