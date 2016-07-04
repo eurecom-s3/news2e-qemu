@@ -199,6 +199,20 @@ void S2EExecutionState::disableForking()
     }
 }
 
+CPUArchState* S2EExecutionState::getEnv(void) {
+	if (m_active) {
+		return reinterpret_cast<CPUArchState*>(m_cpuSystemState->address - CPU_CONC_LIMIT);
+	}
+	else {
+		return reinterpret_cast<CPUArchState*>(
+				m_cpuSystemObject->getConcreteStore(true) - CPU_CONC_LIMIT);
+	}
+}
+
+CPUState* S2EExecutionState::getCPUState(void) {
+	return ENV_GET_CPU(getEnv());
+}
+
 
 void S2EExecutionState::addressSpaceChange(const klee::MemoryObject *mo,
                         const klee::ObjectState *oldState,
@@ -1289,7 +1303,7 @@ void S2EExecutionState::writeRamConcrete(uint64_t hostAddress, const uint8_t* bu
 {
     assert(m_active);
     uint64_t page_offset = hostAddress & ~S2E_RAM_OBJECT_MASK;
-    fprintf(stderr, "S2EExecutionState::writeRamConcrete(0x%" PRIx64 ", 0x%p, %" PRId64 ")\n", hostAddress, buf, size);
+
     if(page_offset + size <= S2E_RAM_OBJECT_SIZE) {
         /* Single-object access */
 
@@ -1309,7 +1323,7 @@ void S2EExecutionState::writeRamConcrete(uint64_t hostAddress, const uint8_t* bu
 
         ObjectState* wos =
                 addressSpace.getWriteable(op.first, op.second);
-        fprintf(stderr, "S2EExecutionState::writeRamConcrete: writing RAM object 0x%p\n", wos->getConcreteStore(true));
+
         for(uint64_t i=0; i<size; ++i) {
             wos->write8(page_offset+i, buf[i]);
         }
@@ -1580,12 +1594,12 @@ void S2EExecutionState::jumpToSymbolicCpp()
 
 void S2EExecutionState::jumpToSymbolic()
 {
-    assert(false && "stubbed");
-//    assert(isActive() && isRunningConcrete());
-//
-//    m_startSymbexAtPC = getPc();
-//    // XXX: what about regs_to_env ?
-//    s2e_longjmp(env->jmp_env, 1);
+    assert(isActive() && isRunningConcrete());
+
+    m_startSymbexAtPC = getPc();
+    // XXX: what about regs_to_env ?
+    fprintf(stderr, "S2EExecutionState::jumpToSymbolic: env = %p\n", getEnv());
+    s2e_longjmp(getCPUState()->jmp_env, 1);
 }
 
 bool S2EExecutionState::needToJumpToSymbolic() const
@@ -1975,7 +1989,6 @@ void S2EExecutionState::dmaWrite(uint64_t hostAddress, uint8_t *buf, unsigned si
 
 void S2EExecutionState::flushTlbCache()
 {
-	fprintf(stderr, "S2EExecutionState::flushTlbCache()\n");
 #ifdef S2E_DEBUG_TLBCACHE
     g_s2e->getDebugStream(this) << "Flushing TLB cache\n";
 #endif

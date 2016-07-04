@@ -227,17 +227,12 @@ public:
     /**
      * Get the Qemu CPU object.
      */
-    CPUState* getCPUState() {
-        return this->m_cpu;
-    }
+    CPUState* getCPUState();
 
 	/**
-	 * Get the CPU env.
+	 * Get the CPU env pointer.
 	 */
-	CPUArchState* getCPUEnv() {
-		assert(this->m_cpu);
-		return static_cast<CPUArchState*>(this->m_cpu->env_ptr);
-	}
+	CPUArchState* getEnv();
 
     TranslationBlock *getTb() const;
 
@@ -326,6 +321,12 @@ public:
     bool getReturnAddress(uint64_t *retAddr);
     bool bypassFunction(unsigned paramCount);
 
+    /**
+     * Switch to symbolic execution.
+     * This exits the CPU loop of Qemu.
+     * A new translation block will be generated starting from the current
+     * instruction, and this block will be executed using Klee.
+     */
     void jumpToSymbolic();
     void jumpToSymbolicCpp();
     bool needToJumpToSymbolic() const;

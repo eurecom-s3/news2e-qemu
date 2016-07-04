@@ -48,6 +48,12 @@ void S2EExecutionState_InitDeviceState(S2EExecutionState *self);
 
 /**
  * Switch state to symbolic execution.
+ * This will do a longjump to exit the CPU loop of Qemu,
+ * forcing a retranslation of the translation block starting from the
+ * current instruction. This TB will then be executed using Klee.
+ *
+ * This function is supposed to be called only from C code.
+ * Calling it from C++ code might result in bad stack cleanup.
  */
 void S2EExecutionState_SwitchToSymbolic(S2EExecutionState *self);
 

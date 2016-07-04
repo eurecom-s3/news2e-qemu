@@ -46,7 +46,7 @@ void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, uint64_t hostAd
 
 void S2EExecutionState_SwitchToSymbolic(S2EExecutionState *self)
 {
-	assert(false && "Switching to symbolic mode not implemented");
+	self->jumpToSymbolic();
 }
 
 void S2EExecutionState_FlushTlbEntry(S2EExecutionState *self, CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_tlb_entry, uint64_t vaddr)

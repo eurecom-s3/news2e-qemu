@@ -39,6 +39,8 @@
 #include <llvm/Support/Process.h> /* XXX: Needs to be here because of weird compiler errors */
 
 extern "C" {
+#include <setjmp.h>
+
 #include <qemu-common.h>
 #include "exec/cpu-all.h"
 #include <tcg.h>
@@ -1759,21 +1761,22 @@ tcg_target_ulong S2EExecutor::executeTranslationBlockConcrete(S2EExecutionState 
                                                        TranslationBlock *tb,
                                                        CPUState* cpu)
 {
+	sigjmp_buf jmp_env;
     assert(state->m_active && state->m_runningConcrete);
-    ++state->m_stats.m_statTranslationBlockConcrete;
+    assert(sizeof(jmp_env) == sizeof(cpu->jmp_env));
+    state->m_stats.m_statTranslationBlockConcrete += 1;
 
     tcg_target_ulong ret = 0;
-    memcpy(s2e_cpuExitJmpBuf, cpu->jmp_env, sizeof(cpu->jmp_env));
 
-    if(s2e_setjmp(cpu->jmp_env)) {
-        memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
-        throw CpuExitException();
+    memcpy(jmp_env, cpu->jmp_env, sizeof(jmp_env));
+    if(sigsetjmp(cpu->jmp_env, 0) == 0) {
+    	ret = tcg_qemu_tb_exec(cpu->env_ptr, tb->tc_ptr);
+    	memcpy(cpu->jmp_env, jmp_env, sizeof(jmp_env));
+    	return ret;
     } else {
-        ret = tcg_qemu_tb_exec(cpu->env_ptr, tb->tc_ptr);
+    	memcpy(cpu->jmp_env, jmp_env, sizeof(jmp_env));
+        throw CpuExitException();
     }
-
-    memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
-    return ret;
 }
 
 static inline void s2e_tb_reset_jump(TranslationBlock *tb, unsigned int n)
@@ -2255,7 +2258,7 @@ inline void S2EExecutor::setCCOpEflags(S2EExecutionState *state)
                 executeFunction(state, "helper_set_cc_op_eflags");
             } catch(s2e::CpuExitException&) {
                 updateStates(state);
-                s2e_longjmp(env->jmp_env, 1);
+                siglongjmp(state->getCPUState()->jmp_env, 1);
             }
         }
     } else {
@@ -2661,7 +2664,7 @@ uintptr_t S2EExecutor_ExecuteTranslationBlock(S2EExecutor* self, struct CPUState
     } 
     catch(s2e::CpuExitException&) {
         self->updateStates(cur_state);
-        s2e_longjmp(cpu->jmp_env, 1);
+        siglongjmp(cpu->jmp_env, 1);
     }
 }
 

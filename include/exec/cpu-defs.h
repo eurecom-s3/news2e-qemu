@@ -161,7 +161,6 @@ typedef struct CPUIOTLBEntry {
 #define S2E_NUM_RAM_OBJECTS_PER_PAGE (1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS))
 
 #define CPU_S2E                                                         \
-    s2e_jmp_buf jmp_env;                                                \
     uint64_t s2e_icount; /* total icount for this CPU */                \
     uint64_t s2e_icount_before_tb; /* icount before starting current TB */ \
     uint64_t s2e_icount_after_tb; /* icount after starting current TB */  \
