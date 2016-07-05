@@ -255,7 +255,7 @@ public:
 
     void generateTraceCall(uintptr_t pc);
     Value* generateCondition(TCGCond cond, Value *arg1, Value *arg2);
-    int generateOperation(int opc, const TCGArg *args);
+    void generateOperation(TCGOp* op, const TCGArg *args);
 
     void generateCode(TCGContext *s, TranslationBlock *tb);
 };
@@ -525,6 +525,7 @@ unsigned TCGLLVMContextPrivate::getValueBits(int idx)
 
 Value* TCGLLVMContextPrivate::getValue(int idx)
 {
+	assert(idx < TCG_MAX_TEMPS && "Invalid value index");
     if(m_values[idx] == NULL) {
         if(idx < m_tcgContext->nb_globals) {
             m_values[idx] = m_builder.CreateLoad(getPtrForValue(idx)
@@ -737,11 +738,11 @@ Value *TCGLLVMContextPrivate::generateCondition(TCGCond cond, Value *arg1, Value
     }
 }
 
-int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
+void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
 {
     Value *v;
+    const TCGOpcode opc = op->opc;
     TCGOpDef &def = tcg_op_defs[opc];
-    int nb_args = def.nb_args;
 
     switch(opc) {
     case INDEX_op_insn_start:
@@ -754,18 +755,17 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
 
     case INDEX_op_call:
         {
-            int nb_oargs = args[0] >> 16;
-            int nb_iargs = args[0] & 0xffff;
-            nb_args = nb_oargs + nb_iargs + def.nb_cargs + 1;
+            int nb_oargs = op->callo;
+            int nb_iargs = op->calli;
 
             //int flags = args[nb_oargs + nb_iargs + 1];
             //assert((flags & TCG_CALL_TYPE_MASK) == TCG_CALL_TYPE_STD);
 
             std::vector<Value*> argValues;
             std::vector<llvm::Type*> argTypes;
-            argValues.reserve(nb_iargs-1);
-            argTypes.reserve(nb_iargs-1);
-            for(int i=0; i < nb_iargs-1; ++i) {
+            argValues.reserve(nb_iargs);
+            argTypes.reserve(nb_iargs);
+            for(int i=0; i < nb_iargs; ++i) {
                 TCGArg arg = args[nb_oargs + i + 1];
                 if(arg != TCG_CALL_DUMMY_ARG) {
                     Value *v = getValue(arg);
@@ -1312,8 +1312,6 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
         tcg_abort();
         break;
     }
-
-    return nb_args;
 }
 
 void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
@@ -1343,11 +1341,11 @@ void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
     initGlobalsAndLocalTemps();
 
     /* Generate code for each opc */
-    TCGArg *args = s->gen_opparam_buf;
     TCGOp *op;
     for ( int opc_idx = s->gen_first_op_idx; opc_idx >= 0; opc_idx = op->next) {
         op = &s->gen_op_buf[opc_idx];
-        TCGOpcode opc = op->opc;
+        const TCGArg* args = &s->gen_opparam_buf[op->args];
+        const TCGOpcode opc = op->opc;
  
         if(opc == INDEX_op_insn_start) {
 #ifndef CONFIG_S2E
@@ -1369,7 +1367,7 @@ void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
         }
 
         generateTraceCall(tb->pc);
-        args += generateOperation(opc, args);
+        generateOperation(op, args);
         //llvm::errs() << *m_tbFunction << "\n";
     }
 
