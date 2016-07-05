@@ -40,6 +40,7 @@ extern "C" {
 #include "s2e/target/tcg-llvm.h"
 #include "s2e/cxx/TCGLLVMContext.h"
 #include "s2e/TCGLLVMRuntime.h"
+#include "s2e/cxx/S2EExecutor.h"
 
 extern "C" {
 #include "config.h"
@@ -253,6 +254,7 @@ public:
                              int mem_index, int bits);
 
     void generateTraceCall(uintptr_t pc);
+    Value* generateCondition(TCGCond cond, Value *arg1, Value *arg2);
     int generateOperation(int opc, const TCGArg *args);
 
     void generateCode(TCGContext *s, TranslationBlock *tb);
@@ -708,6 +710,31 @@ void TCGLLVMContextPrivate::generateTraceCall(uintptr_t pc)
     }
 #endif
 #endif
+}
+
+Value *TCGLLVMContextPrivate::generateCondition(TCGCond cond, Value *arg1, Value *arg2)
+{
+    switch (cond)
+    {
+    case TCG_COND_NEVER:  return ConstantInt::getFalse(m_builder.getContext());
+    case TCG_COND_ALWAYS: return ConstantInt::getTrue(m_builder.getContext());
+    case TCG_COND_EQ:     return m_builder.CreateICmpEQ(arg1, arg2);
+    case TCG_COND_NE:     return m_builder.CreateICmpNE(arg1, arg2);
+            /* signed */
+    case TCG_COND_LT:     return m_builder.CreateICmpSLT(arg1, arg2);
+    case TCG_COND_GE:     return m_builder.CreateICmpSGE(arg1, arg2);
+    case TCG_COND_LE:     return m_builder.CreateICmpSLE(arg1, arg2);
+    case TCG_COND_GT:     return m_builder.CreateICmpSGT(arg1, arg2);
+            /* unsigned */
+    case TCG_COND_LTU:    return m_builder.CreateICmpULT(arg1, arg2);
+    case TCG_COND_GEU:    return m_builder.CreateICmpUGE(arg1, arg2);
+    case TCG_COND_LEU:    return m_builder.CreateICmpULE(arg1, arg2);
+    case TCG_COND_GTU:    return m_builder.CreateICmpUGT(arg1, arg2);
+    default:
+        llvm::errs() << "ERROR: Unknown condition code " << cond << " in TCG code" << '\n';
+        tcg_abort();
+        return 0;
+    }
 }
 
 int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
@@ -1181,7 +1208,6 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
 
         Value *arg2 = getValue(args[2]);
         //llvm::errs() << "arg2=" << *arg2 << "\n";
-        arg2 = m_builder.CreateTrunc(arg2, intType(32));
 
         uint32_t ofs = args[3];
         uint32_t len = args[4];
@@ -1235,6 +1261,50 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
     }
     break;
 #endif
+    case INDEX_op_setcond_i32: {
+		Value *result = generateCondition(static_cast<TCGCond>(args[3]), getValue(args[1]), getValue(args[2]));
+		setValue(args[0], m_builder.CreateSExt(result, intType(32)));
+		break;
+	}
+	case INDEX_op_add2_i32: {
+		Value *al = getValue(args[2]);
+		Value *ah = getValue(args[3]);
+		Value *bl = getValue(args[4]);
+		Value *bh = getValue(args[5]);
+
+		Value *a = m_builder.CreateOr(
+				m_builder.CreateShl(
+						m_builder.CreateZExt(ah, intType(64)),
+						ConstantInt::get(intType(64), 32)),
+				m_builder.CreateZExt(al, intType(64)));
+		Value *b = m_builder.CreateOr(
+				m_builder.CreateShl(
+					m_builder.CreateZExt(bh, intType(64)),
+					ConstantInt::get(intType(64), 32)),
+				m_builder.CreateZExt(bl, intType(64)));
+
+		Value *result = m_builder.CreateAdd(a, b);
+		Value *rl = m_builder.CreateTrunc(result, intType(32));
+		Value *rh = m_builder.CreateTrunc(
+				m_builder.CreateLShr(result, ConstantInt::get(intType(64), 32)),
+				intType(32));
+		setValue(args[0], rl);
+		setValue(args[1], rh);
+		break;
+	}
+	case INDEX_op_movcond_i32: {
+		Value *t0 = m_builder.CreateSExt(
+				generateCondition(static_cast<TCGCond>(args[5]), getValue(args[1]), getValue(args[2])),
+				intType(32));
+		Value *v1 = getValue(args[3]);
+		Value *v2 = getValue(args[4]);
+
+		Value *not_t0 = m_builder.CreateNeg(t0);
+		Value *t1 = m_builder.CreateAnd(v1, not_t0);
+		Value *ret = m_builder.CreateAnd(v2, t0);
+		setValue(args[0], m_builder.CreateOr(ret, t1));
+		break;
+    }
 
     default:
         std::cerr << "ERROR: unknown TCG micro operation '"
@@ -1429,7 +1499,7 @@ void TCGLLVMContext_Close(TCGLLVMContext *self)
     delete self;
 }
 
-void tcg_llvm_gen_code(TCGLLVMContext *l, TCGContext *s, TranslationBlock *tb)
+void TCGLLVM_GenerateCode(TCGLLVMContext *l, TCGContext *s, TranslationBlock *tb)
 {
     l->generateCode(s, tb);
 }
@@ -1499,5 +1569,21 @@ uintptr_t tcg_llvm_qemu_tb_exec(CPUState *cpu, TranslationBlock *tb)
 #endif
 
     return next_tb;
+}
+
+
+/** Generates LLVM code for already translated TB */
+int cpu_gen_llvm(CPUArchState *env, TranslationBlock *tb)
+{
+    TCGContext *s = &tcg_ctx;
+    TCGLLVMContext* tcg_llvm_ctx = TCGLLVMContext_GetInstance();
+    assert(tb->llvm_function == NULL);
+
+    tcg_func_start(s);
+    gen_intermediate_code(env, tb);
+    tcg_llvm_ctx->generateCode(s, tb);
+    tb->s2e_tb->llvm_function = tb->llvm_function;
+
+    return 0;
 }
 

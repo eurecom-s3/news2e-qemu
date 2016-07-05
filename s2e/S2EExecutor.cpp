@@ -1717,10 +1717,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
         S2EExecutionState* state,
         TranslationBlock* tb)
 {
-    assert(false && "stubbed");
-//    tb_function_args[0] = env;
-    tb_function_args[1] = 0;
-    tb_function_args[2] = 0;
+	void* tb_function_args[3] = {state->getEnv(), 0, 0};
 
     assert(state->m_active && !state->m_runningConcrete);
     assert(state->stack.size() == 1);
@@ -1730,7 +1727,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
 
     /* Generate LLVM code if necessary */
     if(!tb->llvm_function) {
-        cpu_gen_llvm(env, tb);
+        cpu_gen_llvm(state->getEnv(), tb);
         assert(tb->llvm_function);
     }
 
