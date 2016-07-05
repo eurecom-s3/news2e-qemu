@@ -1169,14 +1169,14 @@ void S2EExecutor::registerDirtyMask(S2EExecutionState *initial_state, uint64_t h
 
 void S2EExecutor::switchToConcrete(S2EExecutionState *state)
 {
-    assert(false && "stubbed");
-//    assert(!state->m_runningConcrete);
-//
-//    /* Concretize any symbolic registers */
-//    ObjectState* wos = state->m_cpuRegistersObject;
-//    assert(wos);
-//
-//    if (m_forceConcretizations) {
+    assert(!state->m_runningConcrete);
+
+    /* Concretize any symbolic registers */
+    ObjectState* wos = state->m_cpuRegistersObject;
+    assert(wos);
+
+    if (m_forceConcretizations) {
+    	assert(false && "stubbed");
 //        //XXX: Find a adhoc dirty way to implement overconstrained consistency model
 //        //There should be a consistency plugin somewhere else
 //        s2e::plugins::ModuleExecutionDetector *md =
@@ -1197,18 +1197,18 @@ void S2EExecutor::switchToConcrete(S2EExecutionState *state)
 //                }
 //            }
 //        }
-//    }
-//
-//    //assert(os->isAllConcrete());
-//    memcpy((void*) state->m_cpuRegistersState->address,
-//           wos->getConcreteStore(true), wos->size);
-//    static_cast<S2EExecutionState*>(state)->m_runningConcrete = true;
-//
-//    if (PrintModeSwitch) {
-//        m_s2e->getMessagesStream(state)
-//                << "Switched to concrete execution at pc = "
-//                << hexval(state->getPc()) << '\n';
-//    }
+    }
+
+    //assert(os->isAllConcrete());
+    memcpy((void*) state->m_cpuRegistersState->address,
+           wos->getConcreteStore(true), wos->size);
+    static_cast<S2EExecutionState*>(state)->m_runningConcrete = true;
+
+    if (PrintModeSwitch) {
+        m_s2e->getMessagesStream(state)
+                << "Switched to concrete execution at pc = "
+                << hexval(state->getPc()) << '\n';
+    }
 }
 
 void S2EExecutor::switchToSymbolic(S2EExecutionState *state)
