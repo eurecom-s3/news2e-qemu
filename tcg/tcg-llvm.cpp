@@ -766,7 +766,7 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
             argValues.reserve(nb_iargs);
             argTypes.reserve(nb_iargs);
             for(int i=0; i < nb_iargs; ++i) {
-                TCGArg arg = args[nb_oargs + i + 1];
+                TCGArg arg = args[nb_oargs + i];
                 if(arg != TCG_CALL_DUMMY_ARG) {
                     Value *v = getValue(arg);
                     argValues.push_back(v);
@@ -778,12 +778,10 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
             llvm::Type* retType = nb_oargs == 0 ?
                 llvm::Type::getVoidTy(m_context) : wordType(getValueBits(args[1]));
 
-            Value* helperAddr = getValue(args[nb_oargs + nb_iargs]);
             Value* result;
 
             //Generate this in S2E mode
-            tcg_target_ulong helperAddrC = (tcg_target_ulong)
-                    cast<ConstantInt>(helperAddr)->getZExtValue();
+            tcg_target_ulong helperAddrC = args[nb_oargs + nb_iargs];
             assert(helperAddrC);
 
             const char *helperName = tcg_helper_get_name(m_tcgContext,
