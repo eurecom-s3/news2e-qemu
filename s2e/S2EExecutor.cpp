@@ -277,7 +277,10 @@ extern "C" {
 
 namespace s2e {
 
-/* Global array to hold tb function arguments */
+/* Global array to hold tb function arguments,
+ * Needs to be global because it is registered as external memory
+ * object to KLEE.
+ */
 volatile void* tb_function_args[3];
 
 /* External dispatcher to convert QEMU s2e_longjmp's into C++ exceptions */
@@ -1047,17 +1050,31 @@ void S2EExecutor::registerCpu(S2EExecutionState *initialState,
 
     initialState->m_cpuSystemState->setName("CpuSystemState");
 
+    initialState->m_cpuState =
+    	addExternalObject(*initialState,
+    			          cpu,
+						  /* The following works because env is embedded in a superstructure behind cpu */
+						  reinterpret_cast<uint8_t *>(env) - reinterpret_cast<uint8_t *>(cpu),
+						  /* isReadOnly = */ false,
+						  /* isUserSpecified = */ true,
+						  /* isSharedConcrete = */ true);
+    initialState->m_cpuState->setName("CpuState");
+
     m_saveOnContextSwitch.push_back(initialState->m_cpuSystemState);
 
     const ObjectState *cpuSystemObject = initialState->addressSpace
                                 .findObject(initialState->m_cpuSystemState);
     const ObjectState *cpuRegistersObject = initialState->addressSpace
                                 .findObject(initialState->m_cpuRegistersState);
+    const ObjectState *cpuObject = initialState->addressSpace
+    		                    .findObject(initialState->m_cpuState);
 
     initialState->m_cpuRegistersObject = initialState->addressSpace
         .getWriteable(initialState->m_cpuRegistersState, cpuRegistersObject);
     initialState->m_cpuSystemObject = initialState->addressSpace
         .getWriteable(initialState->m_cpuSystemState, cpuSystemObject);
+    initialState->m_cpuObject = initialState->addressSpace
+            .getWriteable(initialState->m_cpuState, cpuObject);
 }
 
 
@@ -1717,11 +1734,13 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
         S2EExecutionState* state,
         TranslationBlock* tb)
 {
-	void* tb_function_args[3] = {state->getEnv(), 0, 0};
-
     assert(state->m_active && !state->m_runningConcrete);
     assert(state->stack.size() == 1);
     assert(state->pc == m_dummyMain->instructions);
+
+    tb_function_args[0] = state->getEnv();
+    tb_function_args[1] = 0;
+    tb_function_args[2] = 0;
 
     ++state->m_stats.m_statTranslationBlockSymbolic;
 
@@ -1730,6 +1749,9 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
         cpu_gen_llvm(state->getEnv(), tb);
         assert(tb->llvm_function);
     }
+
+    g_s2e->getDebugStream() << "Current LLVM function: " << *tb->llvm_function << '\n';
+
 
     if(tb->s2e_tb != state->m_lastS2ETb) {
         unrefS2ETb(state->m_lastS2ETb);

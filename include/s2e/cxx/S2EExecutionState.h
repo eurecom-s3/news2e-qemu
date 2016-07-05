@@ -164,9 +164,11 @@ protected:
     /* Static because they do not change */
     static klee::MemoryObject* m_cpuRegistersState;
     static klee::MemoryObject* m_cpuSystemState;
+    static klee::MemoryObject* m_cpuState;
 
     klee::ObjectState *m_cpuRegistersObject;
     klee::ObjectState *m_cpuSystemObject;
+    klee::ObjectState *m_cpuObject;
 
     static klee::MemoryObject* m_dirtyMask;
     klee::ObjectState *m_dirtyMaskObject;

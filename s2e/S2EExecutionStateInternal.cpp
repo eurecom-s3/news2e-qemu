@@ -96,6 +96,7 @@ using namespace klee;
 
 MemoryObject *S2EExecutionState::m_cpuRegistersState = NULL;
 MemoryObject *S2EExecutionState::m_cpuSystemState = NULL;
+MemoryObject *S2EExecutionState::m_cpuState = nullptr;
 MemoryObject *S2EExecutionState::m_dirtyMask = NULL;
 
 unsigned S2EExecutionState::s_lastSymbolicId = 0;
