@@ -49,6 +49,7 @@ extern "C" {
 #include "sysemu/sysemu.h"
 #include "sysemu/cpus.h"
 #include "qom/cpu.h"
+//#include "trace.h"
 
 extern CPUArchState *env;
 void QEMU_NORETURN raise_exception(CPUArchState *env, int exception_index);
@@ -1905,6 +1906,29 @@ uintptr_t S2EExecutor::executeTranslationBlock(
         }
     }
 
+    //The following code is taken from cpu_tb_exit in cpu-exec.c
+    /* Execute a TB, and fix up the CPU state afterwards if necessary */
+    CPUArchState *env = static_cast<CPUArchState*>(cpu->env_ptr);
+    uintptr_t next_tb;
+
+#if defined(DEBUG_DISAS)
+    if (qemu_loglevel_mask(CPU_LOG_TB_CPU)) {
+#if defined(TARGET_I386)
+        log_cpu_state(cpu, CPU_DUMP_CCOP);
+#elif defined(TARGET_M68K)
+        /* ??? Should not modify env state for dumping.  */
+        cpu_m68k_flush_flags(env, env->cc_op);
+        env->cc_op = CC_OP_FLAGS;
+        env->sr = (env->sr & 0xffe0) | env->cc_dest | (env->cc_x << 4);
+        log_cpu_state(cpu, 0);
+#else
+        log_cpu_state(cpu, 0);
+#endif
+    }
+#endif /* DEBUG_DISAS */
+
+    cpu->can_do_io = !use_icount;
+
     if(executeKlee) {
         if(state->m_runningConcrete) {
             TimerStatIncrementer t(stats::concreteModeTime);
@@ -1917,7 +1941,7 @@ uintptr_t S2EExecutor::executeTranslationBlock(
         int slowdown = UseFastHelpers ? ClockSlowDownFastHelpers : ClockSlowDown;
         cpu_enable_scaling(slowdown);
 
-        return executeTranslationBlockKlee(state, tb);
+        next_tb = executeTranslationBlockKlee(state, tb);
 
     } else {
         //g_s2e_exec_ret_addr = 0;
@@ -1935,8 +1959,34 @@ uintptr_t S2EExecutor::executeTranslationBlock(
 //        }
 //        cpu_enable_scaling(new_scaling);
 
-        return executeTranslationBlockConcrete(state, tb, cpu);
+        next_tb = executeTranslationBlockConcrete(state, tb, cpu);
     }
+
+    cpu->can_do_io = 1;
+//    trace_exec_tb_exit((void *) (next_tb & ~TB_EXIT_MASK),
+//                       next_tb & TB_EXIT_MASK);
+
+    if ((next_tb & TB_EXIT_MASK) > TB_EXIT_IDX1) {
+        /* We didn't start executing this TB (eg because the instruction
+         * counter hit zero); we must restore the guest PC to the address
+         * of the start of the TB.
+         */
+        CPUClass *cc = CPU_GET_CLASS(cpu);
+        TranslationBlock *tb = (TranslationBlock *)(next_tb & ~TB_EXIT_MASK);
+        if (cc->synchronize_from_tb) {
+            cc->synchronize_from_tb(cpu, tb);
+        } else {
+            assert(cc->set_pc);
+            cc->set_pc(cpu, tb->pc);
+        }
+    }
+    if ((next_tb & TB_EXIT_MASK) == TB_EXIT_REQUESTED) {
+        /* We were asked to stop executing TBs (probably a pending
+         * interrupt. We've now stopped, so clear the flag.
+         */
+        cpu->tcg_exit_req = 0;
+    }
+    return next_tb;
 }
 
 void S2EExecutor::cleanupTranslationBlock(S2EExecutionState* state)
