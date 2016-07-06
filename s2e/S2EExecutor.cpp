@@ -49,7 +49,7 @@ extern "C" {
 #include "sysemu/sysemu.h"
 #include "sysemu/cpus.h"
 #include "qom/cpu.h"
-//#include "trace.h"
+#include "trace.h"
 
 extern CPUArchState *env;
 void QEMU_NORETURN raise_exception(CPUArchState *env, int exception_index);
@@ -1963,8 +1963,8 @@ uintptr_t S2EExecutor::executeTranslationBlock(
     }
 
     cpu->can_do_io = 1;
-//    trace_exec_tb_exit((void *) (next_tb & ~TB_EXIT_MASK),
-//                       next_tb & TB_EXIT_MASK);
+    trace_exec_tb_exit((void *) (next_tb & ~TB_EXIT_MASK),
+                       next_tb & TB_EXIT_MASK);
 
     if ((next_tb & TB_EXIT_MASK) > TB_EXIT_IDX1) {
         /* We didn't start executing this TB (eg because the instruction
