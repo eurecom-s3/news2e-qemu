@@ -9,4 +9,8 @@ s2e-obj-y += ConfigFile.o ExprInterface.o \
 s2e-obj-y += Plugins/ Signals/
 
 #s2e-obj-y +=   QemuSocket.o
+
 obj-y += $(s2e-obj-y)
+
+#Compile helper prototypes to LLVM IR
+obj-helper-llvm-y += helper_prototypes.o

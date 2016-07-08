@@ -13,4 +13,6 @@ obj-y += crypto_helper.o
 obj-helper-y = op_helper.o helper.o neon_helper.o iwmmxt_helper.o
 obj-helper-$(TARGET_AARCH64) += helper-a64.o
 
+obj-helper-llvm-y += $(obj-helper-y)
+
 obj-y += $(obj-helper-y)

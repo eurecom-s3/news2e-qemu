@@ -4,3 +4,5 @@ obj-y += gdbstub.o mips-semi.o
 obj-$(CONFIG_SOFTMMU) += machine.o
 obj-$(CONFIG_KVM) += kvm.o
 obj-y += $(obj-helper-y)
+
+obj-helper-llvm-y += $(obj-helper-y)

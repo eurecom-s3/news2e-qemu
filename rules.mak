@@ -85,7 +85,7 @@ LINK = $(call quiet-command,\
        $(call extract-libs,$(1:.lo=.o)) $(LIBS),$(if $(filter %.lo %.la,$1),"lt LINK ", "  LINK  ")"$(TARGET_DIR)$@")
 endif
 
-LLVMLINK = $(call quiet-command,$(LLVM_LINK) -o $@ $1," LLVMAR    $(TARGET_DIR)$@")
+LLVMLINK = $(call quiet-command,$(LLVM_LINK) -o $@ $1,"  LLVMAR    $(TARGET_DIR)$@")
 
 
 %.asm: %.S

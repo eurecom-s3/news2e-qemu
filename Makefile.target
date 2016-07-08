@@ -163,11 +163,16 @@ endif # CONFIG_SOFTMMU
 # S2E target
 ifdef CONFIG_S2E
 
-obj-helper-y := 
+obj-y-save := $(obj-y)
+obj-helper-llvm-y := target-$(TARGET_BASE_ARCH)/ s2e/
+dummy := $(call unnest-vars,,obj-helper-llvm-y)
+
+obj-helper-llvm-y-save := $(obj-helper-llvm-y)
 s2e-obj-y :=  s2e/ tcg/tcg-llvm.o op_helpers.o
 dummy := $(call unnest-vars,,s2e-obj-y)
 
 $(s2e-obj-y): QEMU_CXXFLAGS += $(LLVM_CXXFLAGS) $(S2E_CXXFLAGS)
+obj-y := $(obj-y-save)
 
 else #CONFIG_S2E
 
@@ -214,7 +219,7 @@ ifdef CONFIG_DARWIN
 	$(call quiet-command,SetFile -a C $@,"  SETFILE $(TARGET_DIR)$@")
 endif
 
-op_helpers.bca: $(addprefix target-$(TARGET_BASE_ARCH)/, $(patsubst  %.o,%.bc,$(obj-helper-y)))
+op_helpers.bca: $(patsubst  %.o,%.bc,$(obj-helper-llvm-y-save))
 	$(call LLVMLINK, $^)
 
 gdbstub-xml.c: $(TARGET_XML_FILES) $(SRC_PATH)/scripts/feature_to_c.sh

@@ -4,3 +4,5 @@ obj-y += gdbstub.o
 obj-y += lm32-semi.o
 obj-$(CONFIG_SOFTMMU) += machine.o
 obj-y += $(obj-helper-y)
+
+obj-helper-llvm-y += $(obj-helper-y)

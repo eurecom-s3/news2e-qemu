@@ -8,3 +8,5 @@ obj-$(CONFIG_SOFTMMU) += machine.o arch_memory_mapping.o arch_dump.o monitor.o
 obj-$(CONFIG_KVM) += kvm.o
 obj-$(call lnot,$(CONFIG_KVM)) += kvm-stub.o
 obj-y += $(obj-helper-y)
+
+obj-helper-llvm-y += $(obj-helper-y)

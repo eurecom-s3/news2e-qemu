@@ -7,3 +7,5 @@ obj-$(CONFIG_SOFTMMU) += monitor.o
 obj-y += translate.o cpu.o
 obj-y += gdbstub.o
 obj-y += $(obj-helper-y)
+
+obj-helper-llvm-y += $(obj-helper-y)

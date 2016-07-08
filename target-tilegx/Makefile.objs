@@ -1,3 +1,5 @@
 obj-helper-y = helper.o simd_helper.o
 obj-y += cpu.o translate.o 
 obj-y += $(obj-helper-y)
+
+obj-helper-llvm-y += $(obj-helper-y)
