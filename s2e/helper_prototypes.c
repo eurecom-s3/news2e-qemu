@@ -46,6 +46,7 @@ void dummy_include_helper_prototypes(void);
  */
 void dummy_include_helper_prototypes(void) {
 	helper_s2e_instrument_code(NULL, NULL, 0);
+	helper_s2e_base_instruction(NULL, 0);
 }
 
 

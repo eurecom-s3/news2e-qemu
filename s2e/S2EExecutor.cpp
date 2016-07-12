@@ -51,6 +51,7 @@ extern "C" {
 #include "sysemu/cpus.h"
 #include "qom/cpu.h"
 #include "trace.h"
+#include "exec/ram_addr.h"
 
 void QEMU_NORETURN raise_exception(CPUArchState *env, int exception_index);
 void QEMU_NORETURN raise_exception_err(CPUArchState *env, int exception_index, int error_code);
@@ -630,6 +631,19 @@ void S2EExecutor::handleGetValue(klee::Executor* executor,
     s2eState->kleeReadMemory(kleeAddress, sizeInBytes, NULL, false, true, add_constraint);
 }
 
+void S2EExecutor::handleBaseInstruction(klee::Executor* executor,
+                               klee::ExecutionState* state,
+                               klee::KInstruction* target,
+                               std::vector<klee::ref<klee::Expr> > &args)
+{
+	klee::ref<klee::ConstantExpr> env = cast<klee::ConstantExpr>(args[0]);
+	assert(!env.isNull() && "env pointer must be a constant expression");
+	klee::ref<klee::ConstantExpr> opcode = cast<klee::ConstantExpr>(args[1]);
+	assert(!opcode.isNull() && "opcode must be a constant expression");
+
+	g_s2e->getCorePlugin()->onCustomInstruction.emit(static_cast<S2EExecutionState*>(state), opcode->getZExtValue());
+}
+
 S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
                     const InterpreterOptions &opts,
                             InterpreterHandler *ie)
@@ -728,6 +742,10 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     assert(function);
     addSpecialFunctionHandler(function, handlerInstrumentInstruction);
 
+    function = kmodule->module->getFunction("helper_s2e_base_instruction");
+	assert(function);
+	addSpecialFunctionHandler(function, handleBaseInstruction);
+
 //    llvm::errs() << *kmodule->module << '\n';
     llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": helper functions stubbed" << '\n';
 
@@ -801,6 +819,7 @@ void S2EExecutor::cleanModule(Module* mod)
 {
 	static const char * KEEP_FUNCTIONS[] = {
         "helper_s2e_instrument_code",
+		"helper_s2e_base_instruction",
         "main",
         "helper_le_ldq_mmu",
         "helper_le_ldsl_mmu",
@@ -1117,6 +1136,9 @@ void S2EExecutor::initializeExecution(S2EExecutionState* state,
 #endif
 
     m_executeAlwaysKlee = executeAlwaysKlee;
+
+    //TODO: lock rcu list before doing that?
+    registerDirtyMask(state, reinterpret_cast<uint64_t>(ram_list.dirty_memory), last_ram_offset() >> TARGET_PAGE_BITS);
 
     initializeGlobals(*state);
     bindModuleConstants();
@@ -1733,6 +1755,9 @@ inline bool S2EExecutor::executeInstructions(S2EExecutionState *state, unsigned 
                       << ki->inst->getParent()->getParent()->getName().str()
                       << ": " << *ki->inst << '\n';
             }
+            llvm::errs() << "executing "
+                                  << ki->inst->getParent()->getParent()->getName().str()
+                                  << ": " << *ki->inst << '\n';
 
 
             stepInstruction(*state);
@@ -2260,9 +2285,10 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
     S2EExecutionState *s2eState = dynamic_cast<S2EExecutionState*>(&state);
 
     /* Checkpoint the device state before branching */
-    assert(false && "stubbed");
+    llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: Checkpoint device state before branching" << '\n';
+//    assert(false && "stubbed");
 //    qemu_aio_flush();
-    bdrv_flush_all();
+//    bdrv_flush_all();
     //s2eState->m_tlb.clearTlbOwnership();
 
     /* Save CPU state */
@@ -2272,7 +2298,7 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
 
     cpu_disable_ticks();
     s2eState->getDeviceState()->saveDeviceState();
-    assert(false && "stubbed");
+    llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: Save timers state in branching" << '\n';
 //    *s2eState->m_timersState = timers_state;
     cpu_enable_ticks();
 
