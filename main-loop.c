@@ -500,7 +500,10 @@ int main_loop_wait(int nonblocking)
     timeout_ns = qemu_soonest_timeout(timeout_ns,
                                       timerlistgroup_deadline_ns(
                                           &main_loop_tlg));
-
+    
+    //FIXME: Ugly hack to debug S2E. Remove as soon as possible.
+    timeout_ns *= 1000;
+    
     ret = os_host_main_loop_wait(timeout_ns);
 #ifdef CONFIG_SLIRP
     slirp_pollfds_poll(gpollfds, (ret < 0));
