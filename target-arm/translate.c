@@ -7671,8 +7671,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
 
 #ifdef CONFIG_S2E
     tmp = tcg_temp_new_i32();
-    tcg_gen_movi_tl(tmp, s->pc);
-    //tcg_gen_st_tl(tmp, cpu_env, offsetof(CPUArchState, regs[15]));
+    tcg_gen_movi_i32(tmp, s->pc - 4); //Decrement by 4, because pc has been incremented before calling this function already
     store_cpu_field(tmp,regs[15]);
 
     tmp64 = tcg_temp_new_i64();
