@@ -126,7 +126,6 @@
 	    CPUS2ETLBEntry tmps2etlb =  env->s2etlb[mmu_idx][index];                 \
         env->s2etlb[mmu_idx][index] = env->s2etlb_v[mmu_idx][vidx];              \
         env->s2etlb_v[mmu_idx][vidx] = tmps2etlb;                                \
-        fprintf(stderr, "Swapping TLB entry (%d, %d) with victim entry (%d, %d)\n", mmu_idx, index, mmu_idx, vidx); \
 	}
 
 #else /* defined(CONFIG_S2E) */
@@ -266,6 +265,11 @@ WORD_TYPE helper_le_ld_name(CPUArchState *env, target_ulong addr,
 #if defined(CONFIG_S2E)
     target_ulong object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
     CPUS2ETLBEntry *e = &env->s2etlb[mmu_idx][index];
+
+#ifdef TARGET_WORDS_BIGENDIAN
+#error TODO: Consider target endianness here
+#endif
+    assert((addr & ~((1 << S2E_RAM_OBJECT_BITS) - 1)) == ((addr + DATA_SIZE - 1) & ~((1 << S2E_RAM_OBJECT_BITS) - 1)) && "TODO: What if read spans multiple S2E objects?");
     if (unlikely(!klee_ObjectState_ReadConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (uint8_t *) &res, DATA_SIZE))) {
     	S2EExecutionState_SwitchToSymbolic(g_s2e_state);
     }
@@ -484,7 +488,10 @@ void helper_le_st_name(CPUArchState *env, target_ulong addr, DATA_TYPE val,
     target_ulong object_index = (addr >> S2E_RAM_OBJECT_BITS) & ((1 << (TARGET_PAGE_BITS - S2E_RAM_OBJECT_BITS)) - 1);
     CPUS2ETLBEntry *e = &env->s2etlb[mmu_idx][index];
 
-    //TODO: Endianness?
+#ifdef TARGET_WORDS_BIGENDIAN
+#error TODO: Consider target endianness here
+#endif
+    assert((addr & ~((1 << S2E_RAM_OBJECT_BITS) - 1)) == ((addr + DATA_SIZE - 1) & ~((1 << S2E_RAM_OBJECT_BITS) - 1)) && "TODO: What if read spans multiple S2E objects?");
     klee_ObjectState_WriteConcrete(e->object_state[object_index], addr & ((1 << S2E_RAM_OBJECT_BITS) - 1), (const uint8_t *) &val, DATA_SIZE);
 #else /* defined(CONFIG_S2E) */
 #if DATA_SIZE == 1
