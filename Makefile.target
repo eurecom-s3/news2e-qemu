@@ -164,7 +164,7 @@ endif # CONFIG_SOFTMMU
 ifdef CONFIG_S2E
 
 obj-y-save := $(obj-y)
-obj-helper-llvm-y := target-$(TARGET_BASE_ARCH)/ s2e/
+obj-helper-llvm-y := target-$(TARGET_BASE_ARCH)/ s2e/ fpu/softfloat.o
 dummy := $(call unnest-vars,,obj-helper-llvm-y)
 
 obj-helper-llvm-y-save := $(obj-helper-llvm-y)
