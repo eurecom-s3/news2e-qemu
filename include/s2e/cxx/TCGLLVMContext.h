@@ -89,6 +89,18 @@ public:
                       struct TranslationBlock *tb);
 
     static TCGLLVMContext* getInstance(void);
+
+
+    /**
+     * Return an LLVM module containing a copy of the
+     * LLVM IR code generated at S2E compile time (helpers etc).
+     * This code is included as a binary blob, and loaded into a Module
+     * by this function.
+     * @param context The LLVM context in which the module is created
+     * @return A copy of an LLVM module containing the compiled code
+     */
+    static llvm::Module* getCompiledBitcode(llvm::LLVMContext& context);
+
 };
 
 

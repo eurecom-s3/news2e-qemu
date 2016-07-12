@@ -347,8 +347,25 @@ public:
     unsigned GetNumStubSlabs() { return m_base->GetNumStubSlabs(); }
 };
 
+///Created by objcopy when the binary contents of op_helper.bc is copied into an object file
 extern "C" const char _binary_op_helpers_bca_start;
+///Created by objcopy when the binary contents of op_helper.bc is copied into an object file
 extern "C" const char _binary_op_helpers_bca_end;
+
+llvm::Module* TCGLLVMContext::getCompiledBitcode(llvm::LLVMContext& context)
+{
+	llvm::SMDiagnostic smerror;
+	llvm::Module* module  = llvm::ParseIR(
+	        llvm::MemoryBuffer::getMemBuffer(
+	            StringRef(&_binary_op_helpers_bca_start, &_binary_op_helpers_bca_end - &_binary_op_helpers_bca_start),
+	            "op_helpers.bc",
+	            false),
+	        smerror,
+			context);
+	//TODO: Check for errors
+	return module;
+}
+
 
 TCGLLVMContextPrivate::TCGLLVMContextPrivate()
     : m_context(getGlobalContext()), m_builder(m_context), m_tbCount(0),
@@ -360,14 +377,7 @@ TCGLLVMContextPrivate::TCGLLVMContextPrivate()
 
     InitializeNativeTarget();
 
-    llvm::SMDiagnostic smerror;
-    m_module = llvm::ParseIR( 
-        llvm::MemoryBuffer::getMemBuffer( 
-            StringRef(&_binary_op_helpers_bca_start, &_binary_op_helpers_bca_end - &_binary_op_helpers_bca_start),
-            "op_helpers.bc",
-            false),
-        smerror,
-        m_context);
+    m_module = TCGLLVMContext::getCompiledBitcode(m_context);
 
     m_jitMemoryManager = new TJITMemoryManager();
 
@@ -791,6 +801,8 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
             std::string funcName = std::string("helper_") + helperName;
             Function* helperFunc = m_module->getFunction(funcName);
             if(!helperFunc) {
+            	llvm::errs() << "TCGLLVMContextPrivate::generateOperation: Unknown helper function " << funcName
+            			<< ", adding to external functions" << '\n';
                 helperFunc = Function::Create(
                         FunctionType::get(retType, argTypes, false),
                         Function::PrivateLinkage, funcName, m_module);
@@ -798,6 +810,34 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
                                                     (void*) helperAddrC);
                 /* XXX: Why do we need this ? */
                 sys::DynamicLibrary::AddSymbol(funcName, (void*) helperAddrC);
+            }
+
+            //Helper function types are compiled with clang and may differ in types
+            //tcg-llvm is not strongly types, e.g., all pointers are simply i64s.
+            //Cast values to appropriate helper function types when possible.
+            Function::arg_iterator helperFuncArg = helperFunc->arg_begin();
+            for (unsigned i = 0; i < argValues.size(); ++i) {
+            	assert(helperFuncArg != helperFunc->arg_end() &&
+            		"Helper function declaration has a different number of arguments from what generated tcg code passes");
+
+            	Value* arg = argValues[i];
+            	if (arg->getType() != helperFuncArg->getType()) {
+            		if (helperFuncArg->getType()->isPointerTy() && arg->getType()->isIntegerTy()) {
+            			//TODO: Assertion should take into account bit width of LLVM pointers
+            			assert(sizeof(void *) * 8 == arg->getType()->getIntegerBitWidth() &&
+            				"Integer does not have appropriate width to represent a pointer");
+
+            			argValues.at(i) = m_builder.CreateIntToPtr(arg, helperFuncArg->getType(), "arg_" + funcName);
+            		}
+            		else {
+            			llvm::errs() << "Don't know how to convert type " << *arg->getType() << " to type "
+            					<< *helperFuncArg->getType() << " for helper function " << funcName
+								<< " call" << '\n';
+            			assert(false && "Missing argument type conversion for helper function call");
+            		}
+            	}
+
+            	++helperFuncArg;
             }
 
             result = m_builder.CreateCall(helperFunc,
