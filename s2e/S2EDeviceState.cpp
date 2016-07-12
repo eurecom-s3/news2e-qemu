@@ -104,10 +104,11 @@ void s2e_init_device_state(S2EExecutionState *s)
 S2EDeviceState::S2EDeviceState(const S2EDeviceState &state):
         m_deviceState(state.m_deviceState)
 {
-    assert( state.m_stateBuffer && s_finalStateSize > 0);
-    m_stateBuffer = (uint8_t*) malloc(s_finalStateSize);
-    memcpy(m_stateBuffer, state.m_stateBuffer, s_finalStateSize);
-    s_memFile = state.s_memFile;
+	llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EDeviceState::S2EDeviceState is stubbed" << '\n';
+//    assert( state.m_stateBuffer && s_finalStateSize > 0);
+//    m_stateBuffer = (uint8_t*) malloc(s_finalStateSize);
+//    memcpy(m_stateBuffer, state.m_stateBuffer, s_finalStateSize);
+//    s_memFile = state.s_memFile;
 }
 
 S2EDeviceState::S2EDeviceState(klee::ExecutionState *state):m_deviceState(state)
@@ -192,20 +193,19 @@ void S2EDeviceState::initDeviceState()
 
 void S2EDeviceState::saveDeviceState()
 {
-    assert(false && "stubbed");
+	llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EDeviceState::saveDeviceState is stubbed" << '\n';
 //    qemu_make_readable(s_memFile);
 
     //DPRINTF("Saving device state %p\n", this);
     /* Iterate through all device descritors and call
     * their snapshot function */
-    for (vector<void*>::iterator it = s_devices.begin(); it != s_devices.end(); it++) {
-        void *se = *it;
+//	for (void* dev : s_devices) {
         //DPRINTF("%s ", s2e_qemu_get_se_idstr(se));
-        s2e_qemu_save_state(s_memFile, se);
-    }
+//        s2e_qemu_save_state(s_memFile, dev);
+//    }
     //DPRINTF("\n");
-    qemu_fflush(s_memFile);
-    initFirstSnapshot();
+//    qemu_fflush(s_memFile);
+//    initFirstSnapshot();
 }
 
 void S2EDeviceState::initFirstSnapshot()

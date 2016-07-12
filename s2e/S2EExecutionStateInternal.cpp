@@ -326,7 +326,7 @@ ExecutionState* S2EExecutionState::clone()
 
     ret->m_stateID = g_s2e->fetchAndIncrementStateId();
 
-    assert(false && "stubbed");
+    llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EExecutionState::S2EExecutionState is stubbed" << '\n';
 //    ret->m_timersState = new TimersState;
 //    *ret->m_timersState = *m_timersState;
 
