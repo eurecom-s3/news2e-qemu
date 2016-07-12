@@ -1464,11 +1464,11 @@ void S2EExecutor::initializeStateSwitchTimer()
 void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
                                 S2EExecutionState* newState)
 {
-    assert(false && "stubbed");
-//    assert(oldState || newState);
-//    assert(!oldState || oldState->m_active);
-//    assert(!newState || !newState->m_active);
-//    assert(!newState || !newState->m_runningConcrete);
+	llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EExecutor::doStateSwitch is partially stubbed" << '\n';
+    assert(oldState || newState);
+    assert(!oldState || oldState->m_active);
+    assert(!newState || !newState->m_active);
+    assert(!newState || !newState->m_runningConcrete);
 //
 //    //Some state save/restore logic in QEMU flushes the cache.
 //    //This can have bad effects in case of saving/restoring states
@@ -1488,13 +1488,15 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
 //            << "Switching from state " << (oldState ? oldState->getID() : -1)
 //            << " to state " << (newState ? newState->getID() : -1) << '\n';
 //
-//    const MemoryObject* cpuMo = oldState ? oldState->m_cpuSystemState :
-//                                            newState->m_cpuSystemState;
-//
-//    if(oldState) {
-//        if(oldState->m_runningConcrete)
-//            switchToSymbolic(oldState);
-//
+    const MemoryObject* cpuSysMo = oldState ? oldState->m_cpuSystemState :
+                                            newState->m_cpuSystemState;
+    const MemoryObject* cpuMo = oldState ? oldState->m_cpuState :
+                                                newState->m_cpuState;
+
+    if(oldState) {
+        if(oldState->m_runningConcrete)
+            switchToSymbolic(oldState);
+
 //        /*
 //        if(use_icount) {
 //            assert(env->s2e_icount == (uint64_t) (qemu_icount -
@@ -1502,9 +1504,9 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
 //        }
 //        */
 //
-//        //copyInConcretes(*oldState);
+        //copyInConcretes(*oldState);
 //        oldState->getDeviceState()->saveDeviceState();
-//        //oldState->m_qemuIcount = qemu_icount;
+        //oldState->m_qemuIcount = qemu_icount;
 //
 //        assert(false && "stubbed");
 ////        *oldState->m_timersState = timers_state;
@@ -1512,62 +1514,65 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
 //        uint8_t *oldStore = oldState->m_cpuSystemObject->getConcreteStore();
 //        memcpy(oldStore, (uint8_t*) cpuMo->address, cpuMo->size);
 //
-//        oldState->m_active = false;
-//    }
-//
-//    if(newState) {
+        oldState->m_active = false;
+    }
+
+    if(newState) {
 //        assert(false && "stubbed");
 ////        timers_state = *newState->m_timersState;
 //        //qemu_icount = newState->m_qemuIcount;
 //
 //        jmp_buf jmp_env;
 //        memcpy(&jmp_env, &env->jmp_env, sizeof(jmp_buf));
-//
-//        const uint8_t *newStore = newState->m_cpuSystemObject->getConcreteStore();
-//        memcpy((uint8_t*) cpuMo->address, newStore, cpuMo->size);
-//
+
+        const uint8_t *newStore = newState->m_cpuSystemObject->getConcreteStore();
+        memcpy((uint8_t*) cpuSysMo->address, newStore, cpuSysMo->size);
+
+        newStore = newState->m_cpuObject->getConcreteStore();
+        memcpy((uint8_t*) cpuMo->address, newStore, cpuMo->size);
+
 //        memcpy(&env->jmp_env, &jmp_env, sizeof(jmp_buf));
-//
-//        newState->m_active = true;
+
+        newState->m_active = true;
 //
 //        //Devices may need to write to memory, which can be done
 //        //after the state is activated
 //        //XXX: assigning g_s2e_state here is ugly but is required for restoreDeviceState...
 //        g_s2e_state = newState;
 //        newState->getDeviceState()->restoreDeviceState();
-//    }
-//
-//    uint64_t totalCopied = 0;
-//    uint64_t objectsCopied = 0;
-//    foreach(MemoryObject* mo, m_saveOnContextSwitch) {
-//        if(mo == cpuMo)
-//            continue;
-//
-//        if(oldState) {
-//            const ObjectState *oldOS = oldState->addressSpace.findObject(mo);
-//            ObjectState *oldWOS = oldState->addressSpace.getWriteable(mo, oldOS);
-//            uint8_t *oldStore = oldWOS->getConcreteStore();
-//            assert(oldStore);
-//            memcpy(oldStore, (uint8_t*) mo->address, mo->size);
-//        }
-//
-//        if(newState) {
-//            const ObjectState *newOS = newState->addressSpace.findObject(mo);
-//            const uint8_t *newStore = newOS->getConcreteStore();
-//            assert(newStore);
-//            memcpy((uint8_t*) mo->address, newStore, mo->size);
-//        }
-//
-//        totalCopied += mo->size;
-//        objectsCopied++;
-//    }
-//
-//    cpu_enable_ticks();
-//
-//    if (VerboseStateSwitching) {
-//        s2e_debug_print("Copied %d (count=%d)\n", totalCopied, objectsCopied);
-//    }
-//
+    }
+
+    uint64_t totalCopied = 0;
+    uint64_t objectsCopied = 0;
+    for(MemoryObject* mo : m_saveOnContextSwitch) {
+        if(mo == cpuMo)
+            continue;
+
+        if(oldState) {
+            const ObjectState *oldOS = oldState->addressSpace.findObject(mo);
+            ObjectState *oldWOS = oldState->addressSpace.getWriteable(mo, oldOS);
+            uint8_t *oldStore = oldWOS->getConcreteStore();
+            assert(oldStore);
+            memcpy(oldStore, (uint8_t*) mo->address, mo->size);
+        }
+
+        if(newState) {
+            const ObjectState *newOS = newState->addressSpace.findObject(mo);
+            const uint8_t *newStore = newOS->getConcreteStore();
+            assert(newStore);
+            memcpy((uint8_t*) mo->address, newStore, mo->size);
+        }
+
+        totalCopied += mo->size;
+        objectsCopied++;
+    }
+
+    cpu_enable_ticks();
+
+    if (VerboseStateSwitching) {
+        s2e_debug_print("Copied %d (count=%d)\n", totalCopied, objectsCopied);
+    }
+
 //    if(FlushTBsOnStateSwitch) {
 //        assert(false && "stubbed");
 ////        tb_flush(env);
@@ -1575,7 +1580,7 @@ void S2EExecutor::doStateSwitch(S2EExecutionState* oldState,
 //
 //    g_s2e_disable_tlb_flush = 0;
 //
-//    //m_s2e->getCorePlugin()->onStateSwitch.emit(oldState, newState);
+    m_s2e->getCorePlugin()->onStateSwitch.emit(oldState, newState);
 }
 
 ExecutionState* S2EExecutor::selectNonSpeculativeState(S2EExecutionState *state)
