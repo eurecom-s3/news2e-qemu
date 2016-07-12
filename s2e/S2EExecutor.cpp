@@ -800,8 +800,19 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
 void S2EExecutor::cleanModule(Module* mod)
 {
 	static const char * KEEP_FUNCTIONS[] = {
-		"helper_s2e_instrument_code",
-		"main"
+        "helper_s2e_instrument_code",
+        "main",
+        "helper_le_ldq_mmu",
+        "helper_le_ldsl_mmu",
+        "helper_le_ldsw_mmu",
+        "helper_le_ldul_mmu",
+        "helper_le_lduw_mmu",
+        "helper_le_stl_mmu",
+        "helper_le_stq_mmu",
+        "helper_le_stw_mmu",
+        "helper_ret_ldsb_mmu",
+        "helper_ret_ldub_mmu",
+        "helper_ret_stb_mmu"
 	};
 
 	PassManager pm;
@@ -813,7 +824,7 @@ void S2EExecutor::cleanModule(Module* mod)
 void S2EExecutor::registerExternalSymbols(void)
 {
 #define DEFINE_EXT_SYMBOL(name) \
-    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) &name);
+    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) &name)
 
 	DEFINE_EXT_SYMBOL(qemu_loglevel);
 //    DEFINE_EXT_SYMBOL(S2EExecutionState_ReadRegisterConcrete);
@@ -891,10 +902,10 @@ void S2EExecutor::registerExternalSymbols(void)
 //    __DEFINE_EXT_FUNCTION(fputc)
 //    __DEFINE_EXT_FUNCTION(fwrite)
 
-//    __DEFINE_EXT_VARIABLE(io_mem_ram)
+    DEFINE_EXT_SYMBOL(io_mem_rom);
 //    __DEFINE_EXT_VARIABLE(io_mem_rom)
 //    __DEFINE_EXT_VARIABLE(io_mem_unassigned)
-//    __DEFINE_EXT_VARIABLE(io_mem_notdirty)
+    DEFINE_EXT_SYMBOL(io_mem_notdirty);
 
 //    __DEFINE_EXT_FUNCTION(cpu_io_recompile)
 //#ifdef TARGET_ARM
@@ -1722,6 +1733,7 @@ inline bool S2EExecutor::executeInstructions(S2EExecutionState *state, unsigned 
                       << ki->inst->getParent()->getParent()->getName().str()
                       << ": " << *ki->inst << '\n';
             }
+
 
             stepInstruction(*state);
             executeInstruction(*state, ki);

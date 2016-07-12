@@ -129,7 +129,7 @@ class TCGLLVMContextPrivate {
     Function *m_helperForkAndConcretize;
     Function *m_helperMakeSymbolic;
     Function *m_helperGetValue;
-    Function* m_qemu_ld_helpers[5];
+    Function* m_qemu_ld_helpers[4];
     Function* m_qemu_st_helpers[5];
 #endif
 
@@ -436,6 +436,16 @@ void TCGLLVMContextPrivate::initializeHelpers()
 //    m_helperGetValue =
 //            m_module->getFunction("tcg_llvm_get_value");
 //
+    static const char* mmu_ld_helpers[] = {
+    	"helper_ret_ldub_mmu",
+		"helper_le_lduw_mmu",
+		"helper_le_ldul_mmu",
+		"helper_le_ldq_mmu"
+    };
+
+    for (unsigned i = 0; i < sizeof(mmu_ld_helpers) / sizeof(mmu_ld_helpers[0]); ++i) {
+    	m_qemu_ld_helpers[i] = m_module->getFunction(mmu_ld_helpers[i]);
+    }
 //    m_qemu_ld_helpers[0] = m_module->getFunction("__ldb_mmu");
 //    m_qemu_ld_helpers[1] = m_module->getFunction("__ldw_mmu");
 //    m_qemu_ld_helpers[2] = m_module->getFunction("__ldl_mmu");
@@ -688,17 +698,60 @@ inline Value* TCGLLVMContextPrivate::generateQemuMemOp(bool ld,
     assert(TCG_TARGET_REG_BITS == 64); //XXX
 
 #ifdef CONFIG_SOFTMMU
+    Value* tbArg = cast<Value>(m_builder.GetInsertBlock()->getParent()->arg_begin());
+    Value* env = m_builder.CreateLoad(m_builder.CreateConstGEP1_32(tbArg, 0));
+    Function* func;
 
-    if(ld) {
-        return m_builder.CreateCall2(m_qemu_ld_helpers[bits>>4], addr,
-                    ConstantInt::get(intType(8*sizeof(int)), mem_index));
-    } else {
-        m_builder.CreateCall3(m_qemu_st_helpers[bits>>4], addr, value,
-                    ConstantInt::get(intType(8*sizeof(int)), mem_index));
-        return NULL;
+    if (ld) {
+    	assert((bits >> 4) < sizeof(m_qemu_ld_helpers) / sizeof(m_qemu_ld_helpers[0]) && "mmu ld helpers array out of bounds");
+    	switch (bits) {
+    		case 8: func = m_qemu_ld_helpers[0]; break;
+    		case 16: func = m_qemu_ld_helpers[1]; break;
+    		case 32: func = m_qemu_ld_helpers[2]; break;
+    		case 64: func = m_qemu_ld_helpers[3]; break;
+    		default: abort();
+    	}
+    }
+    else {
+    	assert((bits >> 4) < sizeof(m_qemu_st_helpers) / sizeof(m_qemu_st_helpers[0]) && "mmu ld helpers array out of bounds");
+		switch (bits) {
+			case 8: func = m_qemu_st_helpers[0]; break;
+			case 16: func = m_qemu_st_helpers[1]; break;
+			case 32: func = m_qemu_st_helpers[2]; break;
+			case 64: func = m_qemu_st_helpers[3]; break;
+			default: abort();
+		}
     }
 
+    SmallVector<Value*, 5> args;
+    Function::arg_iterator ldstArg = func->arg_begin();
+    args.push_back(m_builder.CreateIntToPtr(env, ldstArg->getType()));
+    ++ldstArg;
+    assert(addr->getType() == ldstArg->getType() && "Mismatch between type in generated code and helper arg");
+    args.push_back(addr);
+
+    if (!ld) {
+       assert(value->getType() == ldstArg->getType() && "Mismatch between value type in generated type and helper arg");
+       ++ldstArg;
+       args.push_back(value);
+    }
+
+    ++ldstArg;
+    args.push_back(ConstantInt::get(ldstArg->getType(), mem_index));
+    ++ldstArg;
+    args.push_back(ConstantInt::get(ldstArg->getType(), 0));
+
+    Value* result = m_builder.CreateCall(func, args);
+
+    if (ld) {
+    	return result;
+    }
+    else {
+    	return NULL;
+    }
 #else // CONFIG_SOFTMMU
+#error Adapt code for new Qemu
+    assert(false && "Not adapted to new Qemu");
     addr = m_builder.CreateZExt(addr, wordType());
     addr = m_builder.CreateAdd(addr,
         ConstantInt::get(wordType(), GUEST_BASE));

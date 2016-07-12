@@ -13,4 +13,4 @@ s2e-obj-y += Plugins/ Signals/
 obj-y += $(s2e-obj-y)
 
 #Compile helper prototypes to LLVM IR
-obj-helper-llvm-y += helper_prototypes.o
+obj-helper-llvm-y += helper_prototypes.o softmmu_llvm.o
