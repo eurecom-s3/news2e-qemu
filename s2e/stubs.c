@@ -21,8 +21,6 @@ void S2E_InitTimers(S2E *self) { }
 
 void S2E_InitExecution(S2E *self, S2EExecutionState *state) { }
 
-void S2E_RegisterDirtyMask(S2E *self, S2EExecutionState *state) { }
-
 void S2E_CallOnInitializationCompleteHandlers(S2E *self) { }
 
 void S2E_Destroy(void) { }

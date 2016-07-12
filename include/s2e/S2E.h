@@ -67,13 +67,6 @@ void S2E_InitTimers(S2E *self);
 void S2E_InitExecution(S2E *self, S2EExecutionState *state);
 
 /**
- * Register dirty memory mask.
- * @param self S2E instance pointer
- * @param state 
- */
-void S2E_RegisterDirtyMask(S2E *self, S2EExecutionState *state);
-
-/**
  * Call registered handlers for the OnInitializationComplete event.
  * @param self S2E instance pointer
  */
