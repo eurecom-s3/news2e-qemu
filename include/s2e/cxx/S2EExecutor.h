@@ -241,8 +241,11 @@ protected:
                                     klee::KInstruction* target,
                                     std::vector<klee::ref<klee::Expr> > &args);
 
-    //Traces every single LLVM instruction in dyngend code
-    static void handlerTraceInstruction(klee::Executor* executor,
+    /**
+     * Calls to this function are inserted in generated code at instrumented instructions
+     * (e.g., for execution signals on beginning/end of TB or instruction).
+     */
+    static void handlerInstrumentInstruction(klee::Executor* executor,
                                     klee::ExecutionState* state,
                                     klee::KInstruction* target,
                                     std::vector<klee::ref<klee::Expr> > &args);
@@ -333,6 +336,15 @@ protected:
     void setupTimersHandler();
     void initializeStateSwitchTimer();
     static void stateSwitchTimerCallback(void *opaque);
+
+    /**
+     * Remove all non-whitelisted functions from the module.
+     * @param mod Module to clean.
+     */
+    void cleanModule(llvm::Module* mod);
+
+    /**Register external symbols in the LLVM module*/
+    void registerExternalSymbols(void);
 
     /** The following are special handlers for MMU functions */
     static void handle_ldb_mmu(klee::Executor* executor,

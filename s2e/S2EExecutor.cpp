@@ -38,6 +38,7 @@
  */
 #include <llvm/Support/Process.h> /* XXX: Needs to be here because of weird compiler errors */
 
+
 extern "C" {
 #include <setjmp.h>
 
@@ -51,7 +52,6 @@ extern "C" {
 #include "qom/cpu.h"
 #include "trace.h"
 
-extern CPUArchState *env;
 void QEMU_NORETURN raise_exception(CPUArchState *env, int exception_index);
 void QEMU_NORETURN raise_exception_err(CPUArchState *env, int exception_index, int error_code);
 extern const uint8_t parity_table[256];
@@ -120,6 +120,7 @@ uint64_t helper_set_cc_op_eflags(void);
 #include <klee/CoreStats.h>
 #include <klee/TimerStatIncrementer.h>
 #include <klee/Solver.h>
+#include <llvm/Transforms/IPO.h>
 
 #include <llvm/Support/TimeValue.h>
 
@@ -143,6 +144,10 @@ uint64_t helper_set_cc_op_eflags(void);
 using namespace std;
 using namespace llvm;
 using namespace klee;
+
+using llvm::PassManager;
+using llvm::createInternalizePass;
+using llvm::createGlobalOptimizerPass;
 
 extern "C" {
     // XXX
@@ -316,18 +321,19 @@ static void s2e_ext_sigsegv_handler(int signal, siginfo_t *info, void *context) 
 }
 
 bool S2EExternalDispatcher::runProtectedCall(llvm::Function *f, uint64_t *args) {
-    assert(false && "stubbed");
+//  CPUState *cpu = ENV_GET_CPU(
+  #ifndef _WIN32
+  struct sigaction segvAction, segvActionOld;
+  #endif
+  bool res;
+
+  assert(false && "not tested");
+
+  if (!f)
     return false;
-//  #ifndef _WIN32
-//  struct sigaction segvAction, segvActionOld;
-//  #endif
-//  bool res;
-//
-//  if (!f)
-//    return false;
-//
-//  gTheArgsP = args;
-//
+
+  gTheArgsP = args;
+
 //  #ifdef _WIN32
 //  signal(SIGSEGV, s2e_ext_sigsegv_handler);
 //  #else
@@ -340,18 +346,20 @@ bool S2EExternalDispatcher::runProtectedCall(llvm::Function *f, uint64_t *args) 
 //
 //  memcpy(s2e_cpuExitJmpBuf, env->jmp_env, sizeof(env->jmp_env));
 //
-//  if(s2e_setjmp(env->jmp_env)) {
-//      memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
-//      throw CpuExitException();
-//  } else {
-//      if (s2e_setjmp(s2e_escapeCallJmpBuf)) {
-//        res = false;
-//      } else {
+//  if(sigsetjmp(env->jmp_env, 0) == 0) {
+//      if (sigsetjmp(s2e_escapeCallJmpBuf, 0) == 0) {
 //        std::vector<GenericValue> gvArgs;
 //
 //        executionEngine->runFunction(f, gvArgs);
 //        res = true;
 //      }
+//      else {
+//        res = false;
+//      }
+//  }
+//  else {
+//      memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
+//      throw CpuExitException();
 //  }
 //
 //  memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
@@ -362,7 +370,7 @@ bool S2EExternalDispatcher::runProtectedCall(llvm::Function *f, uint64_t *args) 
 //#else
 //  sigaction(SIGSEGV, &segvActionOld, 0);
 //#endif
-//  return res;
+  return res;
 }
 
 /**
@@ -459,26 +467,17 @@ void S2EExecutor::handlerTraceMemoryAccess(Executor* executor,
     }
 }
 
-void S2EExecutor::handlerTraceInstruction(klee::Executor* executor,
+void S2EExecutor::handlerInstrumentInstruction(klee::Executor* executor,
                                 klee::ExecutionState* state,
                                 klee::KInstruction* target,
                                 std::vector<klee::ref<klee::Expr> > &args)
 {
     S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
-    g_s2e->getDebugStream()
-            << "pc=" << hexval(s2eState->getPc())
-#ifdef TARGET_I386
-            << " EAX: " << s2eState->readCpuRegister(offsetof(CPUX86State, regs[R_EAX]), klee::Expr::Int32)
-            << " ECX: " << s2eState->readCpuRegister(offsetof(CPUX86State, regs[R_ECX]), klee::Expr::Int32)
-            << " CCSRC: " << s2eState->readCpuRegister(offsetof(CPUX86State, cc_src), klee::Expr::Int32)
-            << " CCDST: " << s2eState->readCpuRegister(offsetof(CPUX86State, cc_dst), klee::Expr::Int32)
-            << " CCOP: " << s2eState->readCpuRegister(offsetof(CPUX86State, cc_op), klee::Expr::Int32)
-#elif TARGET_ARM
-            // TODO
-#else
-#error "Target architecture not supported"
-#endif
-            << '\n';
+
+    //Should definitely be concrete
+    ExecutionSignal* signal = reinterpret_cast<ExecutionSignal*>(cast<klee::ConstantExpr>(args.at(1))->getZExtValue());
+    uint64_t pc = cast<klee::ConstantExpr>(args.at(2))->getZExtValue();
+    signal->emit(static_cast<S2EExecutionState*>(state), pc);
 }
 
 void S2EExecutor::handlerOnTlbMiss(Executor* executor,
@@ -644,153 +643,48 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
             tcgLLVMContext->getExecutionEngine());
 
     LLVMContext& ctx = m_tcgLLVMContext->getLLVMContext();
+    Module *M = m_tcgLLVMContext->getModule();
 
     // XXX: this will not work without creating JIT
     // XXX: how to get data layout without without ExecutionEngine ?
+    //TODO: Is it even necessary to set the data layout here? Should be included from the compiled module ...
     m_tcgLLVMContext->getModule()->setDataLayout(
             m_tcgLLVMContext->getExecutionEngine()
                 ->getDataLayout()->getStringRepresentation());
 
-    /* Define globally accessible functions */
-#define __DEFINE_EXT_FUNCTION(name) \
-    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) name);
+    //The symbols registered here are supposed to be called from LLVM IR
+	//code generated for a TB. All other functions in the LLVM module will
+	//be deleted by optimization passes.
+    registerExternalSymbols();
 
-#define __DEFINE_EXT_VARIABLE(name) \
-    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) &name);
+    //Remove all functions from the module that are not contained in a whitelist.
+    //This is useful, because tracking down each missing symbol is a pain. Much easier
+    //to start from a clean slate and then include successively what is required.
+    cleanModule(M);
 
-    //__DEFINE_EXT_FUNCTION(raise_exception)
-    //__DEFINE_EXT_FUNCTION(raise_exception_err)
-
-#ifdef _WIN32
-    __DEFINE_EXT_VARIABLE(g_s2e_concretize_io_addresses)
-    __DEFINE_EXT_VARIABLE(g_s2e_concretize_io_writes)
-    __DEFINE_EXT_VARIABLE(g_s2e_fork_on_symbolic_address)
-#endif
-
-    __DEFINE_EXT_VARIABLE(g_s2e_enable_mmio_checks)
-
-    __DEFINE_EXT_FUNCTION(fprintf)
-    __DEFINE_EXT_FUNCTION(sprintf)
-    __DEFINE_EXT_FUNCTION(fputc)
-    __DEFINE_EXT_FUNCTION(fwrite)
-
-//    __DEFINE_EXT_VARIABLE(io_mem_ram)
-    __DEFINE_EXT_VARIABLE(io_mem_rom)
-//    __DEFINE_EXT_VARIABLE(io_mem_unassigned)
-    __DEFINE_EXT_VARIABLE(io_mem_notdirty)
-
-    __DEFINE_EXT_FUNCTION(cpu_io_recompile)
-#ifdef TARGET_ARM
-    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
-    //__DEFINE_EXT_FUNCTION(arm_cpu_handle_mmu_fault)
-    __DEFINE_EXT_FUNCTION(cpsr_read)
-    __DEFINE_EXT_FUNCTION(cpsr_write)
-    __DEFINE_EXT_FUNCTION(arm_cpu_list)
-//    __DEFINE_EXT_FUNCTION(do_interrupt)
-#endif
-#ifdef TARGET_I386
-    __DEFINE_EXT_FUNCTION(x86_cpu_handle_mmu_fault)
-    __DEFINE_EXT_FUNCTION(cpu_x86_update_cr0)
-    __DEFINE_EXT_FUNCTION(cpu_x86_update_cr3)
-    __DEFINE_EXT_FUNCTION(cpu_x86_update_cr4)
-    __DEFINE_EXT_FUNCTION(cpu_x86_cpuid)
-    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
-//    __DEFINE_EXT_FUNCTION(cpu_get_apic_base)
-//    __DEFINE_EXT_FUNCTION(cpu_set_apic_base)
-//    __DEFINE_EXT_FUNCTION(cpu_get_apic_tpr)
-//    __DEFINE_EXT_FUNCTION(cpu_set_apic_tpr)
-    __DEFINE_EXT_FUNCTION(cpu_smm_update)
-    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
-//    __DEFINE_EXT_FUNCTION(hw_breakpoint_insert)
-//    __DEFINE_EXT_FUNCTION(hw_breakpoint_remove)
-//    __DEFINE_EXT_FUNCTION(check_hw_breakpoints)
-    __DEFINE_EXT_FUNCTION(cpu_get_tsc)
-    helper_register_symbols();
-#endif
-
-    __DEFINE_EXT_FUNCTION(cpu_outb)
-    __DEFINE_EXT_FUNCTION(cpu_outw)
-    __DEFINE_EXT_FUNCTION(cpu_outl)
-    __DEFINE_EXT_FUNCTION(cpu_inb)
-    __DEFINE_EXT_FUNCTION(cpu_inw)
-    __DEFINE_EXT_FUNCTION(cpu_inl)
-    __DEFINE_EXT_FUNCTION(cpu_restore_state)
-    __DEFINE_EXT_FUNCTION(cpu_abort)
-    __DEFINE_EXT_FUNCTION(cpu_loop_exit)
-
-    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
-//    __DEFINE_EXT_FUNCTION(tb_find_pc)
-
-    __DEFINE_EXT_FUNCTION(qemu_system_reset_request)
-
-    __DEFINE_EXT_FUNCTION(tlb_flush_page)
-    __DEFINE_EXT_FUNCTION(tlb_flush)
-
-    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
-//    __DEFINE_EXT_FUNCTION(io_readb_mmu)
-//    __DEFINE_EXT_FUNCTION(io_readw_mmu)
-//    __DEFINE_EXT_FUNCTION(io_readl_mmu)
-//    __DEFINE_EXT_FUNCTION(io_readq_mmu)
-
-//    __DEFINE_EXT_FUNCTION(io_writeb_mmu)
-//    __DEFINE_EXT_FUNCTION(io_writew_mmu)
-//    __DEFINE_EXT_FUNCTION(io_writel_mmu)
-//    __DEFINE_EXT_FUNCTION(io_writeq_mmu)
-
-    __DEFINE_EXT_FUNCTION(iotlb_to_region)
-
-
-    __DEFINE_EXT_FUNCTION(s2e_ensure_symbolic)
-
-    //__DEFINE_EXT_FUNCTION(s2e_on_tlb_miss)
-    __DEFINE_EXT_FUNCTION(s2e_on_page_fault)
-    __DEFINE_EXT_FUNCTION(s2e_is_port_symbolic)
-    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_b)
-    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_w)
-    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_l)
-    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_q)
-
-    __DEFINE_EXT_FUNCTION(s2e_on_privilege_change);
-    __DEFINE_EXT_FUNCTION(s2e_on_page_fault);
-
-
-    __DEFINE_EXT_FUNCTION(s2e_ismemfunc)
-    __DEFINE_EXT_FUNCTION(s2e_notdirty_mem_write)
-
-    __DEFINE_EXT_FUNCTION(cpu_io_recompile)
-    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
- //   __DEFINE_EXT_FUNCTION(can_do_io)
-
-    __DEFINE_EXT_FUNCTION(ldub_phys)
-    __DEFINE_EXT_FUNCTION(stb_phys)
-
-    __DEFINE_EXT_FUNCTION(lduw_phys)
-    __DEFINE_EXT_FUNCTION(stw_phys)
-
-    __DEFINE_EXT_FUNCTION(ldl_phys)
-    __DEFINE_EXT_FUNCTION(stl_phys)
-
-    __DEFINE_EXT_FUNCTION(ldq_phys)
-    __DEFINE_EXT_FUNCTION(stq_phys)
 
     if(UseSelectCleaner) {
         m_tcgLLVMContext->getFunctionPassManager()->add(new SelectRemovalPass());
         m_tcgLLVMContext->getFunctionPassManager()->doInitialization();
     }
 
+    //It is not cool to allow KLEE to run the optimize passes,
+    //as it will first run an Internalize pass, and then the
+    //GlobalOpt pass, which will remove all the internalized functions,
+    //leaving us with an empty module.
+    //Subsequently, the helper function definitions cannot be found when
+    //the external helpers are registered, which makes us :(
     ModuleOptions MOpts = ModuleOptions(vector<string>(),
-                                        /* Optimize= */ true, /* CheckDivZero= */ false);
+                                        /* Optimize= */ false, /* CheckDivZero= */ false);
 
     /* This catches obvious LLVM misconfigurations */
-    Module *M = m_tcgLLVMContext->getModule();
     DataLayout TD(M);
     assert(M->getPointerSize() == Module::Pointer64 && "Something is broken in your LLVM build: LLVM thinks pointers are 32-bits!");
 
-    s2e->getDebugStream() << "Current data layout: " << m_tcgLLVMContext->getModule()->getDataLayout() << '\n';
-    s2e->getDebugStream() << "Current target triple: " << m_tcgLLVMContext->getModule()->getTargetTriple() << '\n';
+    s2e->getDebugStream() << "Current data layout: " << M->getDataLayout() << '\n';
+    s2e->getDebugStream() << "Current target triple: " << M->getTargetTriple() << '\n';
 
-
-    setModule(m_tcgLLVMContext->getModule(), MOpts, false);
+    setModule(M, MOpts, false);
 
     if (UseFastHelpers) {
         disableConcreteLLVMHelpers();
@@ -827,6 +721,13 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     m_dummyMain = kmodule->functionMap[dummyMain];
 
     llvm::Function* function;
+
+    //Function types don't matter at this point, we simply insert all helper functions as
+    //void (*)(void) type, even if they aren't.
+    function = kmodule->module->getFunction("helper_s2e_instrument_code");
+    assert(function);
+    addSpecialFunctionHandler(function, handlerInstrumentInstruction);
+
 //    llvm::errs() << *kmodule->module << '\n';
     llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": helper functions stubbed" << '\n';
 
@@ -894,6 +795,202 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
         }
     }
 
+}
+
+void S2EExecutor::cleanModule(Module* mod)
+{
+	static const char * KEEP_FUNCTIONS[] = {
+		"helper_s2e_instrument_code",
+		"main"
+	};
+
+	PassManager pm;
+	pm.add(createInternalizePass(ArrayRef<const char*>(KEEP_FUNCTIONS, sizeof(KEEP_FUNCTIONS) / sizeof(KEEP_FUNCTIONS[0]))));
+	pm.add(createGlobalOptimizerPass());
+	pm.run(*mod);
+}
+
+void S2EExecutor::registerExternalSymbols(void)
+{
+#define DEFINE_EXT_SYMBOL(name) \
+    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) &name);
+
+	DEFINE_EXT_SYMBOL(qemu_loglevel);
+//    DEFINE_EXT_SYMBOL(S2EExecutionState_ReadRegisterConcrete);
+//	DEFINE_EXT_SYMBOL(S2EExecutionState_WriteRegisterConcrete);
+	//DEFINE_EXT_SYMBOL(__assert_fail);
+	//DEFINE_EXT_SYMBOL(abort);
+	//DEFINE_EXT_SYMBOL(address_space_ldl);
+	//DEFINE_EXT_SYMBOL(address_space_ldq);
+	//DEFINE_EXT_SYMBOL(arm_handle_psci_call);
+    //DEFINE_EXT_SYMBOL(arm_is_psci_call);
+    //DEFINE_EXT_SYMBOL(armv7m_nvic_acknowledge_irq);
+    //DEFINE_EXT_SYMBOL(armv7m_nvic_complete_irq);
+    //DEFINE_EXT_SYMBOL(armv7m_nvic_set_pending);
+//   DEFINE_EXT_SYMBOL(cpu_abort);
+//    DEFINE_EXT_SYMBOL(cpu_breakpoint_insert);
+//    DEFINE_EXT_SYMBOL(cpu_breakpoint_remove_all);
+//    DEFINE_EXT_SYMBOL(cpu_breakpoint_remove_by_ref);
+//    DEFINE_EXT_SYMBOL(cpu_generic_init);
+    DEFINE_EXT_SYMBOL(cpu_interrupt_handler);
+//    DEFINE_EXT_SYMBOL(cpu_loop_exit);
+//    DEFINE_EXT_SYMBOL(cpu_restore_state);
+//    DEFINE_EXT_SYMBOL(cpu_resume_from_signal);
+//    DEFINE_EXT_SYMBOL(cpu_watchpoint_insert);
+//    DEFINE_EXT_SYMBOL(cpu_watchpoint_remove_all);
+//    DEFINE_EXT_SYMBOL(cpu_watchpoint_remove_by_ref);
+    DEFINE_EXT_SYMBOL(cpus);
+//    //DEFINE_EXT_SYMBOL(crc32);
+    //DEFINE_EXT_SYMBOL(crc32c);
+    //DEFINE_EXT_SYMBOL(do_arm_semihosting);
+//    DEFINE_EXT_SYMBOL(fprintf);
+//    DEFINE_EXT_SYMBOL(g_assertion_message_expr);
+//    DEFINE_EXT_SYMBOL(g_free);
+//    DEFINE_EXT_SYMBOL(g_hash_table_get_keys);
+//    DEFINE_EXT_SYMBOL(g_hash_table_insert);
+//    DEFINE_EXT_SYMBOL(g_hash_table_lookup);
+//    DEFINE_EXT_SYMBOL(g_list_foreach);
+//    DEFINE_EXT_SYMBOL(g_list_free);
+//    DEFINE_EXT_SYMBOL(g_list_sort);
+//    DEFINE_EXT_SYMBOL(g_malloc0);
+//    DEFINE_EXT_SYMBOL(g_malloc_n);
+//    DEFINE_EXT_SYMBOL(g_memdup);
+//    DEFINE_EXT_SYMBOL(g_s2e_state);
+//    DEFINE_EXT_SYMBOL(g_slist_foreach);
+//    DEFINE_EXT_SYMBOL(g_slist_free);
+//    DEFINE_EXT_SYMBOL(g_slist_sort);
+//    DEFINE_EXT_SYMBOL(g_strndup);
+    //DEFINE_EXT_SYMBOL(gdb_register_coprocessor);
+//    DEFINE_EXT_SYMBOL(helper_ret_stb_mmu);
+//    DEFINE_EXT_SYMBOL(ldl_phys);
+
+    //The functions in this list are supposed to be called from LLVM IR
+    //code generated for a TB. All other functions in the LLVM module will
+    //be deleted by optimization passes.
+//    __DEFINE_EXT_FUNCTION()
+    /* Define globally accessible functions */
+//#define __DEFINE_EXT_FUNCTION(name) \
+//    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) name);
+
+//#define __DEFINE_EXT_VARIABLE(name) \
+//    llvm::sys::DynamicLibrary::AddSymbol(#name, (void*) &name);
+
+    //__DEFINE_EXT_FUNCTION(raise_exception)
+    //__DEFINE_EXT_FUNCTION(raise_exception_err)
+
+//#ifdef _WIN32
+//    __DEFINE_EXT_VARIABLE(g_s2e_concretize_io_addresses)
+//    __DEFINE_EXT_VARIABLE(g_s2e_concretize_io_writes)
+//    __DEFINE_EXT_VARIABLE(g_s2e_fork_on_symbolic_address)
+//#endif
+
+//    __DEFINE_EXT_VARIABLE(g_s2e_enable_mmio_checks)
+
+//    __DEFINE_EXT_FUNCTION(fprintf)
+//    __DEFINE_EXT_FUNCTION(sprintf)
+//    __DEFINE_EXT_FUNCTION(fputc)
+//    __DEFINE_EXT_FUNCTION(fwrite)
+
+//    __DEFINE_EXT_VARIABLE(io_mem_ram)
+//    __DEFINE_EXT_VARIABLE(io_mem_rom)
+//    __DEFINE_EXT_VARIABLE(io_mem_unassigned)
+//    __DEFINE_EXT_VARIABLE(io_mem_notdirty)
+
+//    __DEFINE_EXT_FUNCTION(cpu_io_recompile)
+//#ifdef TARGET_ARM
+//    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//    //__DEFINE_EXT_FUNCTION(arm_cpu_handle_mmu_fault)
+//    __DEFINE_EXT_FUNCTION(cpsr_read)
+//    __DEFINE_EXT_FUNCTION(cpsr_write)
+//    __DEFINE_EXT_FUNCTION(arm_cpu_list)
+//    __DEFINE_EXT_FUNCTION(do_interrupt)
+//#endif
+//#ifdef TARGET_I386
+//    __DEFINE_EXT_FUNCTION(x86_cpu_handle_mmu_fault)
+//    __DEFINE_EXT_FUNCTION(cpu_x86_update_cr0)
+//    __DEFINE_EXT_FUNCTION(cpu_x86_update_cr3)
+//    __DEFINE_EXT_FUNCTION(cpu_x86_update_cr4)
+//    __DEFINE_EXT_FUNCTION(cpu_x86_cpuid)
+//    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//    __DEFINE_EXT_FUNCTION(cpu_get_apic_base)
+//    __DEFINE_EXT_FUNCTION(cpu_set_apic_base)
+//    __DEFINE_EXT_FUNCTION(cpu_get_apic_tpr)
+//    __DEFINE_EXT_FUNCTION(cpu_set_apic_tpr)
+//    __DEFINE_EXT_FUNCTION(cpu_smm_update)
+//    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//    __DEFINE_EXT_FUNCTION(hw_breakpoint_insert)
+//    __DEFINE_EXT_FUNCTION(hw_breakpoint_remove)
+//    __DEFINE_EXT_FUNCTION(check_hw_breakpoints)
+//    __DEFINE_EXT_FUNCTION(cpu_get_tsc)
+//    helper_register_symbols();
+//#endif
+
+//    __DEFINE_EXT_FUNCTION(cpu_outb)
+//    __DEFINE_EXT_FUNCTION(cpu_outw)
+//    __DEFINE_EXT_FUNCTION(cpu_outl)
+//    __DEFINE_EXT_FUNCTION(cpu_inb)
+//    __DEFINE_EXT_FUNCTION(cpu_inw)
+//    __DEFINE_EXT_FUNCTION(cpu_inl)
+//    __DEFINE_EXT_FUNCTION(cpu_restore_state)
+//    __DEFINE_EXT_FUNCTION(cpu_abort)
+//    __DEFINE_EXT_FUNCTION(cpu_loop_exit)
+
+//    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//    __DEFINE_EXT_FUNCTION(tb_find_pc)
+
+//    __DEFINE_EXT_FUNCTION(qemu_system_reset_request)
+
+//    __DEFINE_EXT_FUNCTION(tlb_flush_page)
+//    __DEFINE_EXT_FUNCTION(tlb_flush)
+
+//    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+//    __DEFINE_EXT_FUNCTION(io_readb_mmu)
+//    __DEFINE_EXT_FUNCTION(io_readw_mmu)
+//    __DEFINE_EXT_FUNCTION(io_readl_mmu)
+//    __DEFINE_EXT_FUNCTION(io_readq_mmu)
+
+//    __DEFINE_EXT_FUNCTION(io_writeb_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writew_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writel_mmu)
+//    __DEFINE_EXT_FUNCTION(io_writeq_mmu)
+
+//    __DEFINE_EXT_FUNCTION(iotlb_to_region)
+
+
+//    __DEFINE_EXT_FUNCTION(s2e_ensure_symbolic)
+
+    //__DEFINE_EXT_FUNCTION(s2e_on_tlb_miss)
+//    __DEFINE_EXT_FUNCTION(s2e_on_page_fault)
+//    __DEFINE_EXT_FUNCTION(s2e_is_port_symbolic)
+//    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_b)
+//    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_w)
+//    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_l)
+//    __DEFINE_EXT_FUNCTION(s2e_is_mmio_symbolic_q)
+
+//    __DEFINE_EXT_FUNCTION(s2e_on_privilege_change);
+//    __DEFINE_EXT_FUNCTION(s2e_on_page_fault);
+
+
+//    __DEFINE_EXT_FUNCTION(s2e_ismemfunc)
+//    __DEFINE_EXT_FUNCTION(s2e_notdirty_mem_write)
+
+//    __DEFINE_EXT_FUNCTION(cpu_io_recompile)
+//    llvm::errs() << "WARN - " << __FILE__ << ":" << __LINE__ << ": stubbed" << '\n';
+ //   __DEFINE_EXT_FUNCTION(can_do_io)
+
+//    __DEFINE_EXT_FUNCTION(ldub_phys)
+//    __DEFINE_EXT_FUNCTION(stb_phys)
+
+//    __DEFINE_EXT_FUNCTION(lduw_phys)
+//    __DEFINE_EXT_FUNCTION(stw_phys)
+
+//    __DEFINE_EXT_FUNCTION(ldl_phys)
+//    __DEFINE_EXT_FUNCTION(stl_phys)
+
+//    __DEFINE_EXT_FUNCTION(ldq_phys)
+//    __DEFINE_EXT_FUNCTION(stq_phys)
+
+#undef DEFINE_EXT_SYMBOL
 }
 
 void S2EExecutor::initializeStatistics()
@@ -1739,6 +1836,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
     assert(state->stack.size() == 1);
     assert(state->pc == m_dummyMain->instructions);
 
+
     tb_function_args[0] = state->getEnv();
     tb_function_args[1] = 0;
     tb_function_args[2] = 0;
@@ -1943,6 +2041,10 @@ uintptr_t S2EExecutor::executeTranslationBlock(
 
         next_tb = executeTranslationBlockKlee(state, tb);
 
+        if ((next_tb & TB_EXIT_MASK) == TB_EXIT_REQUESTED) {
+            state->m_startSymbexAtPC = state->getPc();
+        }
+
     } else {
         //g_s2e_exec_ret_addr = 0;
         if(!state->m_runningConcrete)
@@ -1986,6 +2088,8 @@ uintptr_t S2EExecutor::executeTranslationBlock(
          */
         cpu->tcg_exit_req = 0;
     }
+        
+
     return next_tb;
 }
 
