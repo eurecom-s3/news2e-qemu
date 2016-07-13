@@ -139,7 +139,7 @@ S2EExecutionState::~S2EExecutionState()
     //XXX: This cannot be done, as device states may refer to each other
     //delete m_deviceState;
 
-    assert(false && "stubbed");
+    llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EExecutionState::~S2EExecutionState is partially stubbed" << '\n';
     //delete m_timersState;
 }
 
