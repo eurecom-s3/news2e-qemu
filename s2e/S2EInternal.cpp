@@ -197,7 +197,12 @@ using namespace std;
 S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     const std::string &configFileName, const std::string &outputDirectory,
     int verbose, unsigned s2e_max_processes)
-        : m_tcgLLVMContext(tcgLLVMContext)
+        : m_tcgLLVMContext(tcgLLVMContext),
+          m_startTimeSeconds(llvm::sys::TimeValue::now().seconds()),
+          m_maxProcesses(s2e_max_processes),
+          m_currentProcessIndex(0),
+          m_currentProcessId(0),
+          m_forking(false)
 {
     if (s2e_max_processes < 1) {
         std::cerr << "You must at least allow one process for S2E." << '\n';
@@ -217,13 +222,6 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     }
 #endif
 
-    m_startTimeSeconds = llvm::sys::TimeValue::now().seconds();
-
-    m_forking = false;
-
-    m_maxProcesses = s2e_max_processes;
-    m_currentProcessIndex = 0;
-    m_currentProcessId = 0;
     S2EShared *shared = m_sync.acquire();
     shared->currentProcessCount = 1;
     shared->lastStateId = 0;
@@ -835,9 +833,9 @@ void S2E::instrumentTCGCode(ExecutionSignal* signal, uint64_t pc, uint64_t next_
 /******************************/
 /* Functions called from QEMU */
 
-int s2e_is_forking()
+bool S2E_IsForking(S2E* self)
 {
-    return g_s2e->isForking();
+	return self->isForking();
 }
 
 void s2e_debug_print(const char *fmtstr, ...)

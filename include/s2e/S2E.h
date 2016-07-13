@@ -85,14 +85,6 @@ void S2E_CallOnDeviceRegistrationHandlers(S2E *self);
  */
 void S2E_CallOnPrivilegeChangeHandlers(S2E *self, unsigned from, unsigned to);
 
-
-/**
- * Test if forking is enabled.
- * @param self Instance pointer
- * @return <b>true</b> if forking is enabled
- */
-bool S2E_IsForking(S2E *self);
-
 /**
  * Execute a QMP subcommand of "s2e".
  * @param qdict Parsed input subcommand in form of a QDict.
@@ -110,7 +102,11 @@ void S2E_Destroy(void);
  * Get the singleton instance of the S2E object.
  * @return S2E instance
  */
-S2E* S2E_GetInstance(void);
+static inline S2E* S2E_GetInstance(void)
+{
+	assert(g_s2e && "S2E instance should be initialized by now");
+	return g_s2e;
+}
 
 /**
  * Get the S2EExecutor from the S2E object.
@@ -118,6 +114,15 @@ S2E* S2E_GetInstance(void);
  * @return S2EExecutor instance pointer
  */
 S2EExecutor* S2E_GetExecutor(S2E* self);
+
+/**
+ * Check if we are currently forking a new S2E process.
+ * This function is useful in Qemu code to change behaviors
+ * based on if this is the first initialization or a fork of a secondary S2E process.
+ * @param self S2E instance
+ * @return <b>true</b> if S2E is currently forking a new process, <b>false</b> otherwise.
+ */
+bool S2E_IsForking(S2E* self);
 
 #if defined(__cplusplus)
 }

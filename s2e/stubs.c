@@ -41,8 +41,6 @@ void S2EExecutor_RegisterRam(
 {
 }
 
-S2E* S2E_GetInstance(void) {return NULL;}
-
 S2EExecutor* S2E_GetExecutor(S2E* self) {return NULL;}
 
 S2EExecutionState* S2EExecutor_GetCurrentState(S2EExecutor* self) {return NULL;}
@@ -67,3 +65,5 @@ void S2EExecutionState_WriteRamConcrete(S2EExecutionState *self, uint64_t hostAd
 void S2EExecutionState_FlushTlbEntry(S2EExecutionState *self, CPUTLBEntry *tlb_entry, CPUS2ETLBEntry *s2e_tlb_entry, uint64_t vaddr)
 {
 }
+
+bool S2E_IsForking(S2E* self) {return false;}

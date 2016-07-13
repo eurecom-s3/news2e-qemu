@@ -1249,10 +1249,6 @@ static void qemu_cpu_kick_no_halt(void)
 
 void qemu_cpu_kick(CPUState *cpu)
 {
-#ifdef CONFIG_S2E_DEBUG
-    s2e_debug_print("MAIN: qemu_cpu_kick: qemu_cond_broadcast(env->halt_cond) %p\n", cpu->halt_cond);
-#endif
-
     qemu_cond_broadcast(cpu->halt_cond);
     if (tcg_enabled()) {
         qemu_cpu_kick_no_halt();
@@ -1389,7 +1385,7 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
 #ifdef CONFIG_S2E
         /* Forks inherit parent's memory, therefore we do not want
            to allocate new memory regions, just overwrite them. */
-        if (!S2E_IsForking(g_s2e)) {
+        if (!S2E_IsForking(S2E_GetInstance())) {
             cpu->thread = g_malloc0(sizeof(QemuThread));
             cpu->halt_cond = g_malloc0(sizeof(QemuCond));
         }
@@ -1397,6 +1393,7 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
         cpu->thread = g_malloc0(sizeof(QemuThread));
         cpu->halt_cond = g_malloc0(sizeof(QemuCond));
 #endif
+
         qemu_cond_init(cpu->halt_cond);
         tcg_halt_cond = cpu->halt_cond;
         snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/TCG",
@@ -1423,7 +1420,7 @@ static void qemu_kvm_start_vcpu(CPUState *cpu)
 #ifdef CONFIG_S2E
     /* Forks inherit parent's memory, therefore we do not want
        to allocate new memory regions, just overwrite them. */
-    if (!s2e_is_forking()) {
+    if (!S2E_IsForking(S2E_GetInstance())) {
         cpu->thread = g_malloc0(sizeof(QemuThread));
         cpu->halt_cond = g_malloc0(sizeof(QemuCond));
     }
@@ -1449,7 +1446,7 @@ static void qemu_dummy_start_vcpu(CPUState *cpu)
 #ifdef CONFIG_S2E
     /* Forks inherit parent's memory, therefore we do not want
        to allocate new memory regions, just overwrite them. */
-    if (!s2e_is_forking()) {
+    if (!S2E_IsForking(S2E_GetInstance())) {
         cpu->thread = g_malloc0(sizeof(QemuThread));
         cpu->halt_cond = g_malloc0(sizeof(QemuCond));
     }

@@ -39,13 +39,6 @@ void S2E_Initialize(int argc, char * argv[], S2ECommandLineOptions *cmdline_opts
 	atexit(S2E_Destroy);
 }
 
-S2E* S2E_GetInstance(void) 
-{
-    assert(g_s2e && "S2E instance should be initialized by now");
-    return g_s2e;
-}
-
-
 S2EExecutor* S2E_GetExecutor(S2E* self)
 {
     return self->getExecutor();
@@ -148,13 +141,6 @@ void S2E_CallOnTranslateBlockEndHandlers(S2E *self, S2EExecutionState *state, Tr
         s2e_longjmp(state->getCPUState()->jmp_env, 1);
     }
 }
-
-bool S2E_IsForking(S2E *self)
-{
-	llvm::errs() << "TODO: implement " << __func__ << '\n';
-	return false;
-}
-
 
 void S2E_Destroy(void)
 {
