@@ -499,10 +499,6 @@ static void arm_cpu_initfn(Object *obj)
             arm_translate_init();
         }
     }
-#if defined(CONFIG_S2E)
-	S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
-	S2EExecutor_RegisterCpu(executor, S2EExecutor_GetCurrentState(executor), cs);
-#endif /* defined(CONFIG_S2E) */
 }
 
 static Property arm_cpu_reset_cbar_property =
@@ -676,6 +672,11 @@ static void arm_cpu_realizefn(DeviceState *dev, Error **errp)
     cpu_reset(cs);
 
     acc->parent_realize(dev, errp);
+
+#if defined(CONFIG_S2E)
+	S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
+	S2EExecutor_RegisterCpu(executor, S2EExecutor_GetCurrentState(executor), cs);
+#endif /* defined(CONFIG_S2E) */
 }
 
 static ObjectClass *arm_cpu_class_by_name(const char *cpu_model)
