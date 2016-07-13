@@ -99,7 +99,6 @@ glue(glue(glue(cpu_ld, USUFFIX), MEMSUFFIX), _ra)(CPUArchState *env,
 		}
 	}
 
-    fprintf(stderr, "softmmu(%s): Loaded value 0x%" PRIx64 " from address 0x%08" PRIx64 "\n", __func__, (uint64_t) res, (uint64_t) addr);
     return res;
 }
 
