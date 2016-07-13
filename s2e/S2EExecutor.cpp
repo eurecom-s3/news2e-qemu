@@ -1888,9 +1888,6 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
         assert(tb->llvm_function);
     }
 
-    g_s2e->getDebugStream() << "Current LLVM function: " << *tb->llvm_function << '\n';
-
-
     if(tb->s2e_tb != state->m_lastS2ETb) {
         unrefS2ETb(state->m_lastS2ETb);
         state->m_lastS2ETb = tb->s2e_tb;

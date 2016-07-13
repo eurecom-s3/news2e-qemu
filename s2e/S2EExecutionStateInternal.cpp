@@ -1601,7 +1601,6 @@ void S2EExecutionState::jumpToSymbolic()
 
     m_startSymbexAtPC = getPc();
     // XXX: what about regs_to_env ?
-    fprintf(stderr, "S2EExecutionState::jumpToSymbolic: env = %p\n", getEnv());
     s2e_longjmp(getCPUState()->jmp_env, 1);
 }
 
