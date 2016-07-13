@@ -1192,6 +1192,7 @@ void S2EExecutor::registerCpu(S2EExecutionState *initialState,
     initialState->m_cpuState->setName("CpuState");
 
     m_saveOnContextSwitch.push_back(initialState->m_cpuSystemState);
+    m_saveOnContextSwitch.push_back(initialState->m_cpuState);
 
     const ObjectState *cpuSystemObject = initialState->addressSpace
                                 .findObject(initialState->m_cpuSystemState);
@@ -2297,9 +2298,13 @@ void S2EExecutor::notifyBranch(ExecutionState &state)
     //s2eState->m_tlb.clearTlbOwnership();
 
     /* Save CPU state */
-    const MemoryObject* cpuMo = s2eState->m_cpuSystemState;
-    uint8_t *cpuStore = s2eState->m_cpuSystemObject->getConcreteStore();
-    memcpy(cpuStore, (uint8_t*) cpuMo->address, cpuMo->size);
+    const MemoryObject* cpuSysMo = s2eState->m_cpuSystemState;
+    uint8_t *cpuSysStore = s2eState->m_cpuSystemObject->getConcreteStore();
+    memcpy(cpuSysStore, (uint8_t*) cpuSysMo->address, cpuSysMo->size);
+
+    const MemoryObject* cpuMo = s2eState->m_cpuState;
+        uint8_t *cpuStore = s2eState->m_cpuObject->getConcreteStore();
+        memcpy(cpuStore, (uint8_t*) cpuMo->address, cpuMo->size);
 
     cpu_disable_ticks();
     s2eState->getDeviceState()->saveDeviceState();

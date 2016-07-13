@@ -298,7 +298,6 @@ ExecutionState* S2EExecutionState::clone()
     // When cloning, all ObjectState becomes not owned by neither of states
     // This means that we must clean owned-by-us flag in S2E TLB
     assert(m_active && m_cpuSystemState);
-#ifdef S2E_ENABLE_S2E_TLB
     CPUArchState* cpu = (CPUArchState*)(m_cpuSystemState->address
                           - CPU_CONC_LIMIT);
 
@@ -315,7 +314,8 @@ ExecutionState* S2EExecutionState::clone()
             }
         }
     }
-#endif
+
+    //TODO: iterate victim TLB
 
     S2EExecutionState *ret = new S2EExecutionState(*this);
     ret->addressSpace.state = ret;
@@ -342,11 +342,13 @@ ExecutionState* S2EExecutionState::clone()
                             m_cpuRegistersState, m_cpuRegistersObject);
     ret->m_cpuSystemObject = ret->addressSpace.getWriteable(
                             m_cpuSystemState, m_cpuSystemObject);
+    ret->m_cpuObject = ret->addressSpace.getWriteable(m_cpuState, m_cpuObject);
 
     m_cpuRegistersObject = addressSpace.getWriteable(
                             m_cpuRegistersState, m_cpuRegistersObject);
     m_cpuSystemObject = addressSpace.getWriteable(
                             m_cpuSystemState, m_cpuSystemObject);
+    m_cpuObject = addressSpace.getWriteable(m_cpuState, m_cpuObject);
 
     ret->m_dirtyMaskObject = ret->addressSpace.getWriteable(
             m_dirtyMask, m_dirtyMaskObject);
