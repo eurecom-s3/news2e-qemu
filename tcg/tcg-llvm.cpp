@@ -1499,10 +1499,7 @@ void TCGLLVMContextPrivate::generateCode(TCGContext *s, TranslationBlock *tb)
         std::string fcnString;
         llvm::raw_string_ostream s(fcnString);
         s << *m_tbFunction;
-        qemu_log("OUT (LLVM IR):\n");
-        qemu_log("%s", s.str().c_str());
-        qemu_log("\n");
-        qemu_log_flush();
+        qemu_log("OUT (LLVM IR):\n%s\n", s.str().c_str());
     }
 }
 
