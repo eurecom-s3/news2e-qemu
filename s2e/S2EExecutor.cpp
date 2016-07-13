@@ -1761,10 +1761,6 @@ inline bool S2EExecutor::executeInstructions(S2EExecutionState *state, unsigned 
                       << ki->inst->getParent()->getParent()->getName().str()
                       << ": " << *ki->inst << '\n';
             }
-            llvm::errs() << "executing "
-                                  << ki->inst->getParent()->getParent()->getName().str()
-                                  << ": " << *ki->inst << '\n';
-
 
             stepInstruction(*state);
             executeInstruction(*state, ki);
