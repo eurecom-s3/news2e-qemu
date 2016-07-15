@@ -984,6 +984,8 @@ for opt do
   ;;
   --with-klee=*) kleedir="$optarg"
   ;;
+  --with-klee-src=*) kleesrcdir="$optarg"
+  ;;
   --with-stp=*) stpdir="$optarg"
   ;;
   --disable-kvm) kvm="no"
@@ -3130,19 +3132,20 @@ if test "$s2e" = "yes" ; then
   cat > $TMPCXX << EOF
 #include <llvm/LLVMContext.h>
 #include <klee/Common.h>
-int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); klee::klee_message("a"); return 0; }
+#include <klee/util/BitArray.h>
+int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); klee::BitArray(32); return 0; }
 EOF
-  if test "$kleedir" != ""; then
-      klee_config="$kleedir/bin/klee-config"
-  else
-      klee_config="klee-config"
+  if test "$kleedir" = ""; then
+      error_exit "configuration switch --with-klee=... must be passed when compiling for S2E."
   fi
-  klee_cflags=-I`$klee_config --includedir 2> /dev/null`
-  klee_cxxflags=`$klee_config --cxxflags 2> /dev/null`
-  klee_ldflags=`$klee_config --ldflags 2> /dev/null`
-  klee_libs=`$klee_config --libs 2> /dev/null`
-  klee_libdir=`$klee_config --libdir 2> /dev/null | sed s:Debug/lib$:Release/lib:`
-  klee_libfiles=`$klee_config --libfiles 2> /dev/null`
+  if test "$kleesrcdir" = ""; then
+      error_exit "configuration switch --with-klee-src=... must be passed when compiling for S2E."
+  fi
+  klee_cxxflags="-I$kleesrcdir/include -I$kleesrcdir -I$kleedir/../include"
+  klee_cflags="-I$kleesrcdir/include"
+  klee_libdir="$kleedir/lib"
+  klee_libs="-lkleeCore"
+  klee_ldflags="-L$klee_libdir"
 
   if test "$stpdir" != ""; then
     stpdir=$(cd $stpdir>/dev/null && pwd)
