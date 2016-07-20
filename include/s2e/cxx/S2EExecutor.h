@@ -97,11 +97,6 @@ class S2EExecutor : public klee::Executor
 {
 	friend class S2ELUAExecutionState;
 	friend uint64_t s2e_expr_to_constant(void *_expr);
-	template<klee::Expr::Width WIDTH, bool WRITE, bool SIGNED, bool LE>
-	friend void handle_helper_ldst_mmu(klee::Executor* executor,
-	                                   klee::ExecutionState* state,
-	                                   klee::KInstruction* target,
-	                                   std::vector< klee::ref<klee::Expr> > &args);
 
 protected:
     S2E* m_s2e;
@@ -364,18 +359,16 @@ protected:
     void registerExternalSymbols(void);
 
     /**
-     * This function handles all MMU accesses.
-     * A template wrapper function is used to have function pointers for
-     * for the different combinations of isWrite/isSigned/littleEndian
-     * combinations of parameters.
-     */
-    void handleLdstMmu(klee::ExecutionState* state,
-                       klee::KInstruction* target,
-                       std::vector< klee::ref<klee::Expr> > &args,
-                       klee::Expr::Width width,
-                       bool isWrite,
-                       bool isSigned,
-					   bool littleEndian);
+	 * This function handles all MMU accesses.
+	 * A template wrapper function is used to have function pointers for
+	 * for the different combinations of isWrite/isSigned/littleEndian
+	 * combinations of parameters.
+	 */
+    template<klee::Expr::Width WIDTH, bool IS_WRITE, bool IS_SIGNED, bool IS_LITTLE_ENDIAN>
+    static void handleLdstMmu(klee::Executor* executor,
+    	                      klee::ExecutionState* state,
+    	                      klee::KInstruction* target,
+    	                      std::vector< klee::ref<klee::Expr> > &args);
 
     static klee::ref<klee::ConstantExpr> handleForkAndConcretizeNative(klee::Executor* executor,
                                                klee::ExecutionState* state,

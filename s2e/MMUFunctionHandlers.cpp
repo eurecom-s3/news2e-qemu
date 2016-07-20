@@ -292,17 +292,31 @@ ref<ConstantExpr> S2EExecutor::handleForkAndConcretizeNative(Executor* executor,
 /* Params: ldl: addr, mmu_idx */
 /* Params: stl: addr, val, mmu_idx */
 
-
-void S2EExecutor::handleLdstMmu(ExecutionState* state,
-                                KInstruction* target,
-								vector< ref<Expr> > &args,
-								Expr::Width width,
-								bool isWrite,
-								bool isSigned,
-								bool littleEndian)
+template<klee::Expr::Width WIDTH, bool IS_WRITE, bool IS_SIGNED, bool IS_LITTLE_ENDIAN>
+void S2EExecutor::handleLdstMmu(klee::Executor* kleeExecutor,
+    	                        klee::ExecutionState* kleeState,
+    	                        klee::KInstruction* target,
+    	                        std::vector< klee::ref<klee::Expr> > &args)
 {
+	S2EExecutor* self = static_cast<S2EExecutor*>(kleeExecutor);
+	S2EExecutionState* state = static_cast<S2EExecutionState*>(kleeState);
+
+	assert(IS_WRITE && (args.size() == 5) && "Wrong number of arguments for a store");
+	assert(!IS_WRITE && (args.size() == 4) && "Wrong number of arguments for a load");
+	assert(isa<ConstantExpr>(args.at(0)) && "env pointer must be a constant");
+	assert(isa<ConstantExpr>(args.at(2)) && "MemOpIdx must be a constant");
+	assert(isa<ConstantExpr>(args.at(3)) && "retaddr must be a constant");
+
+	CPUArchState* env = reinterpret_cast<CPUArchState*>(cast<ConstantExpr>(args[0])->getZExtValue());
+	ref<Expr> addrExpr = args[1]; //Can be symbolic
+	unsigned mmuIdx = get_mmuidx(cast<ConstantExpr>(args[2])->getZExtValue());
+
     assert(false && "stubbed");
     
+    if (IS_WRITE) {
+    	self->bindLocal(target, *state, nullptr /* TODO */);
+    }
+
 //    S2EExecutionState *s2estate = static_cast<S2EExecutionState*>(state);
 //
 //    ref<Expr> symbAddress = args[0];
@@ -584,28 +598,16 @@ void S2EExecutor::handleLdstMmu(ExecutionState* state,
 ////    }
 //}
 
-/**
- * This is a wrapper which simply calls S2EExecutor::HandleLdstMmu.
- */
-template<Expr::Width WIDTH, bool WRITE, bool SIGNED, bool LE>
-void handle_helper_ldst_mmu(Executor* executor,
-                            ExecutionState* state,
-                            KInstruction* target,
-                            vector< ref<Expr> > &args)
-{
-	static_cast<S2EExecutor*>(executor)->handleLdstMmu(state, target, args, WIDTH, WRITE, SIGNED, LE);
-}
-
 S2EExecutor::HandlerInfo S2EExecutor::s_handlerInfo[] = {
-	{"handler_ret_ldub_mmu", &handle_helper_ldst_mmu<Expr::Int8, false, false, true>},
-	{"handler_ret_ldsb_mmu", &handle_helper_ldst_mmu<Expr::Int8, false, true, true>},
-	{"handler_le_lduw_mmu", &handle_helper_ldst_mmu<Expr::Int16, false, false, true>},
-	{"handler_le_ldsw_mmu", &handle_helper_ldst_mmu<Expr::Int16, false, true, true>},
-	{"handler_le_ldul_mmu", &handle_helper_ldst_mmu<Expr::Int32, false, false, true>},
-	{"handler_le_ldsl_mmu", &handle_helper_ldst_mmu<Expr::Int32, false, true, true>},
-	{"handler_le_ldq_mmu", &handle_helper_ldst_mmu<Expr::Int64, false, false, true>},
+	{"handler_ret_ldub_mmu", &S2EExecutor::handleLdstMmu<Expr::Int8, false, false, true>},
+	{"handler_ret_ldsb_mmu", &S2EExecutor::handleLdstMmu<Expr::Int8, false, true, true>},
+	{"handler_le_lduw_mmu", &S2EExecutor::handleLdstMmu<Expr::Int16, false, false, true>},
+	{"handler_le_ldsw_mmu", &S2EExecutor::handleLdstMmu<Expr::Int16, false, true, true>},
+	{"handler_le_ldul_mmu", &S2EExecutor::handleLdstMmu<Expr::Int32, false, false, true>},
+	{"handler_le_ldsl_mmu", &S2EExecutor::handleLdstMmu<Expr::Int32, false, true, true>},
+	{"handler_le_ldq_mmu", &S2EExecutor::handleLdstMmu<Expr::Int64, false, false, true>},
 
-	{"handler_le_stl_mmu", &handle_helper_ldst_mmu<Expr::Int32, true, false, true>},
+	{"handler_le_stl_mmu", &S2EExecutor::handleLdstMmu<Expr::Int32, true, false, true>},
 };
 
 
