@@ -363,6 +363,7 @@ vhdx=""
 numa=""
 tcmalloc="no"
 jemalloc="no"
+address_sanitizer="no"
 
 # parse CC options first
 for opt do
@@ -1224,6 +1225,10 @@ for opt do
   ;;
   --with-llvm-config=*) llvm_config="$optarg"
   ;;
+  --enable-address-sanitizer) address_sanitizer="yes"
+  ;;
+  --disable-address-sanitizer) address_sanitizer="no"
+  ;;
   *)
       echo "ERROR: unknown option $opt"
       echo "Try '$0 --help' for more information"
@@ -1290,6 +1295,15 @@ case "$cpu" in
     # No special flags required for other host CPUs
 esac
 
+if [ "x$address_sanitizer" = "xyes" ]; then
+    CFLAGS="-fstack-protector-all -fsanitize=address $CFLAGS"
+    CXXFLAGS="-fstack-protector-all -Wno-mismatched-tags -fsanitize=address $CXXFLAGS"
+    #This is required for probing LLVM and KLEE, as they
+    #might be compiled with AddressSanitizer instrumentation.
+    LDFLAGS="$LDFLAGS -fsanitize=address"
+fi
+
+
 QEMU_CFLAGS="$CPU_CFLAGS $QEMU_CFLAGS"
 EXTRA_CFLAGS="$CPU_CFLAGS $EXTRA_CFLAGS"
 
@@ -1340,6 +1354,7 @@ Advanced options (experts only):
   --objcc=OBJCC            use Objective-C compiler OBJCC [$objcc]
   --extra-cflags=CFLAGS    append extra C compiler flags QEMU_CFLAGS
   --extra-ldflags=LDFLAGS  append extra linker flags LDFLAGS
+  --enable-address-sanitizer Use LLVM's address sanitizing instrumentation.
   --make=MAKE              use specified make [$make]
   --install=INSTALL        use specified install [$install]
   --python=PYTHON          use specified python [$python]
@@ -3117,11 +3132,9 @@ EOF
 fi
 
 if test "$llvm" = "yes" ; then
-  #These will be automatically added by klee and we don't want
-  #duplicated libs on the command line.
-  if [ "x$s2e" != "xyes" ]; then
-    LIBS="$llvm_libs $LIBS $llvm_ldflags"
-  fi
+  #LLVM does not come with RTTI, and nobody needs it.
+  #Tell this to the compiler.
+  llvm_cxxflags="$llvm_cxxflags -fno-rtti"
   linker="$cxx"
 fi
 
@@ -3144,13 +3157,13 @@ EOF
   klee_cxxflags="-I$kleesrcdir/include -I$kleesrcdir -I$kleedir/../include"
   klee_cflags="-I$kleesrcdir/include"
   klee_libdir="$kleedir/lib"
-  klee_libs="-lkleeCore"
+  klee_libs="-lkleeCore  -lkleeModule -lkleeBasic -lkleaverSolver -lkleaverExpr -lkleeSupport"
   klee_ldflags="-L$klee_libdir"
 
   if test "$stpdir" != ""; then
     stpdir=$(cd $stpdir>/dev/null && pwd)
-    klee_ldflags="$klee_ldflags -L$stpdir/lib"
     klee_libs="$klee_libs -lstp"
+    klee_ldflags="$klee_ldflags -L$stpdir/lib"
   fi
 
   if compile_prog_cxx "$klee_cxxflags $llvm_cxxflags" "$klee_ldflags $klee_libs $llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then

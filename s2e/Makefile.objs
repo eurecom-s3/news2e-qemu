@@ -2,9 +2,9 @@ s2e-obj-y += ConfigFile.o ExprInterface.o \
 	MMUFunctionHandlers.o Plugin.o \
 	S2E.o S2EDeviceState.o \
 	S2EExecutionState.o S2EExecutor.o S2EStatsTracker.o \
-	SelectRemovalPass.o Slab.o Synchronization.o \
+	SelectRemovalPass.o Synchronization.o \
 	S2EInternal.o S2EExecutionStateInternal.o TCGLLVMContext.o \
-	helper.o \
+	helper.o S2EMergingSearcher.o \
 
 s2e-obj-y += Plugins/ Signals/
 

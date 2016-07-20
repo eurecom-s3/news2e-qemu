@@ -59,9 +59,11 @@ extern "C" {
 #include <s2e/cxx/Plugin.h>
 #include <s2e/cxx/Utils.h>
 
-#include <klee/Context.h>
-#include <klee/Memory.h>
+//KLEE includes
+#include "lib/Core/Context.h"
+#include "lib/Core/Memory.h"
 #include <klee/Solver.h>
+
 #include "s2e/cxx/S2E.h"
 #include <s2e/cxx/Utils.h>
 #include <s2e/s2e_qemu.h>
@@ -71,6 +73,24 @@ extern "C" {
 
 #include <iomanip>
 #include <sstream>
+
+using klee::ExecutionState;
+using klee::ref;
+using klee::Expr;
+using klee::ConstantExpr;
+using klee::MemoryObject;
+using klee::ObjectPair;
+using klee::ConcatExpr;
+using klee::ZExtExpr;
+using klee::Context;
+using klee::ExtractExpr;
+using klee::Array;
+using klee::Query;
+using klee::UpdateList;
+using klee::ReadExpr;
+using klee::Solver;
+
+using llvm::isa;
 
 //XXX: The idea is to avoid function calls
 //#define small_memcpy(dest, source, count) asm volatile ("cld; rep movsb"::"S"(source), "D"(dest), "c" (count):"flags", "memory")
@@ -90,9 +110,9 @@ extern llvm::cl::opt<bool> ConcolicMode;
 extern llvm::cl::opt<bool> VerboseStateDeletion;
 extern llvm::cl::opt<bool> DebugConstraints;
 
-namespace s2e {
 
-using namespace klee;
+
+namespace s2e {
 
 MemoryObject *S2EExecutionState::m_cpuRegistersState = NULL;
 MemoryObject *S2EExecutionState::m_cpuSystemState = NULL;
@@ -829,6 +849,15 @@ void S2EExecutionState::dumpStack(unsigned count)
     dumpStack(getSp());
 }
 
+/**
+ * Print a KLEE Expr to the output stream.
+ * TODO: Should be moved to a more appropriate place,
+ *       possibly into KLEE.
+ * @param os
+ * @param expr
+ * @return
+ */
+
 void S2EExecutionState::dumpStack(unsigned count, uint64_t sp)
 {
     std::stringstream os;
@@ -839,10 +868,13 @@ void S2EExecutionState::dumpStack(unsigned count, uint64_t sp)
         klee::ref<klee::Expr> val = readMemory(sp + i * sizeof(uint32_t), klee::Expr::Int32);
         klee::ConstantExpr *ce = dyn_cast<klee::ConstantExpr>(val);
         if (ce) {
-            os << std::hex << "0x" << sp + i * sizeof(uint32_t) << " 0x" << std::setw(sizeof(uint32_t)*2) << std::setfill('0') << val;
+            os << std::hex << "0x" << sp + i * sizeof(uint32_t)
+               << " 0x" << std::setw(sizeof(uint32_t)*2)
+               << std::setfill('0') << *val;
             os << std::setfill(' ');
         }else {
-            os << std::hex << "0x" << sp + i * sizeof(uint32_t) << val;
+            os << std::hex << "0x" << sp + i * sizeof(uint32_t)
+               << *val;
         }
         os << '\n';
     }
@@ -1475,7 +1507,14 @@ ref<Expr> S2EExecutionState::createConcolicValue(
 
     const Array *array = new Array(sname, bytes);
 
-    MemoryObject *mo = new MemoryObject(0, bytes, false, false, false, NULL);
+    MemoryObject *mo = new MemoryObject(
+    		/* _address = */ 0,
+			/* _size = */ bytes,
+			/* _isLocal = */ false,
+			/* _isGlobal = */ false,
+			/* _isFixed = */ false,
+			/* _allocSite = */ nullptr,
+			/* _parent = */ nullptr);
     mo->setName(sname);
 
     symbolics.push_back(std::make_pair(mo, array));
@@ -1533,7 +1572,14 @@ std::vector<ref<Expr> > S2EExecutionState::createConcolicArray(
     //Add it to the set of symbolic expressions, to be able to generate
     //test cases later.
     //Dummy memory object
-    MemoryObject *mo = new MemoryObject(0, size, false, false, false, NULL);
+    MemoryObject *mo = new MemoryObject(
+    		/* _address = */ 0,
+			/* _size = */ size,
+			/* _isLocal = */ false,
+			/* _isGlobal = */ false,
+			/* _isFixed = */ false,
+			/* _allocSite = */ nullptr,
+			/* _parent = */ nullptr);
     mo->setName(sname);
 
     symbolics.push_back(std::make_pair(mo, array));

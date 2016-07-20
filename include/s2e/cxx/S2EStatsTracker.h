@@ -41,7 +41,7 @@
 #endif /* !defined(__cplusplus) */
 
 #include <klee/Statistic.h>
-#include <klee/StatsTracker.h>
+#include "lib/Core/StatsTracker.h"
 
 namespace klee {
 namespace stats {

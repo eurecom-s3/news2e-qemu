@@ -186,7 +186,7 @@ public:
     std::string getOutputFilename(const std::string& fileName);
 
     /** Create output file in an output directory */
-    llvm::raw_ostream* openOutputFile(const std::string &filename);
+    llvm::raw_fd_ostream* openOutputFile(const std::string &filename);
 
     /** Get info stream (used only by KLEE internals) */
     llvm::raw_ostream& getInfoStream(const S2EExecutionState* state = 0) const {

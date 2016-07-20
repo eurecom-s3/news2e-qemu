@@ -323,7 +323,7 @@ int S2EDeviceState::writeSector(struct BlockDriverState *bs, int64_t sector, con
         uintptr_t address = (uintptr_t) bstart + sector * SECTOR_SIZE;
         ObjectPair op = m_deviceState.findObject(address);
         if (op.first == NULL) {
-            MemoryObject *mo = new MemoryObject(address, SECTOR_SIZE, false, false, false, NULL);
+            MemoryObject *mo = new MemoryObject(address, SECTOR_SIZE, false, false, false, nullptr, nullptr);
             ObjectState *os = new ObjectState(mo);
             m_deviceState.bindObject(mo, os);
             op.first = mo;
@@ -362,6 +362,10 @@ int S2EDeviceState::readSector(struct BlockDriverState *bs, int64_t sector, uint
     }
 
     return readCount;
+}
+
+void S2EDeviceState::setExecutionState(S2EExecutionState* state) {
+	assert(false && "Setting the execution state would mean changing the ExecutionState of the AddressSpace");
 }
 
 /*****************************************************************************/

@@ -40,7 +40,9 @@
 #error This file is not supposed to be included from C!
 #endif /* !defined(__cplusplus) */
 
-#include <klee/Executor.h>
+#include "lib/Core/Executor.h"
+#include "lib/Core/SpecialFunctionHandler.h"
+
 #include <llvm/Support/raw_ostream.h>
 #include <cpu.h>
 
@@ -78,7 +80,7 @@ public:
 
     llvm::raw_ostream &getInfoStream() const;
     std::string getOutputFilename(const std::string &fileName);
-    llvm::raw_ostream *openOutputFile(const std::string &fileName);
+    llvm::raw_fd_ostream *openOutputFile(const std::string &fileName);
 
     /* klee-related function */
     void incPathsExplored();
@@ -93,6 +95,14 @@ typedef void (*StateManagerCb)(S2EExecutionState *s, bool killingState);
 
 class S2EExecutor : public klee::Executor
 {
+	friend class S2ELUAExecutionState;
+	friend uint64_t s2e_expr_to_constant(void *_expr);
+	template<klee::Expr::Width WIDTH, bool WRITE, bool SIGNED, bool LE>
+	friend void handle_helper_ldst_mmu(klee::Executor* executor,
+	                                   klee::ExecutionState* state,
+	                                   klee::KInstruction* target,
+	                                   std::vector< klee::ref<klee::Expr> > &args);
+
 protected:
     S2E* m_s2e;
     TCGLLVMContext* m_tcgLLVMContext;
@@ -235,6 +245,8 @@ public:
         return yieldedState;
     }
 
+    klee::Solver* getSolver() const;
+
 protected:
     static void handlerTraceMemoryAccess(klee::Executor* executor,
                                     klee::ExecutionState* state,
@@ -351,83 +363,19 @@ protected:
     /**Register external symbols in the LLVM module*/
     void registerExternalSymbols(void);
 
-    /** The following are special handlers for MMU functions */
-    static void handle_ldb_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_ldw_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_ldl_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_ldq_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_stb_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_stw_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_stl_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_stq_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static klee::ref<klee::Expr> handle_ldst_mmu(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args,
-                        bool isWrite, unsigned data_size, bool signExtend, bool zeroExtend);
-
-    static void handle_lduw_kernel(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_ldl_kernel(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_ldq_kernel(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_stl_kernel(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_stq_kernel(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args);
-
-    static void handle_ldst_kernel(klee::Executor* executor,
-                        klee::ExecutionState* state,
-                        klee::KInstruction* target,
-                        std::vector< klee::ref<klee::Expr> > &args,
-                        bool isWrite, unsigned data_size, bool signExtend, bool zeroExtend);
+    /**
+     * This function handles all MMU accesses.
+     * A template wrapper function is used to have function pointers for
+     * for the different combinations of isWrite/isSigned/littleEndian
+     * combinations of parameters.
+     */
+    void handleLdstMmu(klee::ExecutionState* state,
+                       klee::KInstruction* target,
+                       std::vector< klee::ref<klee::Expr> > &args,
+                       klee::Expr::Width width,
+                       bool isWrite,
+                       bool isSigned,
+					   bool littleEndian);
 
     static klee::ref<klee::ConstantExpr> handleForkAndConcretizeNative(klee::Executor* executor,
                                                klee::ExecutionState* state,
@@ -439,7 +387,7 @@ protected:
 
     struct HandlerInfo {
       const char *name;
-      S2EExecutor::FunctionHandler handler;
+      klee::SpecialFunctionHandler::FunctionHandler handler;
     };
 
     static HandlerInfo s_handlerInfo[];

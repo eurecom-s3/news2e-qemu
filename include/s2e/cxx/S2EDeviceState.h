@@ -50,7 +50,8 @@ extern "C" {
 #include <stdint.h>
 #include <llvm/ADT/SmallVector.h>
 
-#include <klee/AddressSpace.h>
+//KLEE includes
+#include "lib/Core/AddressSpace.h"
 
 #include "s2e/s2e_block.h"
 
@@ -96,9 +97,11 @@ public:
     S2EDeviceState(const S2EDeviceState &state);
     ~S2EDeviceState();
 
+    /* TODO: Apparently not required any more for new KLEE
     void setExecutionState(klee::ExecutionState *state) {
         m_deviceState.state = state;
     }
+    */
 
     void initDeviceState();
 
@@ -113,6 +116,12 @@ public:
 
     int writeSector(struct BlockDriverState *bs, int64_t sector, const uint8_t *buf, int nb_sectors);
     int readSector(struct BlockDriverState *bs, int64_t sector, uint8_t *buf, int nb_sectors);
+
+    /**
+     * Set the S2EExecutionState this device state belongs to.
+     * @param state
+     */
+    void setExecutionState(S2EExecutionState* state);
 };
 
 }

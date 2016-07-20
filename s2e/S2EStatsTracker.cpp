@@ -39,7 +39,8 @@
 #include "s2e/cxx/S2EExecutor.h"
 #include "s2e/cxx/S2EExecutionState.h"
 
-#include <klee/CoreStats.h>
+//KLEE includes
+#include "lib/Core/CoreStats.h"
 #include <klee/SolverStats.h>
 #include <klee/Internal/System/Time.h>
 

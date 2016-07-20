@@ -59,7 +59,8 @@ extern "C" {
 #include <iostream>
 #include <sstream>
 
-#include <klee/Searcher.h>
+//KLEE includes
+#include "lib/Core/Searcher.h"
 #include <klee/Solver.h>
 
 
@@ -211,7 +212,7 @@ void BaseInstructions::killState(S2EExecutionState *state)
     std::ostringstream os;
     os << "State was terminated by opcode\n"
        << "            message: \"" << message << "\"\n"
-       << "            status: " << status;
+       << "            status: " << *status;
     s2e()->getExecutor()->terminateStateEarly(*state, os.str());
 }
 
@@ -461,7 +462,7 @@ void BaseInstructions::assume(S2EExecutionState *state)
     if (!isValid) {
         std::stringstream ss;
         ss << "BaseInstructions: specified assume expression cannot be true. "
-                << boolExpr;
+                << *boolExpr;
         g_s2e->getExecutor()->terminateStateEarly(*state, ss.str());
     }
 

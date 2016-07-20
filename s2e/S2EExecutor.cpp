@@ -85,21 +85,22 @@ uint64_t helper_set_cc_op_eflags(void);
 #include "s2e/cxx/S2EExecutor.h"
 #include "s2e/cxx/TCGLLVMContext.h"
 #include "s2e/TCGLLVMRuntime.h"
-#include <s2e/s2e_config.h>
+#include "s2e/s2e_config.h"
 #include "s2e/cxx/S2E.h"
 #include "s2e/cxx/S2EExecutionState.h"
-#include <s2e/cxx/Utils.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/cxx/ConfigFile.h>
+#include "s2e/cxx/Utils.h"
+#include "s2e/Plugins/CorePlugin.h"
+#include "s2e/cxx/ConfigFile.h"
+#include "s2e/cxx/S2EMergingSearcher.h"
 
-#include <s2e/cxx/S2EDeviceState.h>
-#include <s2e/cxx/SelectRemovalPass.h>
-#include <s2e/cxx/S2EStatsTracker.h>
+#include "s2e/cxx/S2EDeviceState.h"
+#include "s2e/cxx/SelectRemovalPass.h"
+#include "s2e/cxx/S2EStatsTracker.h"
 
 //XXX: Remove this from executor
-#include <s2e/Plugins/ModuleExecutionDetector.h>
+#include "s2e/Plugins/ModuleExecutionDetector.h"
 
-#include <s2e/s2e_qemu.h>
+#include "s2e/s2e_qemu.h"
 
 #include <llvm/Module.h>
 #include <llvm/Function.h>
@@ -113,16 +114,18 @@ uint64_t helper_set_cc_op_eflags(void);
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/CommandLine.h>
 
-#include <klee/PTree.h>
-#include <klee/Memory.h>
-#include <klee/Searcher.h>
-#include <klee/ExternalDispatcher.h>
-#include <klee/UserSearcher.h>
-#include <klee/CoreStats.h>
+//KLEE includes
+#include "lib/Core/PTree.h"
+#include "lib/Core/Memory.h"
+#include "lib/Core/Searcher.h"
+#include "lib/Core/ExternalDispatcher.h"
+#include "lib/Core/UserSearcher.h"
+#include "lib/Core/CoreStats.h"
+#include "lib/Core/TimingSolver.h"
 #include <klee/TimerStatIncrementer.h>
 #include <klee/Solver.h>
-#include <llvm/Transforms/IPO.h>
 
+#include <llvm/Transforms/IPO.h>
 #include <llvm/Support/TimeValue.h>
 
 #include <vector>
@@ -150,6 +153,8 @@ using llvm::PassManager;
 using llvm::createInternalizePass;
 using llvm::createGlobalOptimizerPass;
 
+using klee::ExternalDispatcher;
+
 extern "C" {
     // XXX
     //void* g_s2e_exec_ret_addr = 0;
@@ -167,27 +172,27 @@ namespace {
 }
 
 namespace {
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     UseSelectCleaner("use-select-cleaner",
-            cl::desc("Remove Select statements from LLVM code"),
-            cl::init(false));
+            llvm::cl::desc("Remove Select statements from LLVM code"),
+            llvm::cl::init(false));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     StateSharedMemory("state-shared-memory",
-            cl::desc("Allow unimportant memory regions (like video RAM) to be shared between states"),
-            cl::init(false));
+            llvm::cl::desc("Allow unimportant memory regions (like video RAM) to be shared between states"),
+            llvm::cl::init(false));
 
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     FlushTBsOnStateSwitch("flush-tbs-on-state-switch",
-            cl::desc("Flush translation blocks when switching states -"
+            llvm::cl::desc("Flush translation blocks when switching states -"
                      " disabling leads to faster but possibly incorrect execution"),
-            cl::init(true));
+            llvm::cl::init(true));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     KeepLLVMFunctions("keep-llvm-functions",
-            cl::desc("Never delete generated LLVM functions"),
-            cl::init(false));
+            llvm::cl::desc("Never delete generated LLVM functions"),
+            llvm::cl::init(false));
 
     //The default is true for two reasons:
     //1. Symbolic addresses are very expensive to handle
@@ -195,80 +200,80 @@ namespace {
     //all possible addresses.
     //Overall, we have more path explosion, but at least execution
     //does not get stuck in various places.
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     ForkOnSymbolicAddress("fork-on-symbolic-address",
-            cl::desc("Fork on each memory access with symbolic address"),
-            cl::init(true));
+            llvm::cl::desc("Fork on each memory access with symbolic address"),
+            llvm::cl::init(true));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     ConcretizeIoAddress("concretize-io-address",
-            cl::desc("Concretize symbolic I/O addresses"),
-            cl::init(true));
+            llvm::cl::desc("Concretize symbolic I/O addresses"),
+            llvm::cl::init(true));
 
     //XXX: Works for MMIO only, add support for port I/O
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     ConcretizeIoWrites("concretize-io-writes",
-            cl::desc("Concretize symbolic I/O writes"),
-            cl::init(true));
+            llvm::cl::desc("Concretize symbolic I/O writes"),
+            llvm::cl::init(true));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     S2EDebugInstructions("print-llvm-instructions",
-                   cl::desc("Traces all LLVM instructions sent to KLEE"),  cl::init(false));
+                   llvm::cl::desc("Traces all LLVM instructions sent to KLEE"),  llvm::cl::init(false));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     VerboseFork("verbose-fork-info",
-                   cl::desc("Print detailed information on forks"),  cl::init(false));
+                   llvm::cl::desc("Print detailed information on forks"),  llvm::cl::init(false));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     VerboseStateSwitching("verbose-state-switching",
-                   cl::desc("Print detailed information on state switches"),  cl::init(false));
+                   llvm::cl::desc("Print detailed information on state switches"),  llvm::cl::init(false));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     VerboseTbFinalize("verbose-tb-finalize",
-                   cl::desc("Print detailed information when finalizing a partially-completed TB"),  cl::init(false));
+                   llvm::cl::desc("Print detailed information when finalizing a partially-completed TB"),  llvm::cl::init(false));
 
-    cl::opt<bool>
+    llvm::cl::opt<bool>
     UseFastHelpers("use-fast-helpers",
-                   cl::desc("Replaces LLVM bitcode with fast symbolic-aware equivalent native helpers"),  cl::init(false));
+                   llvm::cl::desc("Replaces LLVM bitcode with fast symbolic-aware equivalent native helpers"),  llvm::cl::init(false));
 
-    cl::opt<unsigned>
+    llvm::cl::opt<unsigned>
     ClockSlowDown("clock-slow-down",
-                   cl::desc("Slow down factor when interpreting LLVM code"),  cl::init(101));
+                   llvm::cl::desc("Slow down factor when interpreting LLVM code"),  llvm::cl::init(101));
 
-    cl::opt<unsigned>
+    llvm::cl::opt<unsigned>
     ClockSlowDownFastHelpers("clock-slow-down-fast-helpers",
-                   cl::desc("Slow down factor when interpreting LLVM code and using fast helpers"),  cl::init(11));
+                   llvm::cl::desc("Slow down factor when interpreting LLVM code and using fast helpers"),  llvm::cl::init(11));
 }
 
 //The logs may be flooded with messages when switching execution mode.
 //This option allows disabling printing mode switches.
-cl::opt<bool>
+llvm::cl::opt<bool>
 PrintModeSwitch("print-mode-switch",
-                cl::desc("Print message when switching from symbolic to concrete and vice versa"),
-                cl::init(false));
+                llvm::cl::desc("Print message when switching from symbolic to concrete and vice versa"),
+                llvm::cl::init(false));
 
-cl::opt<bool>
+llvm::cl::opt<bool>
 PrintForkingStatus("print-forking-status",
-                cl::desc("Print message when enabling/disabling forking."),
-                cl::init(false));
+                llvm::cl::desc("Print message when enabling/disabling forking."),
+                llvm::cl::init(false));
 
-cl::opt<bool>
+llvm::cl::opt<bool>
 VerboseStateDeletion("verbose-state-deletion",
-               cl::desc("Print detailed information on state deletion"),  cl::init(false));
+               llvm::cl::desc("Print detailed information on state deletion"),  llvm::cl::init(false));
 
 //Concolic mode is the default because it works better than symbex.
-cl::opt<bool>
+llvm::cl::opt<bool>
 ConcolicMode("use-concolic-execution",
-               cl::desc("Concolic execution mode"),  cl::init(true));
+               llvm::cl::desc("Concolic execution mode"),  llvm::cl::init(true));
 
-cl::opt<bool>
+llvm::cl::opt<bool>
 DebugConstraints("debug-constraints",
-               cl::desc("Check that added constraints are satisfiable"),  cl::init(false));
+               llvm::cl::desc("Check that added constraints are satisfiable"),  llvm::cl::init(false));
 
 
 
 
-extern cl::opt<bool> UseExprSimplifier;
+extern llvm::cl::opt<bool> UseExprSimplifier;
 
 extern "C" {
     bool g_s2e_fork_on_symbolic_address = 0;
@@ -383,7 +388,7 @@ bool S2EExternalDispatcher::runProtectedCall(llvm::Function *f, uint64_t *args) 
  * machine code in KLEE's external dispatcher.
  */
 void S2EExternalDispatcher::removeFunction(llvm::Function *f) {
-        dispatchers_ty::iterator it, itn;
+        ExternalDispatcher::dispatchers_ty::iterator it, itn;
 
         it = dispatchers.begin();
         while (it != dispatchers.end()) {
@@ -419,7 +424,7 @@ std::string S2EHandler::getOutputFilename(const std::string &fileName)
     return m_s2e->getOutputFilename(fileName);
 }
 
-llvm::raw_ostream *S2EHandler::openOutputFile(const std::string &fileName)
+llvm::raw_fd_ostream *S2EHandler::openOutputFile(const std::string &fileName)
 {
     return m_s2e->openOutputFile(fileName);
 }
@@ -688,8 +693,12 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     //leaving us with an empty module.
     //Subsequently, the helper function definitions cannot be found when
     //the external helpers are registered, which makes us :(
-    ModuleOptions MOpts = ModuleOptions(vector<string>(),
-                                        /* Optimize= */ false, /* CheckDivZero= */ false);
+    ModuleOptions MOpts = ModuleOptions(
+    		/* _LibraryDir = */ "",
+			/* _Optimize = */ false,
+			/* _CheckDivZero = */ false,
+			/* _CheckOvershift = */ false,
+			/* _CustomPasses = */ nullptr);
 
     /* This catches obvious LLVM misconfigurations */
     DataLayout TD(M);
@@ -809,7 +818,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
             s2e->getWarningsStream()
                     << UseFastHelpers.ArgStr << " can only be used if "
                     << ForkOnSymbolicAddress.ArgStr << " is enabled\n";
-            exit(-1);
+            ::exit(-1);
         }
     }
 
@@ -1615,7 +1624,7 @@ ExecutionState* S2EExecutor::selectNonSpeculativeState(S2EExecutionState *state)
 
     if (!newState) {
         m_s2e->getWarningsStream() << "All states were terminated" << '\n';
-        foreach(S2EExecutionState* s, m_deletedStates) {
+        for (S2EExecutionState* s : m_deletedStates) {
             //Leave the current state in a zombie form to let QEMU exit gracefully.
             if (s != g_s2e_state) {
                 unrefS2ETb(s->m_lastS2ETb);
@@ -2042,7 +2051,6 @@ uintptr_t S2EExecutor::executeTranslationBlock(
 
     //The following code is taken from cpu_tb_exit in cpu-exec.c
     /* Execute a TB, and fix up the CPU state afterwards if necessary */
-    CPUArchState *env = static_cast<CPUArchState*>(cpu->env_ptr);
     uintptr_t next_tb;
 
 #if defined(DEBUG_DISAS)
@@ -2232,7 +2240,7 @@ void S2EExecutor::doStateFork(S2EExecutionState *originalState,
 
     if (VerboseFork) {
         m_s2e->getDebugStream() << "Stack frame at fork:" << '\n';
-        foreach(const StackFrame& fr, originalState->stack) {
+        for (const StackFrame& fr : originalState->stack) {
             m_s2e->getDebugStream() << fr.kf->function->getName().str() << '\n';
         }
     }
@@ -2552,8 +2560,9 @@ inline void S2EExecutor::doInterrupt(S2EExecutionState *state, int intno,
 
 void S2EExecutor::setupTimersHandler()
 {
-    m_s2e->getCorePlugin()->onTimer.connect(
-            sigc::bind(sigc::ptr_fun(&onAlarm), 0));
+	llvm::errs() << __FILE__ << ":" << __LINE__ << ": S2EExecutor::setupTimersHandler has been stubbed" << '\n';
+//    m_s2e->getCorePlugin()->onTimer.connect(
+//            sigc::bind(sigc::ptr_fun(&onAlarm), 0));
 }
 
 /** Suspend the given state (does not kill it) */
@@ -2642,7 +2651,7 @@ void S2EExecutor::queueStateForMerge(S2EExecutionState *state)
 
     m_s2e->getMessagesStream(state) << "Queueing state for merging" << '\n';
 
-    static_cast<MergingSearcher*>(searcher)->queueStateForMerge(*state, mergePoint);
+    static_cast<S2EMergingSearcher*>(searcher)->queueStateForMerge(*state, mergePoint);
     throw CpuExitException();
 }
 
@@ -2650,6 +2659,10 @@ void S2EExecutor::updateStats(S2EExecutionState *state)
 {
     state->m_stats.updateStats(state);
     processTimers(state, 0);
+}
+
+Solver* S2EExecutor::getSolver() const {
+	return solver->solver;
 }
 
 } // namespace s2e
@@ -2848,7 +2861,7 @@ S2EExecutionState* S2EExecutor_CreateInitialState(S2EExecutor* self)
 {
 	if (g_s2e_state != NULL) {
         llvm::errs() << "ERROR - " << __FILE__ << ":" << __LINE__ << ": g_s2e_state is already initialized" << '\n';
-        exit(1);
+        ::exit(1);
     }
     
     S2EExecutionState *state = self->createInitialState();

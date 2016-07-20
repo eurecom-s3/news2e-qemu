@@ -103,6 +103,13 @@ void print_stacktrace(void)
 #include <execinfo.h>
 #include <cxxabi.h>
 
+using klee::MemoryObject;
+using klee::Context;
+using klee::ExtractExpr;
+using klee::ZExtExpr;
+using klee::ObjectPair;
+using klee::ConcatExpr;
+
 extern TCGv_ptr cpu_env;
 
 /** Print a demangled stack backtrace of the caller function to FILE* out. */
@@ -205,20 +212,20 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
           m_forking(false)
 {
     if (s2e_max_processes < 1) {
-        std::cerr << "You must at least allow one process for S2E." << '\n';
-        exit(1);
+        llvm::errs() << "You must at least allow one process for S2E." << '\n';
+        ::exit(1);
     }
 
     if (s2e_max_processes > S2E_MAX_PROCESSES) {
-        std::cerr << "S2E can handle at most " << S2E_MAX_PROCESSES << " processes." << '\n';
-        std::cerr << "Please increase the S2E_MAX_PROCESSES constant." << '\n';
-        exit(1);
+        llvm::errs() << "S2E can handle at most " << S2E_MAX_PROCESSES << " processes." << '\n';
+        llvm::errs() << "Please increase the S2E_MAX_PROCESSES constant." << '\n';
+        ::exit(1);
     }
 
 #ifdef CONFIG_WIN32
     if (s2e_max_processes > 1) {
-        std::cerr << "S2E for Windows does not support more than one process" << '\n';
-        exit(1);
+        llvm::errs() << "S2E for Windows does not support more than one process" << '\n';
+        ::exit(1);
     }
 #endif
 
@@ -288,7 +295,7 @@ void S2E::writeBitCodeToFile()
 S2E::~S2E()
 {
     //Delete all the stuff used by the instance
-    foreach(Plugin* p, m_activePluginsList)
+    for (Plugin* p : m_activePluginsList)
         delete p;
 
     //Tell other instances we are dead so they can fork more
@@ -353,7 +360,7 @@ std::string S2E::getOutputFilename(const std::string &fileName)
     return filePath.str();
 }
 
-llvm::raw_ostream* S2E::openOutputFile(const std::string &fileName)
+llvm::raw_fd_ostream* S2E::openOutputFile(const std::string &fileName)
 {
     std::string path = getOutputFilename(fileName);
     std::string error;
@@ -361,7 +368,7 @@ llvm::raw_ostream* S2E::openOutputFile(const std::string &fileName)
 
     if (!f || error.size()>0) {
         llvm::errs() << "Error opening " << path << ": " << error << "\n";
-        exit(-1);
+        ::exit(-1);
     }
 
     return f;
@@ -429,9 +436,9 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
 #else
     if (outDir.createDirectoryOnDisk(true, &mkdirError)) {
 #endif
-        std::cerr << "Could not create output directory " << outDir.str() <<
+        llvm::errs() << "Could not create output directory " << outDir.str() <<
                 " error: " << mkdirError << '\n';
-        exit(-1);
+        ::exit(-1);
     }
 
 #ifndef _WIN32
@@ -441,12 +448,12 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
 
         if ((unlink(s2eLast.c_str()) < 0) && (errno != ENOENT)) {
             perror("ERROR: Cannot unlink s2e-last");
-            exit(1);
+            ::exit(1);
         }
 
         if (symlink(m_outputDirectoryBase.c_str(), s2eLast.c_str()) < 0) {
             perror("ERROR: Cannot make symlink s2e-last");
-            exit(1);
+            ::exit(1);
         }
     }
 #endif
@@ -499,9 +506,6 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
     m_warningsFile->rdbuf(m_warningsStreamBuf);
     m_warningsFile->setf(ios_base::unitbuf);
 #endif
-
-    klee::klee_message_stream = m_messageStream;
-    klee::klee_warning_stream = m_warningStream;
 }
 
 void S2E::initKleeOptions()
@@ -541,26 +545,26 @@ void S2E::initPlugins()
     vector<string> pluginNames = getConfig()->getStringList("plugins");
 
     /* Check and load plugins */
-    foreach(const string& pluginName, pluginNames) {
+    for(const string& pluginName : pluginNames) {
         const PluginInfo* pluginInfo = m_pluginsFactory->getPluginInfo(pluginName);
         if(!pluginInfo) {
-            std::cerr << "ERROR: plugin '" << pluginName
+            llvm::errs() << "ERROR: plugin '" << pluginName
                       << "' does not exist in this S2E installation" << '\n';
-            exit(1);
+            ::exit(1);
         } else if(getPlugin(pluginInfo->name)) {
-            std::cerr << "ERROR: plugin '" << pluginInfo->name
+            llvm::errs() << "ERROR: plugin '" << pluginInfo->name
                       << "' was already loaded "
                       << "(is it enabled multiple times ?)" << '\n';
-            exit(1);
+            ::exit(1);
         } else if(!pluginInfo->functionName.empty() &&
                     getPlugin(pluginInfo->functionName)) {
-            std::cerr << "ERROR: plugin '" << pluginInfo->name
+           llvm::errs() << "ERROR: plugin '" << pluginInfo->name
                       << "' with function '" << pluginInfo->functionName
                       << "' can not be loaded because" << '\n'
                       <<  "    this function is already provided by '"
                       << getPlugin(pluginInfo->functionName)->getPluginInfo()->name
                       << "' plugin" << '\n';
-            exit(1);
+            ::exit(1);
         } else {
             Plugin* plugin = m_pluginsFactory->createPlugin(this, pluginName);
             assert(plugin);
@@ -575,19 +579,19 @@ void S2E::initPlugins()
     }
 
     /* Check dependencies */
-    foreach(Plugin* p, m_activePluginsList) {
-        foreach(const string& name, p->getPluginInfo()->dependencies) {
+    for (Plugin* p : m_activePluginsList) {
+        for (const string& name : p->getPluginInfo()->dependencies) {
             if(!getPlugin(name)) {
-                std::cerr << "ERROR: plugin '" << p->getPluginInfo()->name
+                llvm::errs() << "ERROR: plugin '" << p->getPluginInfo()->name
                           << "' depends on plugin '" << name
                           << "' which is not enabled in config" << '\n';
-                exit(1);
+                ::exit(1);
             }
         }
     }
 
     /* Initialize plugins */
-    foreach(Plugin* p, m_activePluginsList) {
+    for (Plugin* p : m_activePluginsList) {
         p->initialize();
     }
 }
@@ -698,13 +702,13 @@ int S2E::fork()
         qemu_init_cpu_loop();
         if (qemu_init_main_loop(&main_loop_err)) {
             fprintf(stderr, "qemu_init_main_loop failed\n");
-            exit(1);
+            ::exit(1);
         }
 
         assert(false && "stubbed");
 //        if (init_timer_alarm(0)<0) {
 //            getDebugStream() << "Could not initialize timers" << '\n';
-//            exit(-1);
+//            ::exit(-1);
 //        }
 //
 //        qemu_init_vcpu(env);

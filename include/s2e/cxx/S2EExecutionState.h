@@ -43,8 +43,10 @@
 //First include C declarations, as name mangling will be C++ otherwise
 #include "s2e/S2EExecutionState.h"
 
+//KLEE includes
 #include <klee/ExecutionState.h>
-#include <klee/Memory.h>
+#include "lib/Core/Memory.h"
+
 #include <cpu.h>
 #include "s2e/cxx/S2EDeviceState.h"
 #include "s2e/cxx/S2EStatsTracker.h"
