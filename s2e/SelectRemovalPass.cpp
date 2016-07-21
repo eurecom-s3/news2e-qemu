@@ -33,8 +33,8 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#include <llvm/Function.h>
-#include <llvm/IRBuilder.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 #include "s2e/cxx/SelectRemovalPass.h"

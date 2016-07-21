@@ -18,6 +18,8 @@ using std::map;
 
 namespace s2e {
 
+const std::string S2EMergingSearcher::NAME = "S2EMergingSearcher";
+
 S2EMergingSearcher::S2EMergingSearcher(Executor &_executor, Searcher *_baseSearcher)
   : executor(_executor),
     baseSearcher(_baseSearcher),

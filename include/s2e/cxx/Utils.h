@@ -40,6 +40,8 @@
 #error This file is not supposed to be included from C!
 #endif /* !defined(__cplusplus) */
 
+#include <llvm/Support/raw_ostream.h>
+
 #include <cstdio>
 #include <cassert>
 #include <ostream>
@@ -47,7 +49,6 @@
 #include <sstream>
 #include <deque>
 #include <inttypes.h>
-#include <llvm/Support/raw_ostream.h>
 #include <klee/Expr.h>
 
 namespace s2e {

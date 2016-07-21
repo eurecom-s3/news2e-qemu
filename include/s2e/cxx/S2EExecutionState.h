@@ -501,6 +501,11 @@ public:
     void flushTlbCache();
 
     void flushTlbCachePage(klee::ObjectState *objectState, int mmu_idx, int index);
+
+    //LLVM style RTTI
+    static const std::string CLASS_NAME;
+    virtual const std::string& getClassName() const override {return S2EExecutionState::CLASS_NAME;}
+    static bool classof(const klee::ExecutionState* es) {return es->getClassName() == CLASS_NAME;}
 };
 
 //Some convenience macros

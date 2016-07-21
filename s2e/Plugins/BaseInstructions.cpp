@@ -382,91 +382,91 @@ void BaseInstructions::printMessage(S2EExecutionState *state, bool isWarning)
 #ifdef TARGET_I386
 void BaseInstructions::invokePlugin(S2EExecutionState *state)
 {
-    BaseInstructionsPluginInvokerInterface *iface = NULL;
-    Plugin *plugin;
-    std::string pluginName;
-    target_ulong pluginNamePointer = 0;
-    target_ulong dataPointer = 0;
-    target_ulong dataSize = 0;
-    target_ulong result = 0;
-    bool ok = true;
-
-    ok &= state->readCpuRegisterConcrete(PARAM0, &pluginNamePointer, sizeof(pluginNamePointer));
-    ok &= state->readCpuRegisterConcrete(PARAM2, &dataPointer, sizeof(dataPointer));
-    ok &= state->readCpuRegisterConcrete(PARAM3, &dataSize, sizeof(dataSize));
-    if(!ok) {
-        s2e()->getWarningsStream(state)
-            << "ERROR: symbolic arguments was passed to s2e_op invokePlugin opcode\n";
-        result = 1;
-        goto fail;
-    }
-
-
-    if (!state->readString(pluginNamePointer, pluginName)) {
-        s2e()->getWarningsStream(state)
-            << "ERROR: invokePlugin could not read name of plugin to invoke\n";
-        result = 2;
-        goto fail;
-    }
-
-    plugin = s2e()->getPlugin(pluginName);
-    if (!plugin) {
-        s2e()->getWarningsStream(state)
-            << "ERROR: invokePlugin could not find plugin " << pluginName << "\n";
-        result = 3;
-        goto fail;
-    }
-
-    iface = dynamic_cast<BaseInstructionsPluginInvokerInterface*>(plugin);
-
-    if (!iface) {
-        s2e()->getWarningsStream(state)
-            << "ERROR: " << pluginName << " is not an instance of BaseInstructionsPluginInvokerInterface\n";
-        result = 4;
-        goto fail;
-    }
-
-    iface->handleOpcodeInvocation(state, dataPointer, dataSize);
-
- fail:
-    state->writeCpuRegisterConcrete(PARAM0, &result, sizeof(result));
+//    BaseInstructionsPluginInvokerInterface *iface = NULL;
+//    Plugin *plugin;
+//    std::string pluginName;
+//    target_ulong pluginNamePointer = 0;
+//    target_ulong dataPointer = 0;
+//    target_ulong dataSize = 0;
+//    target_ulong result = 0;
+//    bool ok = true;
+//
+//    ok &= state->readCpuRegisterConcrete(PARAM0, &pluginNamePointer, sizeof(pluginNamePointer));
+//    ok &= state->readCpuRegisterConcrete(PARAM2, &dataPointer, sizeof(dataPointer));
+//    ok &= state->readCpuRegisterConcrete(PARAM3, &dataSize, sizeof(dataSize));
+//    if(!ok) {
+//        s2e()->getWarningsStream(state)
+//            << "ERROR: symbolic arguments was passed to s2e_op invokePlugin opcode\n";
+//        result = 1;
+//        goto fail;
+//    }
+//
+//
+//    if (!state->readString(pluginNamePointer, pluginName)) {
+//        s2e()->getWarningsStream(state)
+//            << "ERROR: invokePlugin could not read name of plugin to invoke\n";
+//        result = 2;
+//        goto fail;
+//    }
+//
+//    plugin = s2e()->getPlugin(pluginName);
+//    if (!plugin) {
+//        s2e()->getWarningsStream(state)
+//            << "ERROR: invokePlugin could not find plugin " << pluginName << "\n";
+//        result = 3;
+//        goto fail;
+//    }
+//
+//    iface = cast<BaseInstructionsPluginInvokerInterface*>(plugin);
+//
+//    if (!iface) {
+//        s2e()->getWarningsStream(state)
+//            << "ERROR: " << pluginName << " is not an instance of BaseInstructionsPluginInvokerInterface\n";
+//        result = 4;
+//        goto fail;
+//    }
+//
+//    iface->handleOpcodeInvocation(state, dataPointer, dataSize);
+//
+// fail:
+//    state->writeCpuRegisterConcrete(PARAM0, &result, sizeof(result));
 }
-
+//
 void BaseInstructions::assume(S2EExecutionState *state)
 {
-    klee::ref<klee::Expr> expr = state->readCpuRegister(PARAM0, klee::Expr::Int32);
-
-    klee::ref<klee::Expr> zero = klee::ConstantExpr::create(0, expr.get()->getWidth());
-    klee::ref<klee::Expr> boolExpr = klee::NeExpr::create(expr, zero);
-
-
-    //Check that the added constraint is consistent with
-    //the existing path constraints
-    bool isValid = true;
-    if (ConcolicMode) {
-        klee::ref<klee::Expr> ce = state->concolics.evaluate(boolExpr);
-        assert(isa<klee::ConstantExpr>(ce) && "Expression must be constant here");
-        if (!ce->isTrue()) {
-            isValid = false;
-        }
-    } else {
-        bool truth;
-        Solver *solver = s2e()->getExecutor()->getSolver();
-        Query query(state->constraints, boolExpr);
-        bool res = solver->mustBeTrue(query.negateExpr(), truth);
-        if (!res || truth) {
-            isValid = false;
-        }
-    }
-
-    if (!isValid) {
-        std::stringstream ss;
-        ss << "BaseInstructions: specified assume expression cannot be true. "
-                << *boolExpr;
-        g_s2e->getExecutor()->terminateStateEarly(*state, ss.str());
-    }
-
-    state->addConstraint(boolExpr);
+//    klee::ref<klee::Expr> expr = state->readCpuRegister(PARAM0, klee::Expr::Int32);
+//
+//    klee::ref<klee::Expr> zero = klee::ConstantExpr::create(0, expr.get()->getWidth());
+//    klee::ref<klee::Expr> boolExpr = klee::NeExpr::create(expr, zero);
+//
+//
+//    //Check that the added constraint is consistent with
+//    //the existing path constraints
+//    bool isValid = true;
+//    if (ConcolicMode) {
+//        klee::ref<klee::Expr> ce = state->concolics.evaluate(boolExpr);
+//        assert(isa<klee::ConstantExpr>(ce) && "Expression must be constant here");
+//        if (!ce->isTrue()) {
+//            isValid = false;
+//        }
+//    } else {
+//        bool truth;
+//        Solver *solver = s2e()->getExecutor()->getSolver();
+//        Query query(state->constraints, boolExpr);
+//        bool res = solver->mustBeTrue(query.negateExpr(), truth);
+//        if (!res || truth) {
+//            isValid = false;
+//        }
+//    }
+//
+//    if (!isValid) {
+//        std::stringstream ss;
+//        ss << "BaseInstructions: specified assume expression cannot be true. "
+//                << *boolExpr;
+//        g_s2e->getExecutor()->terminateStateEarly(*state, ss.str());
+//    }
+//
+//    state->addConstraint(boolExpr);
 }
 #endif
 

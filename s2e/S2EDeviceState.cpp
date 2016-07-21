@@ -33,6 +33,9 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
+//Needs to be first because of some include bug
+#include "s2e/cxx/Utils.h"
+
 extern "C" {
 #include <qemu-common.h>
 #include <block/block.h>
@@ -47,7 +50,6 @@ void vm_start(void);
 
 #include <iostream>
 #include <sstream>
-#include "s2e/cxx/Utils.h"
 #include "s2e/cxx/S2E.h"
 #include "s2e/s2e_qemu.h"
 #include "llvm/Support/CommandLine.h"

@@ -65,7 +65,7 @@ public:
 
 };
 
-CPUArchStateInfo::FieldIndex CPUArchStateInfo::SYMBOLIC_FIELDS[] = {};
+const CPUArchStateInfo::FieldIndex CPUArchStateInfo::SYMBOLIC_FIELDS[] = {};
 
 #undef ENV_FIELDSIZE
 #undef ENV_FIELDOFFSET

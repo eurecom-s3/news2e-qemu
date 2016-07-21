@@ -21,6 +21,7 @@ class S2EMergingSearcher : public klee::Searcher {
 
   private:
     uint64_t getMergePoint(klee::ExecutionState &es);
+    static const std::string NAME;
 
   public:
     S2EMergingSearcher(klee::Executor &executor, klee::Searcher *baseSearcher);
@@ -33,9 +34,10 @@ class S2EMergingSearcher : public klee::Searcher {
                 const std::set<klee::ExecutionState*> &addedStates,
                 const std::set<klee::ExecutionState*> &removedStates);
     bool empty() { return baseSearcher->empty() && statesAtMerge.empty(); }
-    void printName(llvm::raw_ostream &os) {
-      os << "S2EMergingSearcher\n";
-    }
+
+    virtual const std::string& getName() const override {return NAME;}
+    //LLVM-style RTTI
+    static bool classof(klee::Searcher* s) {return s->getName() == NAME;}
   };
 
 

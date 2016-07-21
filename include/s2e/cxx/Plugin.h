@@ -87,6 +87,9 @@ public:
         m_CachedPluginS2EState = NULL;
         m_CachedPluginState = NULL;
     }
+
+    //LLVM-style RTTI
+    static bool classof(const Plugin* plg) {return true;}
 };
 
 #define DECLARE_PLUGINSTATE_P(plg, c, execstate) \
@@ -183,6 +186,8 @@ public:
     public:                                                                        \
         virtual const PluginInfo* getPluginInfo() const { return &s_pluginInfo; }  \
         static  const PluginInfo* getPluginInfoStatic() { return &s_pluginInfo; }  \
+		/* LLVM-style RTTI */                                                      \
+		static bool classof(const Plugin* plg);                                    \
     private:
 
 /** Defines an S2E plugin. Should be put in a cpp file.
@@ -196,7 +201,11 @@ public:
          "pluginsConfig['" #className "']",                                        \
         _pluginCreatorHelper<className>                                            \
     }; \
-    static CompiledPlugin s_##className(className::getPluginInfoStatic())
+    /* LLVM-style RTTI */                                                          \
+    bool className::classof(const Plugin* plg) {                                   \
+    	return plg->getPluginInfo()->name == className::s_pluginInfo.name;         \
+    }                                                                              \
+	static CompiledPlugin s_##className(className::getPluginInfoStatic())
 
 template<class C>
 Plugin* _pluginCreatorHelper(S2E* s2e) { return new C(s2e); }

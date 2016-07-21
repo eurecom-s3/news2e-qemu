@@ -50,7 +50,7 @@ extern MemoryRegion io_mem_unassigned;
 #include <s2e/s2e_qemu.h>
 #include "exec/s2e.h"
 
-#include <llvm/Module.h>
+#include <llvm/IR/Module.h>
 
 #include <vector>
 

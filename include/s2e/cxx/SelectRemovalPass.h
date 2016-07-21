@@ -41,7 +41,7 @@
 #endif /* !defined(__cplusplus) */
 
 #include "llvm/Pass.h"
-#include "llvm/Function.h"
+#include "llvm/IR/Function.h"
 
 
   struct SelectRemovalPass : public llvm::FunctionPass {

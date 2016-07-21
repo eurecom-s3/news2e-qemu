@@ -34,6 +34,7 @@
  */
 
 #include <llvm/Support/Path.h> /* XXX: Needs to be here because of mysterious compiler errors */
+#include "s2e/cxx/S2E.h"
 
 // XXX: qemu stuff should be included before anything from KLEE or LLVM !
 extern "C" {
@@ -47,8 +48,6 @@ extern "C" {
 }
 
 #include "s2e/cxx/TCGLLVMContext.h"
-
-#include "s2e/cxx/S2E.h"
 
 #include "s2e/cxx/Plugin.h"
 #include "s2e/Plugins/CorePlugin.h"
@@ -64,7 +63,7 @@ extern "C" {
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include <llvm/Module.h>
+#include <llvm/IR/Module.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/Bitcode/ReaderWriter.h>
 
@@ -102,6 +101,9 @@ void print_stacktrace(void)
 #include <stdlib.h>
 #include <execinfo.h>
 #include <cxxabi.h>
+
+using llvm::SmallString;
+using llvm::error_code;
 
 using klee::MemoryObject;
 using klee::Context;
@@ -284,7 +286,7 @@ void S2E::writeBitCodeToFile()
 {
     std::string error;
     std::string fileName = getOutputFilename("module.bc");
-    llvm::raw_fd_ostream o(fileName.c_str(), error, llvm::raw_fd_ostream::F_Binary);
+    llvm::raw_fd_ostream o(fileName.c_str(), error, llvm::sys::fs::F_Binary);
 
     llvm::Module *module = m_tcgLLVMContext->getModule();
 
@@ -355,8 +357,8 @@ Plugin* S2E::getPlugin(const std::string& name) const
 
 std::string S2E::getOutputFilename(const std::string &fileName)
 {
-    llvm::sys::Path filePath(m_outputDirectory);
-    filePath.appendComponent(fileName);
+    SmallString<256> filePath(m_outputDirectory);
+    llvm::sys::path::append(filePath, fileName);
     return filePath.str();
 }
 
@@ -364,7 +366,7 @@ llvm::raw_fd_ostream* S2E::openOutputFile(const std::string &fileName)
 {
     std::string path = getOutputFilename(fileName);
     std::string error;
-    llvm::raw_fd_ostream *f = new llvm::raw_fd_ostream(path.c_str(), error, llvm::raw_fd_ostream::F_Binary);
+    llvm::raw_fd_ostream *f = new llvm::raw_fd_ostream(path.c_str(), error, llvm::sys::fs::F_Binary);
 
     if (!f || error.size()>0) {
         llvm::errs() << "Error opening " << path << ": " << error << "\n";
@@ -379,19 +381,17 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
     if (!forked) {
         //In case we create the first S2E process
         if (outputDirectory.empty()) {
-            llvm::sys::Path cwd = llvm::sys::Path::GetCurrentDirectory();
+        	SmallString<256> cwd;
+        	llvm::sys::fs::current_path(cwd);
 
             for (int i = 0; ; i++) {
                 ostringstream dirName;
                 dirName << "s2e-out-" << i;
 
-                llvm::sys::Path dirPath(cwd);
-                dirPath.appendComponent(dirName.str());
+                SmallString<256> dirPath(cwd);
+                llvm::sys::path::append(dirPath, dirName.str());
 
-                bool exists = false;
-                llvm::sys::fs::exists(dirPath.str(), exists);
-
-                if(!exists) {
+                if(!llvm::sys::fs::exists(dirPath.str())) {
                     m_outputDirectory = dirPath.str();
                     break;
                 }
@@ -410,48 +410,38 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
     if (m_maxProcesses > 1) {
         // Create one output directory per child process.
         // This prevents child processes from clobbering each other's output.
-        llvm::sys::Path dirPath(m_outputDirectory);
+        SmallString<256> dirPath(m_outputDirectory);
 
         ostringstream oss;
         oss << m_currentProcessIndex;
 
-        dirPath.appendComponent(oss.str());
-        bool exists = false;
-        llvm::sys::fs::exists(dirPath.str(), exists);
+        llvm::sys::path::append(dirPath, oss.str());
 
-        assert(!exists);
+        assert(!llvm::sys::fs::exists(dirPath.str()));
         m_outputDirectory = dirPath.str();
     }
 #endif
 
     std::cout << "S2E: output directory = \"" << m_outputDirectory << "\"\n";
 
-    llvm::sys::Path outDir(m_outputDirectory);
-    std::string mkdirError;
-
-#ifdef _WIN32
-    //XXX: If set to true on Windows, it fails when parent directories exist
-    //For now, we assume that only the last component needs to be created
-    if (outDir.createDirectoryOnDisk(false, &mkdirError)) {
-#else
-    if (outDir.createDirectoryOnDisk(true, &mkdirError)) {
-#endif
-        llvm::errs() << "Could not create output directory " << outDir.str() <<
-                " error: " << mkdirError << '\n';
+    if (error_code ec = llvm::sys::fs::create_directories(m_outputDirectory))  {
+        llvm::errs() << "Could not create output directory " << m_outputDirectory <<
+                " error: " << ec.message() << '\n';
         ::exit(-1);
     }
 
 #ifndef _WIN32
     if (!forked) {
-        llvm::sys::Path s2eLast(".");
-        s2eLast.appendComponent("s2e-last");
+        SmallString<256> s2eLast(".");
+        llvm::sys::path::append(s2eLast, "s2e-last");
 
-        if ((unlink(s2eLast.c_str()) < 0) && (errno != ENOENT)) {
+        bool existed;
+        if (llvm::sys::fs::remove(s2eLast.str(), existed) != error_code::success() && existed) {
             perror("ERROR: Cannot unlink s2e-last");
             ::exit(1);
         }
 
-        if (symlink(m_outputDirectoryBase.c_str(), s2eLast.c_str()) < 0) {
+        if (llvm::sys::fs::create_symlink(m_outputDirectoryBase, s2eLast.str()) != error_code::success()) {
             perror("ERROR: Cannot make symlink s2e-last");
             ::exit(1);
         }
@@ -531,9 +521,8 @@ void S2E::initPlugins()
 {
     m_pluginsFactory = new PluginsFactory();
 
-    m_corePlugin = dynamic_cast<CorePlugin*>(
+    m_corePlugin = cast<CorePlugin>(
             m_pluginsFactory->createPlugin(this, "CorePlugin"));
-    assert(m_corePlugin);
 
     m_activePluginsList.push_back(m_corePlugin);
     m_activePluginsMap.insert(

@@ -57,7 +57,9 @@ namespace llvm {
     class Module;
     class ModuleProvider;
     class ExecutionEngine;
-    class FunctionPassManager;
+    namespace legacy {
+        class FunctionPassManager;
+    }
 }
 
 class TCGLLVMContextPrivate;
@@ -80,7 +82,7 @@ public:
     llvm::ExecutionEngine* getExecutionEngine();
 
     void deleteExecutionEngine();
-    llvm::FunctionPassManager* getFunctionPassManager() const;
+    llvm::legacy::FunctionPassManager* getFunctionPassManager() const;
 
     /** Called after linking all helper libraries */
     void initializeHelpers();

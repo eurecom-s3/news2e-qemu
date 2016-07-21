@@ -102,13 +102,13 @@ uint64_t helper_set_cc_op_eflags(void);
 
 #include "s2e/s2e_qemu.h"
 
-#include <llvm/Module.h>
-#include <llvm/Function.h>
-#include <llvm/DerivedTypes.h>
-#include <llvm/Instructions.h>
-#include <llvm/Constants.h>
-#include <llvm/PassManager.h>
-#include <llvm/DataLayout.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/Support/DynamicLibrary.h>
@@ -149,7 +149,7 @@ using namespace std;
 using namespace llvm;
 using namespace klee;
 
-using llvm::PassManager;
+using llvm::legacy::PassManager;
 using llvm::createInternalizePass;
 using llvm::createGlobalOptimizerPass;
 
@@ -448,12 +448,11 @@ void S2EExecutor::handlerTraceMemoryAccess(Executor* executor,
                                      klee::KInstruction* target,
                                      std::vector<klee::ref<klee::Expr> > &args)
 {
-    assert(dynamic_cast<S2EExecutor*>(executor));
+    S2EExecutor* self = cast<S2EExecutor>(executor);
+    assert(self && "Got KLEE executor instead of S2EExecutor");
 
-    S2EExecutor* s2eExecutor = static_cast<S2EExecutor*>(executor);
-    if(!s2eExecutor->m_s2e->getCorePlugin()->onDataMemoryAccess.empty()) {
-        assert(dynamic_cast<S2EExecutionState*>(state));
-        S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    if(!self->m_s2e->getCorePlugin()->onDataMemoryAccess.empty()) {
+        S2EExecutionState* s2eState = cast<S2EExecutionState>(state);
 
         assert(args.size() == 6);
 
@@ -463,7 +462,7 @@ void S2EExecutor::handlerTraceMemoryAccess(Executor* executor,
 
         klee::ref<Expr> value = klee::ExtractExpr::create(args[2], 0, width);
 
-        klee::ref<Expr> result = s2eExecutor->m_s2e->getCorePlugin()->onDataMemoryAccess.emit(
+        klee::ref<Expr> result = self->m_s2e->getCorePlugin()->onDataMemoryAccess.emit(
                 s2eState, args[0], args[1], value, isWrite, isIO);
 
         if (value != result)
@@ -491,11 +490,9 @@ void S2EExecutor::handlerOnTlbMiss(Executor* executor,
                                      klee::KInstruction* target,
                                      std::vector<klee::ref<klee::Expr> > &args)
 {
-    assert(dynamic_cast<S2EExecutor*>(executor));
-
     assert(args.size() == 4);
 
-    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    S2EExecutionState* s2eState = cast<S2EExecutionState>(state);
     klee::ref<Expr> addr = args[2];
     bool isWrite = cast<klee::ConstantExpr>(args[3])->getZExtValue();
 
@@ -519,13 +516,10 @@ void S2EExecutor::handlerTracePortAccess(Executor* executor,
                                      klee::KInstruction* target,
                                      std::vector<klee::ref<klee::Expr> > &args)
 {
-    assert(dynamic_cast<S2EExecutor*>(executor));
-
-    S2EExecutor* s2eExecutor = static_cast<S2EExecutor*>(executor);
+    S2EExecutor* s2eExecutor = cast<S2EExecutor>(executor);
 
     if(!s2eExecutor->m_s2e->getCorePlugin()->onPortAccess.empty()) {
-        assert(dynamic_cast<S2EExecutionState*>(state));
-        S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+        S2EExecutionState* s2eState = cast<S2EExecutionState>(state);
 
         assert(args.size() == 4);
 
@@ -544,7 +538,7 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
                                      klee::KInstruction* target,
                                      std::vector< klee::ref<Expr> > &args)
 {
-    S2EExecutor* s2eExecutor = static_cast<S2EExecutor*>(executor);
+    S2EExecutor* s2eExecutor = cast<S2EExecutor>(executor);
 
     assert(args.size() == 3);
     klee::ref<Expr> address = args[0];
@@ -617,7 +611,7 @@ void S2EExecutor::handleGetValue(klee::Executor* executor,
                                  klee::ExecutionState* state,
                                  klee::KInstruction* target,
                                  std::vector<klee::ref<klee::Expr> > &args) {
-    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    S2EExecutionState* s2eState = cast<S2EExecutionState>(state);
     assert(args.size() == 3 &&
            "Expected three args to tcg_llvm_get_value: addr, size, add_constraint");
 
@@ -823,6 +817,8 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     }
 
 }
+
+const std::string S2EExecutor::CLASS_NAME = "s2e::S2EExecutor";
 
 void S2EExecutor::cleanModule(Module* mod)
 {
@@ -1661,10 +1657,8 @@ S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
     }
 
     ExecutionState& newKleeState = *nstate;
-    assert(dynamic_cast<S2EExecutionState*>(&newKleeState));
 
-    S2EExecutionState* newState =
-            static_cast<S2EExecutionState*  >(&newKleeState);
+    S2EExecutionState* newState = cast<S2EExecutionState>(&newKleeState);
     assert(states.find(newState) != states.end());
 
     if(!state->m_active) {
@@ -1685,7 +1679,7 @@ S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
 
     //We can't free the state immediately if it is the current state.
     //Do it now.
-    foreach(S2EExecutionState* s, m_deletedStates) {
+    for (S2EExecutionState* s : m_deletedStates) {
         assert(s != newState);
         unrefS2ETb(s->m_lastS2ETb);
         s->m_lastS2ETb = NULL;
@@ -2209,9 +2203,8 @@ klee::ref<klee::Expr> S2EExecutor::executeFunction(S2EExecutionState *state,
 
 void S2EExecutor::deleteState(klee::ExecutionState *state)
 {
-    assert(dynamic_cast<S2EExecutionState*>(state));
     processTree->remove(state->ptreeNode);
-    m_deletedStates.push_back(static_cast<S2EExecutionState*>(state));
+    m_deletedStates.push_back(cast<S2EExecutionState>(state));
 }
 
 void S2EExecutor::doStateFork(S2EExecutionState *originalState,
@@ -2252,8 +2245,7 @@ void S2EExecutor::doStateFork(S2EExecutionState *originalState,
 S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
                             klee::ref<Expr> condition, bool isInternal)
 {
-    assert(dynamic_cast<S2EExecutionState*>(&current));
-    assert(!static_cast<S2EExecutionState*>(&current)->m_runningConcrete);
+	assert(cast<S2EExecutionState>(&current)->m_runningConcrete);
 
     StatePair res;
 
@@ -2264,20 +2256,16 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
     }
 
     if(res.first && res.second) {
-
-        assert(dynamic_cast<S2EExecutionState*>(res.first));
-        assert(dynamic_cast<S2EExecutionState*>(res.second));
-
         std::vector<S2EExecutionState*> newStates(2);
         std::vector<klee::ref<Expr> > newConditions(2);
 
-        newStates[0] = static_cast<S2EExecutionState*>(res.first);
-        newStates[1] = static_cast<S2EExecutionState*>(res.second);
+        newStates[0] = cast<S2EExecutionState>(res.first);
+        newStates[1] = cast<S2EExecutionState>(res.second);
 
         newConditions[0] = condition;
         newConditions[1] = klee::NotExpr::create(condition);
 
-        doStateFork(static_cast<S2EExecutionState*>(&current),
+        doStateFork(cast<S2EExecutionState>(&current),
                        newStates, newConditions);
     }
     return res;
@@ -2289,7 +2277,7 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
  */
 void S2EExecutor::notifyBranch(ExecutionState &state)
 {
-    S2EExecutionState *s2eState = dynamic_cast<S2EExecutionState*>(&state);
+    S2EExecutionState *s2eState = cast<S2EExecutionState>(&state);
 
     /* Checkpoint the device state before branching */
     llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: Checkpoint device state before branching" << '\n';
@@ -2326,7 +2314,7 @@ void S2EExecutor::branch(klee::ExecutionState &state,
           const vector<klee::ref<Expr> > &conditions,
           vector<ExecutionState*> &result)
 {
-    S2EExecutionState *s2eState = dynamic_cast<S2EExecutionState*>(&state);
+    S2EExecutionState *s2eState = cast<S2EExecutionState>(&state);
     assert(!s2eState->m_runningConcrete);
 
     Executor::branch(state, conditions, result);
@@ -2341,38 +2329,36 @@ void S2EExecutor::branch(klee::ExecutionState &state,
 
     for(unsigned i = 0; i < n; ++i) {
         if(result[i]) {
-            assert(dynamic_cast<S2EExecutionState*>(result[i]));
-            newStates.push_back(static_cast<S2EExecutionState*>(result[i]));
+            assert(cast<S2EExecutionState>(result[i]));
+            newStates.push_back(cast<S2EExecutionState>(result[i]));
             newConditions.push_back(conditions[i]);
         }
     }
 
     if(newStates.size() > 1) {
-        doStateFork(static_cast<S2EExecutionState*>(&state),
+        doStateFork(cast<S2EExecutionState>(&state),
                        newStates, newConditions);
     }
 }
 
 bool S2EExecutor::merge(klee::ExecutionState &_base, klee::ExecutionState &_other)
 {
-    assert(dynamic_cast<S2EExecutionState*>(&_base));
-    assert(dynamic_cast<S2EExecutionState*>(&_other));
-    S2EExecutionState& base = static_cast<S2EExecutionState&>(_base);
-    S2EExecutionState& other = static_cast<S2EExecutionState&>(_other);
+    S2EExecutionState* base = cast<S2EExecutionState>(&_base);
+    S2EExecutionState* other = cast<S2EExecutionState>(&_other);
 
     /* Ensure that both states are inactive, otherwise merging will not work */
-    if(base.m_active)
-        doStateSwitch(&base, NULL);
-    else if(other.m_active)
-        doStateSwitch(&other, NULL);
+    if(base->m_active)
+        doStateSwitch(base, NULL);
+    else if(other->m_active)
+        doStateSwitch(other, NULL);
 
-    if(base.merge(other)) {
-        m_s2e->getMessagesStream(&base)
-                << "Merged with state " << other.getID() << '\n';
+    if(base->merge(*other)) {
+        m_s2e->getMessagesStream(base)
+                << "Merged with state " << other->getID() << '\n';
         return true;
     } else {
-        m_s2e->getDebugStream(&base)
-                << "Merge with state " << other.getID() << " failed" << '\n';
+        m_s2e->getDebugStream(base)
+                << "Merge with state " << other->getID() << " failed" << '\n';
         return false;
     }
 }
@@ -2619,7 +2605,7 @@ void S2EExecutor::unrefS2ETb(S2ETranslationBlock* s2e_tb)
 
 void S2EExecutor::queueStateForMerge(S2EExecutionState *state)
 {
-    if(dynamic_cast<MergingSearcher*>(searcher) == NULL) {
+    if(!isa<MergingSearcher>(searcher)) {
         m_s2e->getWarningsStream(state)
                 << "State merging request is ignored because"
                    " MergingSearcher is not activated\n";

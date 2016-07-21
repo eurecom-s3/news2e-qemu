@@ -135,6 +135,11 @@ public:
                 klee::InterpreterHandler *ie);
     virtual ~S2EExecutor();
 
+    //LLVM style RTTI
+    static const std::string CLASS_NAME;
+    virtual const std::string& getClassName() const override {return S2EExecutor::CLASS_NAME;}
+    static bool classof(const klee::Executor* e) {return e->getClassName() == CLASS_NAME;}
+
     void flushTb();
 
     /** Create initial execution state */

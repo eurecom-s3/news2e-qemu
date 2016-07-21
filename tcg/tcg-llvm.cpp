@@ -69,24 +69,24 @@ static void *qemu_st_helpers[5] = {
 
 }
 
-#include <llvm/DerivedTypes.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JITMemoryManager.h>
 #include <llvm/ExecutionEngine/JIT.h>
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
-#include <llvm/PassManager.h>
-#include <llvm/Intrinsics.h>
 #include <llvm/Analysis/Verifier.h>
-#include <llvm/DataLayout.h>
-#include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/Scalar.h>
-#include <llvm/IRBuilder.h>
-#include <llvm/Support/Threading.h>
-#include <llvm/Support/IRReader.h>
-
+#include <llvm/IRReader/IRReader.h>
+#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/Threading.h>
 
 #include <iostream>
 #include <sstream>
@@ -101,9 +101,44 @@ TCGLLVMRuntime tcg_llvm_runtime = {
     , 0
 };
 
+using llvm::legacy::FunctionPassManager;
+using llvm::LLVMContext;
+using llvm::IRBuilder;
+using llvm::ExecutionEngine;
+using llvm::Module;
+using llvm::Function;
+using llvm::BasicBlock;
+using llvm::Value;
+using llvm::getGlobalContext;
+using llvm::InitializeNativeTarget;
+using llvm::GlobalValue;
+using llvm::DataLayout;
+using llvm::createReassociatePass;
+using llvm::createDeadStoreEliminationPass;
+using llvm::createPromoteMemoryToRegisterPass;
+using llvm::createCFGSimplificationPass;
+using llvm::createGVNPass;
+using llvm::createInstructionCombiningPass;
+using llvm::createConstantPropagationPass;
+using llvm::JITMemoryManager;
+using llvm::IntegerType;
+using llvm::ConstantInt;
+using llvm::PointerType;
+using llvm::Constant;
+using llvm::toStringRef;
+using llvm::SmallVector;
+using llvm::FunctionType;
+using llvm::sys::DynamicLibrary;
+using llvm::ArrayRef;
+using llvm::StringRef;
+using llvm::APInt;
+using llvm::SMDiagnostic;
+using llvm::ParseIR;
+using llvm::MemoryBuffer;
+using llvm::ReturnInst;
 
+namespace Intrinsic = llvm::Intrinsic;
 
-using namespace llvm;
 
 class TJITMemoryManager;
 
@@ -301,38 +336,35 @@ public:
         return m_base->allocateGlobal(Size, Alignment);
     }
     uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
-                                 unsigned SectionID) {
-        return m_base->allocateCodeSection(Size, Alignment, SectionID);
+                                 unsigned SectionID,
+								 StringRef SectionName) override {
+        return m_base->allocateCodeSection(Size,
+        		Alignment, SectionID, SectionName);
     }
     uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
-                                 unsigned SectionID) {
-        return m_base->allocateDataSection(Size, Alignment, SectionID);
+                                 unsigned SectionID,
+								 StringRef SectionName,
+								 bool isReadOnly) override {
+        return m_base->allocateDataSection(Size,
+        		Alignment, SectionID, SectionName, isReadOnly);
     }
     void *getPointerToNamedFunction(const std::string &Name,
                                     bool AbortOnFailure = true) {
         return m_base->getPointerToNamedFunction(Name, AbortOnFailure);
     }
-    //void deallocateMemForFunction(const Function *F) {
-    //    m_base->deallocateMemForFunction(F);
-    //}
 
-    virtual void deallocateFunctionBody(void *Body) {
+    void deallocateFunctionBody(void *Body) override {
         m_base->deallocateFunctionBody(Body);
     }
 
-    uint8_t* startExceptionTable(const Function* F, uintptr_t &ActualSize) {
-        return m_base->startExceptionTable(F, ActualSize);
+    bool finalizeMemory(std::string *ErrMsg) override {
+    	return m_base->finalizeMemory(ErrMsg);
     }
-    void endExceptionTable(const Function *F, uint8_t *TableStart,
-                                 uint8_t *TableEnd, uint8_t* FrameRegister) {
-        m_base->endExceptionTable(F, TableStart, TableEnd, FrameRegister);
+
+    bool CheckInvariants(std::string &ErrorStr) override {
+            return m_base->CheckInvariants(ErrorStr);
     }
-    virtual void deallocateExceptionTable(void *Body) {
-        m_base->deallocateExceptionTable(Body);
-    }
-    bool CheckInvariants(std::string &ErrorStr) {
-        return m_base->CheckInvariants(ErrorStr);
-    }
+
     size_t GetDefaultCodeSlabSize() {
         return m_base->GetDefaultCodeSlabSize();
     }
@@ -354,9 +386,9 @@ extern "C" const char _binary_op_helpers_bca_end;
 
 llvm::Module* TCGLLVMContext::getCompiledBitcode(llvm::LLVMContext& context)
 {
-	llvm::SMDiagnostic smerror;
-	llvm::Module* module  = llvm::ParseIR(
-	        llvm::MemoryBuffer::getMemBuffer(
+	SMDiagnostic smerror;
+	Module* module  = ParseIR(
+	        MemoryBuffer::getMemBuffer(
 	            StringRef(&_binary_op_helpers_bca_start, &_binary_op_helpers_bca_end - &_binary_op_helpers_bca_start),
 	            "op_helpers.bc",
 	            false),
@@ -862,7 +894,7 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
                 m_executionEngine->addGlobalMapping(helperFunc,
                                                     (void*) helperAddrC);
                 /* XXX: Why do we need this ? */
-                sys::DynamicLibrary::AddSymbol(funcName, (void*) helperAddrC);
+                DynamicLibrary::AddSymbol(funcName, (void*) helperAddrC);
             }
 
             //Helper function types are compiled with clang and may differ in types
@@ -1158,7 +1190,7 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
         assert(getValue(args[1])->getType() == intType(bits));      \
         llvm::Type* Tys[] = { intType(sBits) };                     \
         Function *bswap = Intrinsic::getDeclaration(m_module,       \
-                Intrinsic::bswap, ArrayRef<llvm::Type*>(Tys,1));                          \
+                Intrinsic::bswap, ArrayRef<llvm::Type*>(Tys,1));    \
         v = m_builder.CreateTrunc(getValue(args[1]),intType(sBits));\
         setValue(args[0], m_builder.CreateZExt(                     \
                 m_builder.CreateCall(bswap, v), intType(bits)));    \
@@ -1516,7 +1548,7 @@ TCGLLVMContext::~TCGLLVMContext()
     delete m_private;
 }
 
-llvm::FunctionPassManager* TCGLLVMContext::getFunctionPassManager() const
+FunctionPassManager* TCGLLVMContext::getFunctionPassManager() const
 {
     return m_private->getFunctionPassManager();
 }

@@ -2609,14 +2609,16 @@ struct jit_descriptor {
     struct jit_code_entry *first_entry;
 };
 
-void __jit_debug_register_code(void) __attribute__((noinline));
 #if !defined(CONFIG_S2E)
 /* Do not include this descriptor in S2E code, as LLVM already provides
  * it */
+void __jit_debug_register_code(void) __attribute__((noinline));
 void __jit_debug_register_code(void)
 {
     asm("");
 }
+#else /*!defined(CONFIG_S2E) */
+#define __jit_debug_descriptor __qemu_jit_debug_descriptor
 #endif /* !defined(CONFIG_S2E) */
 
 /* Must statically initialize the version, because GDB may check

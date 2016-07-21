@@ -53,8 +53,8 @@ extern "C" {
 
 }
 
-#include "s2e/cxx/S2EExecutionState.h"
 #include <s2e/cxx/S2EDeviceState.h>
+#include "s2e/cxx/S2EExecutionState.h"
 #include "s2e/cxx/S2EExecutor.h"
 #include <s2e/cxx/Plugin.h>
 #include <s2e/cxx/Utils.h>
@@ -120,6 +120,8 @@ MemoryObject *S2EExecutionState::m_cpuState = nullptr;
 MemoryObject *S2EExecutionState::m_dirtyMask = NULL;
 
 unsigned S2EExecutionState::s_lastSymbolicId = 0;
+
+const std::string S2EExecutionState::CLASS_NAME = "s2e::S2EExecutionState";
 
 S2EExecutionState::S2EExecutionState(klee::KFunction *kf) :
         klee::ExecutionState(kf), m_stateID(g_s2e->fetchAndIncrementStateId()),

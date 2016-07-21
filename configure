@@ -3084,10 +3084,10 @@ fi
 # llvm support probe
 
 llvm_version_major_required=3
-llvm_version_minor_required=2
+llvm_version_minor_required=4
 
 llvm_required=no
-llvm_components="jit asmparser bitreader bitwriter ipo linker engine"
+llvm_components="jit bitreader bitwriter ipo linker engine irreader"
 for target in $target_list; do
   case $target in
     *-s2e-softmmu)
@@ -3099,7 +3099,7 @@ done
 llvm=no
 if test "$llvm_required" = "yes"; then
   cat > $TMPCXX << EOF
-#include <llvm/LLVMContext.h>
+#include <llvm/IR/LLVMContext.h>
 int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); c.getInlineAsmDiagnosticContext(); return 0;}
 EOF
   llvm_version=$( $llvm_config --version 2> /dev/null | grep -o '^[0-9].[0-9]' )
@@ -3143,7 +3143,7 @@ fi
 
 if test "$s2e" = "yes" ; then
   cat > $TMPCXX << EOF
-#include <llvm/LLVMContext.h>
+#include <llvm/IR/LLVMContext.h>
 #include <klee/Common.h>
 #include <klee/util/BitArray.h>
 int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); klee::BitArray(32); return 0; }
