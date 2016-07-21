@@ -364,6 +364,8 @@ numa=""
 tcmalloc="no"
 jemalloc="no"
 address_sanitizer="no"
+stpdir=""
+minisat_dir=""
 
 # parse CC options first
 for opt do
@@ -988,6 +990,8 @@ for opt do
   --with-klee-src=*) kleesrcdir="$optarg"
   ;;
   --with-stp=*) stpdir="$optarg"
+  ;;
+  --with-minisat=*) minisat_dir="$optarg"
   ;;
   --disable-kvm) kvm="no"
   ;;
@@ -3165,6 +3169,15 @@ EOF
     klee_libs="$klee_libs -lstp"
     klee_ldflags="$klee_ldflags -L$stpdir/lib"
   fi
+  
+  if test x"$minisat_dir" != x""; then
+    minisat_dir=$(cd $minisat_dir>/dev/null && pwd)
+    klee_libs="$klee_libs -lminisat"
+    klee_ldflags="$klee_ldflags -L$minisat_dir"
+  fi
+  
+  #Use static library version for KLEE and dependencies
+  klee_libs="-Wl,-Bstatic $klee_libs -Wl,-Bdynamic"
 
   if compile_prog_cxx "$klee_cxxflags $llvm_cxxflags" "$klee_ldflags $klee_libs $llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then
     s2e="yes"
