@@ -6,7 +6,7 @@
 #include "qemu/notify.h"
 #include "qemu/host-utils.h"
 
-#define NANOSECONDS_PER_SECOND 1000000000LL
+#define QEMU_NANOSECONDS_PER_SECOND 1000000000LL
 
 /* timers */
 

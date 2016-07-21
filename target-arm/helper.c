@@ -720,7 +720,7 @@ void pmccntr_sync(CPUARMState *env)
     uint64_t temp_ticks;
 
     temp_ticks = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
-                          ARM_CPU_FREQ, NANOSECONDS_PER_SECOND);
+                          ARM_CPU_FREQ, QEMU_NANOSECONDS_PER_SECOND);
 
     if (env->cp15.c9_pmcr & PMCRD) {
         /* Increment once every 64 processor clock cycles */
@@ -759,7 +759,7 @@ static uint64_t pmccntr_read(CPUARMState *env, const ARMCPRegInfo *ri)
     }
 
     total_ticks = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
-                           ARM_CPU_FREQ, NANOSECONDS_PER_SECOND);
+                           ARM_CPU_FREQ, QEMU_NANOSECONDS_PER_SECOND);
 
     if (env->cp15.c9_pmcr & PMCRD) {
         /* Increment once every 64 processor clock cycles */
@@ -780,7 +780,7 @@ static void pmccntr_write(CPUARMState *env, const ARMCPRegInfo *ri,
     }
 
     total_ticks = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
-                           ARM_CPU_FREQ, NANOSECONDS_PER_SECOND);
+                           ARM_CPU_FREQ, QEMU_NANOSECONDS_PER_SECOND);
 
     if (env->cp15.c9_pmcr & PMCRD) {
         /* Increment once every 64 processor clock cycles */

@@ -39,7 +39,7 @@ static void test_average(void)
     int i;
 
     /* we will compute some average on a period of 1 second */
-    timed_average_init(&ta, QEMU_CLOCK_VIRTUAL, NANOSECONDS_PER_SECOND);
+    timed_average_init(&ta, QEMU_CLOCK_VIRTUAL, QEMU_NANOSECONDS_PER_SECOND);
 
     result = timed_average_min(&ta);
     g_assert(result == 0);
@@ -56,10 +56,10 @@ static void test_average(void)
         g_assert(result == 3);
         result = timed_average_max(&ta);
         g_assert(result == 5);
-        my_clock_value += NANOSECONDS_PER_SECOND / 10;
+        my_clock_value += QEMU_NANOSECONDS_PER_SECOND / 10;
     }
 
-    my_clock_value += NANOSECONDS_PER_SECOND * 100;
+    my_clock_value += QEMU_NANOSECONDS_PER_SECOND * 100;
 
     result = timed_average_min(&ta);
     g_assert(result == 0);
@@ -76,7 +76,7 @@ static void test_average(void)
         g_assert(result == 3);
         result = timed_average_max(&ta);
         g_assert(result == 5);
-        my_clock_value += NANOSECONDS_PER_SECOND / 10;
+        my_clock_value += QEMU_NANOSECONDS_PER_SECOND / 10;
     }
 }
 

@@ -29,7 +29,7 @@
 #include "sysemu/qtest.h"
 
 static QEMUClockType clock_type = QEMU_CLOCK_REALTIME;
-static const int qtest_latency_ns = NANOSECONDS_PER_SECOND / 1000;
+static const int qtest_latency_ns = QEMU_NANOSECONDS_PER_SECOND / 1000;
 
 void block_acct_init(BlockAcctStats *stats, bool account_invalid,
                      bool account_failed)
@@ -61,7 +61,7 @@ void block_acct_add_interval(BlockAcctStats *stats, unsigned interval_length)
 
     for (i = 0; i < BLOCK_MAX_IOTYPE; i++) {
         timed_average_init(&s->latency[i], clock_type,
-                           (uint64_t) interval_length * NANOSECONDS_PER_SECOND);
+                           (uint64_t) interval_length * QEMU_NANOSECONDS_PER_SECOND);
     }
 }
 
