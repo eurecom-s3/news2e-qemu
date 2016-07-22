@@ -3147,10 +3147,14 @@ fi
 
 if test "$s2e" = "yes" ; then
   cat > $TMPCXX << EOF
-#include <llvm/IR/LLVMContext.h>
-#include <klee/Common.h>
+#include <stdint.h>
+#include <cstring>
 #include <klee/util/BitArray.h>
-int main(void) { llvm::LLVMContext& c = llvm::getGlobalContext(); klee::BitArray(32); return 0; }
+
+int main(void) {
+    klee::BitArray(32);
+    return 0;
+}
 EOF
   if test "$kleedir" = ""; then
       error_exit "configuration switch --with-klee=... must be passed when compiling for S2E."
@@ -3176,8 +3180,13 @@ EOF
     klee_ldflags="$klee_ldflags -L$minisat_dir"
   fi
   
-  #Use static library version for KLEE and dependencies
-  klee_libs="-Wl,-Bstatic $klee_libs -Wl,-Bdynamic"
+  #If we are not compiling with ASAN support,
+  #use static library version for KLEE and dependencies
+  #(ASAN doesn't work with static linking)
+
+  if test x"$address_sanitizer" != x"yes"; then
+    klee_libs="-Wl,-Bstatic $klee_libs -Wl,-Bdynamic"
+  fi
 
   if compile_prog_cxx "$klee_cxxflags $llvm_cxxflags" "$klee_ldflags $klee_libs $llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then
     s2e="yes"
