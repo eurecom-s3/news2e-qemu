@@ -1300,8 +1300,8 @@ case "$cpu" in
 esac
 
 if [ "x$address_sanitizer" = "xyes" ]; then
-    CFLAGS="-fstack-protector-all -fsanitize=address $CFLAGS"
-    CXXFLAGS="-fstack-protector-all -Wno-mismatched-tags -fsanitize=address $CXXFLAGS"
+    CFLAGS="-fstack-protector-all -fsanitize=address -fno-optimize-sibling-calls -fno-omit-frame-pointer $CFLAGS"
+    CXXFLAGS="-fstack-protector-all -Wno-mismatched-tags -fsanitize=address -fno-optimize-sibling-calls -fno-omit-frame-pointer $CXXFLAGS"
     #This is required for probing LLVM and KLEE, as they
     #might be compiled with AddressSanitizer instrumentation.
     LDFLAGS="$LDFLAGS -fsanitize=address"
