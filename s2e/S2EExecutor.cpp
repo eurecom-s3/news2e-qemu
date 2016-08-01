@@ -1048,8 +1048,9 @@ void S2EExecutor::flushTb() {
 
 S2EExecutor::~S2EExecutor()
 {
-    if(statsTracker)
-        statsTracker->done();
+	llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO - S2EExecutor::~S2EExecutor is stubbed" << '\n';
+//    if(statsTracker)
+//        statsTracker->done();
 }
 
 S2EExecutionState* S2EExecutor::createInitialState()
@@ -1649,7 +1650,11 @@ void S2EExecutor::restoreYieldedState(void) {
 S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
 {
     assert(state->m_active);
-    updateStates(state);
+
+    //If no more states are there, updateStates will fail
+    if (!searcher->empty() || !addedStates.empty()) {
+    	updateStates(state);
+    }
 
     ExecutionState *nstate = selectNonSpeculativeState(state);
     if (nstate == NULL) {
