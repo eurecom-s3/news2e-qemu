@@ -104,25 +104,28 @@ void s2e_init_device_state(S2EExecutionState *s)
 
 
 S2EDeviceState::S2EDeviceState(const S2EDeviceState &state):
-        m_deviceState(state.m_deviceState)
+        m_deviceState(state.m_deviceState),
+		m_stateBuffer(nullptr)
 {
 	llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EDeviceState::S2EDeviceState is stubbed" << '\n';
 //    assert( state.m_stateBuffer && s_finalStateSize > 0);
-//    m_stateBuffer = (uint8_t*) malloc(s_finalStateSize);
+//    m_stateBuffer = new uint8_t[s_finalStateSize];
 //    memcpy(m_stateBuffer, state.m_stateBuffer, s_finalStateSize);
-//    s_memFile = state.s_memFile;
+    s_memFile = state.s_memFile;
 }
 
-S2EDeviceState::S2EDeviceState(klee::ExecutionState *state):m_deviceState(state)
+S2EDeviceState::S2EDeviceState(klee::ExecutionState *state)
+	: m_deviceState(state),
+	  m_stateBuffer(nullptr)
 {
-    m_stateBuffer = NULL;
-    s_memFile = NULL;
+    s_memFile = nullptr;
 }
 
 S2EDeviceState::~S2EDeviceState()
 {
     if (m_stateBuffer) {
-        free(m_stateBuffer);
+        delete[] m_stateBuffer;
+        m_stateBuffer = nullptr;
     }
 }
 
