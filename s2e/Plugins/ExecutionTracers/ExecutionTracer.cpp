@@ -33,11 +33,11 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#include "ExecutionTracer.h"
+#include "s2e/Plugins/ExecutionTracers/ExecutionTracer.h"
 
-#include <s2e/S2E.h>
-#include <s2e/ConfigFile.h>
-#include <s2e/Utils.h>
+#include "s2e/cxx/S2E.h"
+#include "s2e/cxx/ConfigFile.h"
+#include "s2e/cxx/Utils.h"
 
 #include <llvm/Support/TimeValue.h>
 

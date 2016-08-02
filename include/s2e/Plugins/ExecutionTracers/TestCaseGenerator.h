@@ -33,83 +33,38 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef S2E_PLUGINS_EXECTRACER_H
-#define S2E_PLUGINS_EXECTRACER_H
+#ifndef S2E_PLUGINS_TCGEN_H
+#define S2E_PLUGINS_TCGEN_H
 
-#include <s2e/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/OSMonitor.h>
-#include <s2e/S2EExecutionState.h>
+#include "s2e/cxx/Plugin.h"
+#include <string>
 
-#include <stdio.h>
+namespace s2e{
+namespace plugins{
 
-#include "TraceEntries.h"
-
-namespace s2e {
-namespace plugins {
-
-//Maps a module descriptor to an id, for compression purposes
-typedef std::multimap<ModuleDescriptor, uint16_t, ModuleDescriptor::ModuleByLoadBase> ExecTracerModules;
-
-/**
- *  This plugin manages the binary execution trace file.
- *  It makes sure that all the writes properly go through it.
- *  Each write is encapsulated in an ExecutionTraceItem before being
- *  written to the file.
- */
-class ExecutionTracer : public Plugin
+/** Handler required for KLEE interpreter */
+class TestCaseGenerator : public Plugin
 {
     S2E_PLUGIN
 
-    std::string m_fileName;
-    FILE* m_LogFile;
-    uint32_t m_CurrentIndex;
-    OSMonitor *m_Monitor;
-    ExecTracerModules m_Modules;
+private:
+    typedef std::pair<std::string, std::vector<unsigned char> > VarValuePair;
+    typedef std::vector<VarValuePair> ConcreteInputs;
 
-    uint16_t getCompressedId(const ModuleDescriptor *desc);
+    unsigned m_testIndex;  // number of tests written so far
+    unsigned m_pathsExplored; // number of paths explored so far
 
-    void onTimer();
-    void createNewTraceFile(bool append);
 public:
-    ExecutionTracer(S2E* s2e): Plugin(s2e) {}
-    ~ExecutionTracer();
+    TestCaseGenerator(S2E* s2e);
+
     void initialize();
 
-    uint32_t writeData(
-            const S2EExecutionState *state,
-            void *data, unsigned size, ExecTraceEntryType type);
-
-    void flush();
 private:
-
-    void onFork(S2EExecutionState *state,
-                const std::vector<S2EExecutionState*>& newStates,
-                const std::vector<klee::ref<klee::Expr> >& newConditions
-                );
-
-    void onProcessFork(bool preFork, bool isChild, unsigned parentProcId);
-
-
+    void onTestCaseGeneration(S2EExecutionState *state, const std::string &message);
 };
 
-#if 0
-class ExecutionTracerState: public PluginState
-{
-private:
-    unsigned m_previousItemIndex;
 
-public:
-    ExecutionTracerState();
-    virtual ~ExecutionTracerState();
-    virtual ExecutionTracerState* clone() const;
-    static PluginState *factory();
+}
+}
 
-    friend class ExecutionTracer;
-};
 #endif
-
-} // namespace plugins
-} // namespace s2e
-
-#endif // S2E_PLUGINS_EXAMPLE_H

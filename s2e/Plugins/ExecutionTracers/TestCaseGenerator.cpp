@@ -36,12 +36,12 @@
 #include <iomanip>
 #include <cctype>
 
-#include <s2e/S2E.h>
-#include <s2e/Utils.h>
-#include <s2e/S2EExecutionState.h>
-#include <s2e/S2EExecutor.h>
-#include "TestCaseGenerator.h"
-#include "ExecutionTracer.h"
+#include "s2e/cxx/S2E.h"
+#include "s2e/cxx/Utils.h"
+#include "s2e/cxx/S2EExecutionState.h"
+#include "s2e/cxx/S2EExecutor.h"
+#include "s2e/Plugins/ExecutionTracers/TestCaseGenerator.h"
+#include "s2e/Plugins/ExecutionTracers/ExecutionTracer.h"
 
 namespace s2e {
 namespace plugins {

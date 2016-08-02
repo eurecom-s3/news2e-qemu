@@ -1,5 +1,6 @@
 s2e-obj-y += CorePlugin.o \
 	BaseInstructions.o \
 	InstructionPrinter.o \
-	test/        
+	test/ \
+	ExecutionTracers/       
 

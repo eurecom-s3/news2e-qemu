@@ -1,0 +1,3 @@
+s2e-obj-y += \
+    ExecutionTracer.o \
+    TestCaseGenerator.o

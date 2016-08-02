@@ -37,14 +37,13 @@
 
 #define __MODULE_EXECUTION_DETECTOR_H_
 
-#include <s2e/Plugins/ModuleDescriptor.h>
+#include "s2e/Plugins/ModuleDescriptor.h"
 
 #include "s2e/cxx/Plugin.h"
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/OSMonitor.h>
+#include "s2e/Plugins/CorePlugin.h"
+#include "s2e/Plugins/OSMonitor.h"
 
 #include <inttypes.h>
-#include "OSMonitor.h"
 
 #ifdef TARGET_I386
 
