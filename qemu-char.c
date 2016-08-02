@@ -1437,6 +1437,7 @@ static void tty_serial_init(int fd, int speed,
     printf("tty_serial_init: speed=%d parity=%c data=%d stop=%d\n",
            speed, parity, data_bits, stop_bits);
 #endif
+    memset(&tty, 0, sizeof(tty));
     tcgetattr (fd, &tty);
 
 #define check_speed(val) if (speed <= val) { spd = B##val; break; }
