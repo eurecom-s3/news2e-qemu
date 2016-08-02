@@ -367,7 +367,8 @@ int S2EDeviceState::readSector(struct BlockDriverState *bs, int64_t sector, uint
 }
 
 void S2EDeviceState::setExecutionState(S2EExecutionState* state) {
-	assert(false && "Setting the execution state would mean changing the ExecutionState of the AddressSpace");
+	llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO - S2EDeviceState::setExecutionState is stubbed" << '\n';
+	//assert(false && "Setting the execution state would mean changing the ExecutionState of the AddressSpace");
 }
 
 /*****************************************************************************/
