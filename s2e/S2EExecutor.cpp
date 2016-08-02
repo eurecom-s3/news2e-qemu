@@ -1652,9 +1652,10 @@ S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
     assert(state->m_active);
 
     //If no more states are there, updateStates will fail
-    if (!searcher->empty() || !addedStates.empty()) {
-    	updateStates(state);
-    }
+//    if (!searcher->empty() || !addedStates.empty()) {
+//    	updateStates(state);
+//    }
+    assert(addedStates.empty() && removedStates.empty() && "Simple check that call to updateStates is not needed");
 
     ExecutionState *nstate = selectNonSpeculativeState(state);
     if (nstate == NULL) {
@@ -1758,7 +1759,8 @@ void S2EExecutor::prepareFunctionExecution(S2EExecutionState *state,
 
 inline bool S2EExecutor::executeInstructions(S2EExecutionState *state, unsigned callerStackSize)
 {
-    try {
+	try {
+    	//TODO: Why don't we check !states.empty() && !haltExecution like in KLEE here?
         while(state->stack.size() != callerStackSize) {
             ++state->m_stats.m_statInstructionCountSymbolic;
 
@@ -2250,7 +2252,8 @@ void S2EExecutor::doStateFork(S2EExecutionState *originalState,
 S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
                             klee::ref<Expr> condition, bool isInternal)
 {
-	assert(cast<S2EExecutionState>(&current)->m_runningConcrete);
+	assert(!cast<S2EExecutionState>(&current)->m_runningConcrete &&
+			"Cannot fork while executing in concrete mode");
 
     StatePair res;
 
