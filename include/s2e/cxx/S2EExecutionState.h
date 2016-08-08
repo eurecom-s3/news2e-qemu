@@ -121,9 +121,6 @@ class S2EExecutionState : public klee::ExecutionState
 protected:
     friend class S2EExecutor;
 
-    /* Pointer to Qemu CPU object */
-    CPUState *m_cpu;
-
     static unsigned s_lastSymbolicId;
 
     /** Unique numeric ID for the state */
@@ -207,7 +204,7 @@ protected:
     /** Set when execution enters doInterrupt, reset when it exits. */
     bool m_runningExceptionEmulationCode;
 
-    ExecutionState* clone();
+    S2EExecutionState* clone() override;
     void addressSpaceChange(const klee::MemoryObject *mo,
                             const klee::ObjectState *oldState,
                             klee::ObjectState *newState);
@@ -220,6 +217,7 @@ public:
     };
 
     S2EExecutionState(klee::KFunction *kf);
+    S2EExecutionState(const S2EExecutionState& state);
     ~S2EExecutionState();
 
     int getID() const { return m_stateID; }
@@ -231,12 +229,7 @@ public:
     /**
      * Get the Qemu CPU object.
      */
-    CPUState* getCPUState();
-
-	/**
-	 * Get the CPU env pointer.
-	 */
-	CPUArchState* getEnv();
+    CPUState* getCPUState() const;
 
     TranslationBlock *getTb() const;
 

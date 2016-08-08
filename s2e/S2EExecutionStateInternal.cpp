@@ -140,6 +140,51 @@ S2EExecutionState::S2EExecutionState(klee::KFunction *kf) :
     m_dirtyMaskObject = NULL;
 }
 
+S2EExecutionState::S2EExecutionState(const S2EExecutionState& state)
+    : ExecutionState(state),
+	  m_stateID(0),
+	  m_PluginState(),
+	  m_symbexEnabled(state.m_symbexEnabled),
+	  m_startSymbexAtPC(-1),
+	  m_active(true),
+	  m_zombie(false),
+	  m_yielded(false),
+	  m_runningConcrete(false),
+	  m_toRunSymbolically(),
+	  m_cpuRegistersObject(nullptr),
+	  m_cpuSystemObject(nullptr),
+	  m_cpuObject(nullptr),
+	  m_dirtyMaskObject(nullptr),
+	  m_deviceState(state.m_deviceState),
+	  m_memcache(),
+	  m_timersState(nullptr),
+	  m_qemuIcount(state.m_qemuIcount),
+	  m_lastS2ETb(state.m_lastS2ETb),
+	  m_lastMergeICount(state.m_lastMergeICount),
+	  m_needFinalizeTBExec(state.m_needFinalizeTBExec),
+	  m_nextSymbVarId(state.m_nextSymbVarId),
+	  m_stats(state.m_stats),
+	  m_tlbMap()
+{
+	addressSpace.state = this;
+	m_deviceState.setExecutionState(this);
+
+	if(m_lastS2ETb) {
+	   m_lastS2ETb->refCount += 1;
+	}
+
+	m_stateID = g_s2e->fetchAndIncrementStateId();
+
+	// Clone the plugins
+	for (auto plgState : state.m_PluginState) {
+		m_PluginState.insert(std::make_pair(plgState.first, plgState.second->clone()));
+	}
+
+	    llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EExecutionState::S2EExecutionState is stubbed" << '\n';
+	//    ret->m_timersState = new TimersState;
+	//    *ret->m_timersState = *m_timersState;
+}
+
 S2EExecutionState::~S2EExecutionState()
 {
     assert(m_lastS2ETb == NULL);
@@ -222,18 +267,14 @@ void S2EExecutionState::disableForking()
     }
 }
 
-CPUArchState* S2EExecutionState::getEnv(void) {
+CPUState* S2EExecutionState::getCPUState(void) const {
 	if (m_active) {
-		return reinterpret_cast<CPUArchState*>(m_cpuSystemState->address - CPU_CONC_LIMIT);
+		return reinterpret_cast<CPUState*>(m_cpuState->address);
 	}
 	else {
-		return reinterpret_cast<CPUArchState*>(
-				m_cpuSystemObject->getConcreteStore(true) - CPU_CONC_LIMIT);
+		return reinterpret_cast<CPUState*>(
+				m_cpuObject->getConcreteStore(true));
 	}
-}
-
-CPUState* S2EExecutionState::getCPUState(void) {
-	return ENV_GET_CPU(getEnv());
 }
 
 
@@ -315,7 +356,7 @@ void S2EExecutionState::addressSpaceChange(const klee::MemoryObject *mo,
     }
 }
 
-ExecutionState* S2EExecutionState::clone()
+S2EExecutionState* S2EExecutionState::clone()
 {
     // When cloning, all ObjectState becomes not owned by neither of states
     // This means that we must clean owned-by-us flag in S2E TLB
@@ -340,24 +381,6 @@ ExecutionState* S2EExecutionState::clone()
     //TODO: iterate victim TLB
 
     S2EExecutionState *ret = new S2EExecutionState(*this);
-    ret->addressSpace.state = ret;
-    ret->m_deviceState.setExecutionState(ret);
-
-    if(m_lastS2ETb)
-        m_lastS2ETb->refCount += 1;
-
-    ret->m_stateID = g_s2e->fetchAndIncrementStateId();
-
-    llvm::errs() << __FILE__ << ":" << __LINE__ << ": TODO: S2EExecutionState::S2EExecutionState is stubbed" << '\n';
-//    ret->m_timersState = new TimersState;
-//    *ret->m_timersState = *m_timersState;
-
-    // Clone the plugins
-    PluginStateMap::iterator it;
-    ret->m_PluginState.clear();
-    for(it = m_PluginState.begin(); it != m_PluginState.end(); ++it) {
-        ret->m_PluginState.insert(std::make_pair((*it).first, (*it).second->clone()));
-    }
 
     // This objects are not in TLB and won't cause any changes to it
     ret->m_cpuRegistersObject = ret->addressSpace.getWriteable(
@@ -958,8 +981,8 @@ bool S2EExecutionState::writeMemoryConcrete(uint64_t address, void *buf,
 
 uint64_t S2EExecutionState::getPhysicalAddress(uint64_t virtualAddress) const
 {
-	return CPU_GET_CLASS(m_cpu)->get_phys_page_debug(
-			m_cpu, 
+	return CPU_GET_CLASS(getCPUState())->get_phys_page_debug(
+			getCPUState(),
 			virtualAddress & TARGET_PAGE_MASK) | (virtualAddress & ~TARGET_PAGE_MASK);
 }
 
@@ -986,7 +1009,7 @@ uint64_t S2EExecutionState::getHostAddress(uint64_t address,
 			/* no break here */
 		case PhysicalAddress:
 			rcu_read_lock();
-			MemoryRegion* mr = address_space_translate(m_cpu->as, physicalAddress, &addr1, &len, false);
+			MemoryRegion* mr = address_space_translate(getCPUState()->as, physicalAddress, &addr1, &len, false);
 			if (!mr || !(memory_region_is_ram(mr) || memory_region_is_romd(mr))) {
 				rcu_read_unlock();
 				return -1;
@@ -1584,7 +1607,7 @@ std::vector<ref<Expr> > S2EExecutionState::createConcolicArray(
 			/* _parent = */ nullptr);
     mo->setName(sname);
 
-    symbolics.push_back(std::make_pair(mo, array));
+    addSymbolic(mo, array);
 
     if (concreteBuffer.size() == size) {
         if (ConcolicMode) {

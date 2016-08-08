@@ -1061,6 +1061,8 @@ S2EExecutionState* S2EExecutor::createInitialState()
     S2EExecutionState *state =
         new S2EExecutionState(m_dummyMain);
 
+    llvm::errs() << "S2EExecutor::createInitialState: DEBUG - initial state = " << state << ", size = " << sizeof(*state) << '\n';
+
     state->m_runningConcrete = true;
     state->m_active = true;
 
@@ -1162,8 +1164,6 @@ void S2EExecutor::registerCpu(S2EExecutionState *initialState,
             << "Adding CPU (addr = " << std::hex << cpu
               << ", size = 0x" << sizeof(*env) << ")"
               << std::dec << '\n';
-
-    initialState->m_cpu = cpu;
 
     /* Add registers and eflags area as a true symbolic area */
 
@@ -1689,6 +1689,7 @@ S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
         assert(s != newState);
         unrefS2ETb(s->m_lastS2ETb);
         s->m_lastS2ETb = NULL;
+        llvm::errs() << "S2EExecutor::selectNextState: DEBUG - deleting state " << s << '\n';
         delete s;
     }
     m_deletedStates.clear();
@@ -1886,7 +1887,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
     assert(state->pc == m_dummyMain->instructions);
 
 
-    tb_function_args[0] = state->getEnv();
+    tb_function_args[0] = state->getConcreteCpuState();
     tb_function_args[1] = 0;
     tb_function_args[2] = 0;
 
@@ -1894,7 +1895,7 @@ uintptr_t S2EExecutor::executeTranslationBlockKlee(
 
     /* Generate LLVM code if necessary */
     if(!tb->llvm_function) {
-        cpu_gen_llvm(state->getEnv(), tb);
+        cpu_gen_llvm(state->getConcreteCpuState(), tb);
         assert(tb->llvm_function);
     }
 
