@@ -261,7 +261,7 @@ struct ExecutionTraceTestCase {
         ExecutionTraceTestCase *ret = (ExecutionTraceTestCase*)a;
 
         for(it = inputs.begin(); it != inputs.end(); ++it) {
-            Header hdr = {static_cast<uint32>((*it).first.size()), static_cast<uint32>((*it).second.size())};
+            Header hdr = {static_cast<uint32_t>((*it).first.size()), static_cast<uint32_t>((*it).second.size())};
             memcpy(a, &hdr, sizeof(hdr));
             a+=sizeof(hdr);
             memcpy(a, (*it).first.c_str(), (*it).first.size());
