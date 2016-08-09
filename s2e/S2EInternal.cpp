@@ -33,8 +33,6 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#include <llvm/Support/Path.h> /* XXX: Needs to be here because of mysterious compiler errors */
-#include "s2e/cxx/S2E.h"
 
 // XXX: qemu stuff should be included before anything from KLEE or LLVM !
 extern "C" {
@@ -45,10 +43,12 @@ extern "C" {
 #include "tcg/tcg.h"
 #include "exec/helper-proto.h"
 #include "exec/helper-gen.h"
+#include "qemu/osdep.h"
 }
 
 #include "s2e/cxx/TCGLLVMContext.h"
 
+#include "s2e/cxx/S2E.h"
 #include "s2e/cxx/Plugin.h"
 #include "s2e/Plugins/CorePlugin.h"
 #include "s2e/cxx/ConfigFile.h"
@@ -66,6 +66,7 @@ extern "C" {
 #include <llvm/IR/Module.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/Bitcode/ReaderWriter.h>
+#include <llvm/Support/Path.h>
 
 
 #include <klee/Interpreter.h>
