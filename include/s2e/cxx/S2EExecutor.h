@@ -247,6 +247,11 @@ public:
 
     klee::Solver* getSolver() const;
 
+    /**
+     * Return if the executor is forced to execute all code in KLEE.
+     */
+    bool isExecuteAlwaysKlee() const {return m_executeAlwaysKlee;}
+
 protected:
     static void handlerTraceMemoryAccess(klee::Executor* executor,
                                     klee::ExecutionState* state,
