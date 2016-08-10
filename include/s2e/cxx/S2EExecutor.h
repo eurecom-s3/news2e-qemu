@@ -252,6 +252,11 @@ public:
      */
     bool isExecuteAlwaysKlee() const {return m_executeAlwaysKlee;}
 
+    void terminateStateOnError(klee::ExecutionState &state,
+                               const llvm::Twine &messaget,
+                               const char *suffix,
+                               const llvm::Twine &info) override;
+
 protected:
     static void handlerTraceMemoryAccess(klee::Executor* executor,
                                     klee::ExecutionState* state,

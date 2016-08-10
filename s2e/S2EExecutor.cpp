@@ -1320,6 +1320,46 @@ void S2EExecutor::registerDirtyMask(S2EExecutionState *initial_state, uint64_t h
         .getWriteable(initial_state->m_dirtyMask, dirtyMaskObject);
 }
 
+void S2EExecutor::terminateStateOnError(klee::ExecutionState &kleeState,
+                                     const llvm::Twine &messaget,
+                                     const char *suffix,
+                                     const llvm::Twine &info)
+{
+	S2EExecutionState* state = cast<S2EExecutionState>(&kleeState);
+	std::string message = messaget.str();
+	static std::set< std::pair<Instruction*, std::string> > emittedErrors;
+	Instruction * lastInst;
+	const InstructionInfo &ii = getLastNonKleeInternalInstruction(kleeState, &lastInst);
+
+	if (ii.file != "") {
+		m_s2e->getWarningsStream(state) << "ERROR: " << ii.file
+				<< ":" << ii.line << ": " << message << '\n';
+	} else {
+		m_s2e->getWarningsStream(state) << "ERROR: (location information missing) "
+						<< message << '\n';
+	}
+
+	std::string MsgString;
+	llvm::raw_string_ostream msg(MsgString);
+	msg << "Error: " << message << "\n";
+	if (ii.file != "") {
+	  msg << "File: " << ii.file << "\n";
+	  msg << "Line: " << ii.line << "\n";
+	  msg << "assembly.ll line: " << ii.assemblyLine << "\n";
+	}
+	msg << "Stack: \n";
+	kleeState.dumpStack(msg);
+
+	std::string info_str = info.str();
+	if (info_str != "")
+		msg << "Info: \n" << info_str;
+
+	m_s2e->getWarningsStream(state) << msg.str() << '\n';
+
+	terminateState(kleeState);
+}
+
+
 void S2EExecutor::switchToConcrete(S2EExecutionState *state)
 {
     assert(!state->m_runningConcrete);
