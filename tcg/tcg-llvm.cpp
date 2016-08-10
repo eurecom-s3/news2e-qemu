@@ -165,7 +165,7 @@ class TCGLLVMContextPrivate {
     Function *m_helperMakeSymbolic;
     Function *m_helperGetValue;
     Function* m_qemu_ld_helpers[4];
-    Function* m_qemu_st_helpers[5];
+    Function* m_qemu_st_helpers[4];
 #endif
 
     /* Count of generated translation blocks */
@@ -468,6 +468,7 @@ void TCGLLVMContextPrivate::initializeHelpers()
 //    m_helperGetValue =
 //            m_module->getFunction("tcg_llvm_get_value");
 //
+    //TODO: This only references LE helpers, what if the target is BE?
     static const char* mmu_ld_helpers[] = {
     	"helper_ret_ldub_mmu",
 		"helper_le_lduw_mmu",
@@ -478,6 +479,19 @@ void TCGLLVMContextPrivate::initializeHelpers()
     for (unsigned i = 0; i < sizeof(mmu_ld_helpers) / sizeof(mmu_ld_helpers[0]); ++i) {
     	m_qemu_ld_helpers[i] = m_module->getFunction(mmu_ld_helpers[i]);
     }
+
+    //TODO: This only references LE helpers, what if the target is BE?
+    static const char* mmu_st_helpers[] = {
+		"helper_ret_stb_mmu",
+		"helper_le_stw_mmu",
+		"helper_le_stl_mmu",
+		"helper_le_stq_mmu"
+	};
+
+    for (unsigned i = 0; i < sizeof(mmu_st_helpers) / sizeof(mmu_st_helpers[0]); ++i) {
+		m_qemu_st_helpers[i] = m_module->getFunction(mmu_st_helpers[i]);
+	}
+
 //    m_qemu_ld_helpers[0] = m_module->getFunction("__ldb_mmu");
 //    m_qemu_ld_helpers[1] = m_module->getFunction("__ldw_mmu");
 //    m_qemu_ld_helpers[2] = m_module->getFunction("__ldl_mmu");
@@ -735,7 +749,6 @@ inline Value* TCGLLVMContextPrivate::generateQemuMemOp(bool ld,
     Function* func;
 
     if (ld) {
-    	assert((bits >> 4) < sizeof(m_qemu_ld_helpers) / sizeof(m_qemu_ld_helpers[0]) && "mmu ld helpers array out of bounds");
     	switch (bits) {
     		case 8: func = m_qemu_ld_helpers[0]; break;
     		case 16: func = m_qemu_ld_helpers[1]; break;
@@ -745,7 +758,6 @@ inline Value* TCGLLVMContextPrivate::generateQemuMemOp(bool ld,
     	}
     }
     else {
-    	assert((bits >> 4) < sizeof(m_qemu_st_helpers) / sizeof(m_qemu_st_helpers[0]) && "mmu ld helpers array out of bounds");
 		switch (bits) {
 			case 8: func = m_qemu_st_helpers[0]; break;
 			case 16: func = m_qemu_st_helpers[1]; break;
@@ -943,7 +955,7 @@ void TCGLLVMContextPrivate::generateOperation(TCGOp* op, const TCGArg *args)
                 delPtrForValue(i);
 
             if(nb_oargs == 1)
-                setValue(args[1], result);
+                setValue(args[0], result);
         }
         break;
 
