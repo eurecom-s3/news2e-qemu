@@ -124,6 +124,7 @@ uint64_t helper_set_cc_op_eflags(void);
 #include "lib/Core/TimingSolver.h"
 #include <klee/TimerStatIncrementer.h>
 #include <klee/Solver.h>
+#include <klee/Internal/Module/InstructionInfoTable.h>
 
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Support/TimeValue.h>
@@ -332,50 +333,49 @@ bool S2EExternalDispatcher::runProtectedCall(llvm::Function *f, uint64_t *args) 
   struct sigaction segvAction, segvActionOld;
   #endif
   bool res;
-
-  assert(false && "not tested");
+  CPUState* cpu = g_s2e_state->getCPUState();
 
   if (!f)
     return false;
 
   gTheArgsP = args;
 
-//  #ifdef _WIN32
-//  signal(SIGSEGV, s2e_ext_sigsegv_handler);
-//  #else
-//  segvAction.sa_handler = 0;
-//  memset(&segvAction.sa_mask, 0, sizeof(segvAction.sa_mask));
-//  segvAction.sa_flags = SA_SIGINFO;
-//  segvAction.sa_sigaction = s2e_ext_sigsegv_handler;
-//  sigaction(SIGSEGV, &segvAction, &segvActionOld);
-//  #endif
-//
-//  memcpy(s2e_cpuExitJmpBuf, env->jmp_env, sizeof(env->jmp_env));
-//
-//  if(sigsetjmp(env->jmp_env, 0) == 0) {
-//      if (sigsetjmp(s2e_escapeCallJmpBuf, 0) == 0) {
-//        std::vector<GenericValue> gvArgs;
-//
-//        executionEngine->runFunction(f, gvArgs);
-//        res = true;
-//      }
-//      else {
-//        res = false;
-//      }
-//  }
-//  else {
-//      memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
-//      throw CpuExitException();
-//  }
-//
-//  memcpy(env->jmp_env, s2e_cpuExitJmpBuf, sizeof(env->jmp_env));
-//
-//  #ifdef _WIN32
-//#warning Implement more robust signal handling on windows
-//  signal(SIGSEGV, SIG_IGN);
-//#else
-//  sigaction(SIGSEGV, &segvActionOld, 0);
-//#endif
+  #ifdef _WIN32
+  signal(SIGSEGV, s2e_ext_sigsegv_handler);
+  #else
+  segvAction.sa_handler = 0;
+  memset(&segvAction.sa_mask, 0, sizeof(segvAction.sa_mask));
+  segvAction.sa_flags = SA_SIGINFO;
+  segvAction.sa_sigaction = s2e_ext_sigsegv_handler;
+  sigaction(SIGSEGV, &segvAction, &segvActionOld);
+  #endif
+
+  memcpy(s2e_cpuExitJmpBuf, cpu->jmp_env, sizeof(cpu->jmp_env));
+
+  if(sigsetjmp(cpu->jmp_env, 0) == 0) {
+      if (sigsetjmp(s2e_escapeCallJmpBuf, 0) == 0) {
+        std::vector<GenericValue> gvArgs;
+
+        executionEngine->runFunction(f, gvArgs);
+        res = true;
+      }
+      else {
+        res = false;
+      }
+  }
+  else {
+      memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
+      throw CpuExitException();
+  }
+
+  memcpy(cpu->jmp_env, s2e_cpuExitJmpBuf, sizeof(cpu->jmp_env));
+
+  #ifdef _WIN32
+#warning Implement more robust signal handling on windows
+  signal(SIGSEGV, SIG_IGN);
+#else
+  sigaction(SIGSEGV, &segvActionOld, 0);
+#endif
   return res;
 }
 
@@ -670,6 +670,11 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
 	//be deleted by optimization passes.
     registerExternalSymbols();
 
+    //Delete body of functions that are supposed to be called in native code
+    if (llvm::Function* f = M->getFunction("tlb_fill")) {
+        f->deleteBody();
+    }
+
     //Remove all functions from the module that are not contained in a whitelist.
     //This is useful, because tracking down each missing symbol is a pain. Much easier
     //to start from a clean slate and then include successively what is required.
@@ -836,7 +841,10 @@ void S2EExecutor::cleanModule(Module* mod)
         "helper_le_stw_mmu",
         "helper_ret_ldsb_mmu",
         "helper_ret_ldub_mmu",
-        "helper_ret_stb_mmu"
+        "helper_ret_stb_mmu",
+		"helper_cpsr_read",
+		"helper_cpsr_write",
+		"helper_exception_with_syndrome"
 	};
 
 	PassManager pm;
@@ -875,6 +883,8 @@ void S2EExecutor::registerExternalSymbols(void)
 //    DEFINE_EXT_SYMBOL(cpu_watchpoint_remove_all);
 //    DEFINE_EXT_SYMBOL(cpu_watchpoint_remove_by_ref);
     DEFINE_EXT_SYMBOL(cpus);
+    DEFINE_EXT_SYMBOL(object_dynamic_cast_assert);
+    DEFINE_EXT_SYMBOL(tlb_fill);
 //    //DEFINE_EXT_SYMBOL(crc32);
     //DEFINE_EXT_SYMBOL(crc32c);
     //DEFINE_EXT_SYMBOL(do_arm_semihosting);
@@ -930,6 +940,7 @@ void S2EExecutor::registerExternalSymbols(void)
 //    __DEFINE_EXT_VARIABLE(io_mem_rom)
 //    __DEFINE_EXT_VARIABLE(io_mem_unassigned)
     DEFINE_EXT_SYMBOL(io_mem_notdirty);
+    DEFINE_EXT_SYMBOL(cpu_loop_exit);
 
 //    __DEFINE_EXT_FUNCTION(cpu_io_recompile)
 //#ifdef TARGET_ARM
@@ -1024,6 +1035,11 @@ void S2EExecutor::registerExternalSymbols(void)
 
 //    __DEFINE_EXT_FUNCTION(ldq_phys)
 //    __DEFINE_EXT_FUNCTION(stq_phys)
+
+#if defined(TARGET_ARM)
+    DEFINE_EXT_SYMBOL(cpsr_read);
+    DEFINE_EXT_SYMBOL(cpsr_write);
+#endif /* defined(TARGET_ARM) */
 
 #undef DEFINE_EXT_SYMBOL
 }
@@ -1303,7 +1319,6 @@ void S2EExecutor::registerDirtyMask(S2EExecutionState *initial_state, uint64_t h
     initial_state->m_dirtyMaskObject = initial_state->addressSpace
         .getWriteable(initial_state->m_dirtyMask, dirtyMaskObject);
 }
-
 
 void S2EExecutor::switchToConcrete(S2EExecutionState *state)
 {
