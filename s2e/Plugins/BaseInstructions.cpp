@@ -547,10 +547,6 @@ void BaseInstructions::handleBuiltInOps(S2EExecutionState* state, uint64_t opcod
             break;
         }
 #endif
-        case 0xe: {
-            target_ulong v = s2e()->getExecutor()->isExecuteAlwaysKlee();
-            state->writeCpuRegisterConcrete(PARAM0, &v, sizeof v);
-        }
         case 0xF: { // MJR
             s2e()->getExecutor()->yieldState(*state);
             break;

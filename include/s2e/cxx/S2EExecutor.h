@@ -247,11 +247,6 @@ public:
 
     klee::Solver* getSolver() const;
 
-    /**
-     * Return if the executor is forced to execute all code in KLEE.
-     */
-    bool isExecuteAlwaysKlee() const {return m_executeAlwaysKlee;}
-
     void terminateStateOnError(klee::ExecutionState &state,
                                const llvm::Twine &messaget,
                                const char *suffix,
