@@ -186,9 +186,7 @@ public:
 
     void cleanupTranslationBlock(S2EExecutionState *state);
 
-    void updateStates(klee::ExecutionState *current) {
-        klee::Executor::updateStates(current);
-    }
+    void updateStates(klee::ExecutionState *current);
 
 
     void setCCOpEflags(S2EExecutionState *state);

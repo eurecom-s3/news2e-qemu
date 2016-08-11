@@ -1900,6 +1900,12 @@ bool S2EExecutor::finalizeTranslationBlockExec(S2EExecutionState *state)
     return ret;
 }
 
+void S2EExecutor::updateStates(klee::ExecutionState *current)
+{
+	assert((!states.empty() || !addedStates.empty()) && "No more states to schedule");
+	klee::Executor::updateStates(current);
+}
+
 #ifdef _WIN32
 
 extern "C" volatile LONG g_signals_enabled;
