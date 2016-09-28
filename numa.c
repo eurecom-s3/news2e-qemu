@@ -435,7 +435,7 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
     }
     vmstate_register_ram_global(mr);
 
-		
+#ifdef CONFIG_S2E	
 	S2EExecutor* executor = S2E_GetExecutor(S2E_GetInstance());
 	S2EExecutor_RegisterRam(
 		executor, 
@@ -446,6 +446,7 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
 		false,
 		false,
 		name);
+#endif
 }
 
 void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
@@ -485,7 +486,7 @@ void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
         memory_region_add_subregion(mr, addr, seg);
         vmstate_register_ram_global(seg);
 
-		
+#ifdef CONFIG_S2E		
 		S2EExecutor_RegisterRam(
 				S2E_GetExecutor(S2E_GetInstance()), 
 				S2EExecutor_GetCurrentState(S2E_GetExecutor(S2E_GetInstance())),
@@ -496,6 +497,7 @@ void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
 				false,
 				name);
         addr += size;
+#endif
     }
 }
 
