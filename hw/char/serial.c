@@ -910,38 +910,20 @@ SerialState *serial_init(int base, qemu_irq irq, int baudbase,
 }
 
 /* Memory mapped interface */
-static uint64_t serial_mm_read(void *opaque, hwaddr addr,
+uint64_t serial_mm_read(void *opaque, hwaddr addr,
                                unsigned size)
 {
     SerialState *s = opaque;
     return serial_ioport_read(s, addr >> s->it_shift, 1);
 }
 
-static void serial_mm_write(void *opaque, hwaddr addr,
+void serial_mm_write(void *opaque, hwaddr addr,
                             uint64_t value, unsigned size)
 {
     SerialState *s = opaque;
     value &= ~0u >> (32 - (size * 8));
     serial_ioport_write(s, addr >> s->it_shift, value, 1);
 }
-
-static const MemoryRegionOps serial_mm_ops[3] = {
-    [DEVICE_NATIVE_ENDIAN] = {
-        .read = serial_mm_read,
-        .write = serial_mm_write,
-        .endianness = DEVICE_NATIVE_ENDIAN,
-    },
-    [DEVICE_LITTLE_ENDIAN] = {
-        .read = serial_mm_read,
-        .write = serial_mm_write,
-        .endianness = DEVICE_LITTLE_ENDIAN,
-    },
-    [DEVICE_BIG_ENDIAN] = {
-        .read = serial_mm_read,
-        .write = serial_mm_write,
-        .endianness = DEVICE_BIG_ENDIAN,
-    },
-};
 
 SerialState *serial_mm_init(MemoryRegion *address_space,
                             hwaddr base, int it_shift,

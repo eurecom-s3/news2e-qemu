@@ -32,6 +32,30 @@
 
 #define UART_FIFO_LENGTH    16      /* 16550A Fifo Length */
 
+/* Memory mapped interface */
+uint64_t serial_mm_read(void *opaque, hwaddr addr,
+                               unsigned size);
+
+void serial_mm_write(void *opaque, hwaddr addr,
+                            uint64_t value, unsigned size);
+static const MemoryRegionOps serial_mm_ops[3] = {
+    [DEVICE_NATIVE_ENDIAN] = {
+        .read = serial_mm_read,
+        .write = serial_mm_write,
+        .endianness = DEVICE_NATIVE_ENDIAN,
+    },
+    [DEVICE_LITTLE_ENDIAN] = {
+        .read = serial_mm_read,
+        .write = serial_mm_write,
+        .endianness = DEVICE_LITTLE_ENDIAN,
+    },
+    [DEVICE_BIG_ENDIAN] = {
+        .read = serial_mm_read,
+        .write = serial_mm_write,
+        .endianness = DEVICE_BIG_ENDIAN,
+    },
+};
+
 struct SerialState {
     uint16_t divider;
     uint8_t rbr; /* receive register */
