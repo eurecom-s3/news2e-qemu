@@ -7,19 +7,6 @@
  * This code is licensed under the GPL.
  */
 
-// #include "sysbus.h"
-// #include "arm-misc.h"
-// #include "devices.h"
-// #include "net.h"
-// #include "sysemu.h"
-// #include "pci.h"
-// #include "i2c.h"
-// #include "boards.h"
-// #include "blockdev.h"
-// #include "flash.h"
-// #include "elf.h"
-// #include "qjson.h"
-// #include "qlist.h"
 #include "exec/address-spaces.h"
 #include "hw/sysbus.h"
 #include "hw/devices.h"
@@ -30,19 +17,8 @@
 #include "qapi/qmp/qdict.h"
 #include "exec/memory.h"
 #include <s2e/s2e_qemu.h>
-//#include "s2e/s2e_qemu.h"
-#ifdef TARGET_ARM
-//#include <target-arm/helper.h>
-//#include <target-arm/cpu.h>
-#endif
 
 /* Board init.  */
-
-/* The AB and PB boards both use the same core, just with different
-   peripherals and expansion busses.  For now we emulate a subset of the
-   PB peripherals and just change the board ID.  */
-
-// static struct arm_boot_info versatile_binfo;
 
 static QDict * load_configuration(const char * filename)
 {
@@ -176,8 +152,8 @@ static void machine_init_state(QDict * conf, CPUArchState * cpu) {
 		}
 
 #endif
-		  for (elm = (QDictEntry *) qdict_first(reg); elm != NULL; elm = (QDictEntry *) qdict_next(reg, elm)) {
-			const char * regname;
+        for (elm = (QDictEntry *) qdict_first(reg); elm != NULL; elm = (QDictEntry *) qdict_next(reg, elm)) {
+		    const char * regname;
 			g_assert(qobject_type(qdict_entry_value(elm)) == QTYPE_QINT);
 			regname = strdup(qdict_entry_key(elm));
 			regvalue = qint_get_int(qobject_to_qint(qdict_entry_value(elm)));
@@ -186,24 +162,24 @@ static void machine_init_state(QDict * conf, CPUArchState * cpu) {
 			// TODO: this is very fragile, rework it in a sort-of key filtering
 			char * separator = strchr(regname, '_');
 			if (separator == NULL) {
-				//base registers
-				if (regname[0] == 'r') {
-					WR_cpu(cpu, regs[atoi(&regname[1])], regvalue);
+			    //base registers
+			    if (regname[0] == 'r') {
+				    WR_cpu(cpu, regs[atoi(&regname[1])], regvalue);
 				}
 				else if (strcmp(regname, "pc") == 0) {
-					((CPUARMState *) cpu)->regs[15] = regvalue;
+				    ((CPUARMState *) cpu)->regs[15] = regvalue;
 					// FIXME: something is wrong with offsets in assertion in
 					// s2e_write_register_concrete codepath
 					// WR_cpu(cpu, regs[15], regvalue);
 				}
 			} else {
 				// banked registers
-				int mode=0;
-				*separator = '\0';
-				if (strcmp(separator+1, "fiq") == 0) {
-					mode = ARM_CPU_MODE_FIQ;
-					if (regname[0] == 'r') {
-						WR_cpu(cpu, fiq_regs[atoi(&regname[1])-8], regvalue);
+			    int mode=0;
+			    *separator = '\0';
+			    if (strcmp(separator+1, "fiq") == 0) {
+				    mode = ARM_CPU_MODE_FIQ;
+				    if (regname[0] == 'r') {
+					    WR_cpu(cpu, fiq_regs[atoi(&regname[1])-8], regvalue);
 					}
 				}
 				else if (strcmp(separator+1, "irq") == 0) {
@@ -262,7 +238,10 @@ static void board_init(MachineState * ms)
     const char *initrd_filename = ms->initrd_filename;
     const char *cpu_model = ms->cpu_model;
 
-    CPUState * cpu;
+    ObjectClass *cpu_oc;
+    Object *cpuobj;
+    ARMCPU *cpuu;
+    CPUState *cpu; 
     QDict * conf = NULL;
     uint64_t entry_address=0;
 
@@ -289,8 +268,18 @@ static void board_init(MachineState * ms)
 
     printf("Configurable: Adding processor %s\n", cpu_model);
 
-    cpu = cpu_init(cpu_model);
+    cpu_oc = cpu_class_by_name(TYPE_ARM_CPU, cpu_model);
+    if (!cpu_oc) {
+        fprintf(stderr, "Unable to find CPU definition\n");
+        exit(1);
+    }
 
+    cpuobj = object_new(object_class_get_name(cpu_oc));
+
+    object_property_set_bool(cpuobj, true, "realized", &error_fatal);
+    cpuu = ARM_CPU(cpuobj);
+    cpu = CPU(cpuu);
+    cpu = (CPUState *) &(cpuu->env); 
     if (!cpu)
     {
         fprintf(stderr, "Unable to find CPU definition\n");
@@ -328,11 +317,21 @@ static void board_init(MachineState * ms)
             g_assert(qobject_type(entry->value) == QTYPE_QDICT);
             mapping = qobject_to_qdict(entry->value);
 
-            g_assert(qdict_haskey(mapping, "map") && qobject_type(qdict_get(mapping, "map")) == QTYPE_QLIST && !qlist_empty(qobject_to_qlist(qdict_get(mapping, "map"))));
-            g_assert(qdict_haskey(mapping, "name") && qobject_type(qdict_get(mapping, "name")) == QTYPE_QSTRING);
-            g_assert(!qdict_haskey(mapping, "is_rom") || qobject_type(qdict_get(mapping, "is_rom")) == QTYPE_QBOOL);
+            g_assert(qdict_haskey(mapping, "map") && 
+                qobject_type(qdict_get(mapping, "map")) == QTYPE_QLIST && 
+                !qlist_empty(qobject_to_qlist(qdict_get(mapping, "map"))));
+
+            g_assert(qdict_haskey(mapping, "name") && 
+                qobject_type(qdict_get(mapping, "name")) == QTYPE_QSTRING);
+            
+            g_assert(!qdict_haskey(mapping, "is_rom") || 
+                qobject_type(qdict_get(mapping, "is_rom")) == QTYPE_QBOOL);
+
             g_assert(qdict_haskey(mapping, "size") && qobject_type(qdict_get(mapping, "size")) == QTYPE_QINT);
-            g_assert((qdict_get_int(mapping, "size") & ((1 << 12) - 1)) == 0); //Somewhere deep in QEMU there seems to be a requirement that memory regions have starting addresses with the lowest 12 bit clear
+
+            /*Somewhere deep in QEMU there seems to be a requirement that memory regions have
+              starting addresses with the lowest 12 bit clear */
+            g_assert((qdict_get_int(mapping, "size") & ((1 << 12) - 1)) == 0);
 
             addresses = qobject_to_qlist(qdict_get(mapping, "map"));
             name = qdict_get_str(mapping, "name");
@@ -350,13 +349,15 @@ static void board_init(MachineState * ms)
                 QDict * address_dict;
                 g_assert(qobject_type(address_entry->value) == QTYPE_QDICT);
                 address_dict = qobject_to_qdict(address_entry->value);
-                g_assert(qdict_haskey(address_dict, "address") && qobject_type(qdict_get(address_dict, "address")) == QTYPE_QINT);
+                g_assert(qdict_haskey(address_dict, "address") &&
+                    qobject_type(qdict_get(address_dict, "address")) == QTYPE_QINT);
 
                 address = qdict_get_int(address_dict, "address");
 
                 if (is_first_mapping)
                 {
-                    printf("Configurable: Adding memory region %s (size: 0x%lx) at address 0x%lx\n", name, size, address);
+                    printf("Configurable: Adding memory region %s (size: 0x%lx) at address 0x%lx\n", 
+                        name, size, address);
                     memory_region_add_subregion(sysmem, address, ram);
                     is_first_mapping = FALSE;
 
@@ -374,7 +375,8 @@ static void board_init(MachineState * ms)
 
                     snprintf(alias_name, sizeof(alias_name), "%s.alias_%d", name, alias_num);
 
-                    printf("Configurable: Adding memory region %s (size: 0x%lx) at address 0x%lx\n", alias_name, size, address);
+                    printf("Configurable: Adding memory region %s (size: 0x%lx) at address 0x%lx\n",
+                        alias_name, size, address);
                     memory_region_init_alias(ram_alias, NULL,  alias_name, ram, 0, size);
                     memory_region_add_subregion(sysmem, address, ram_alias);
 
@@ -430,21 +432,22 @@ static void board_init(MachineState * ms)
                 close(file);
 
                 //And copy the data to the memory, if it is initialized
-                printf("Configurable: Copying 0x%lx byte of data from file %s to address 0x%lx\n", data_size, filename, address);
-//                ram_ptr = qemu_get_ram_ptr(memory_region_get_ram_addr(ram));
-//                memcpy(ram_ptr, data, data_size);
-//                qemu_put_ram_ptr(ram_ptr);
+                printf("Configurable: Copying 0x%lx byte of data from file %s to address 0x%lx\n",
+                    data_size, filename, address);
+                
+                cpu->as = g_new(AddressSpace, 1);
+                address_space_init(cpu->as, sysmem, "main_address_space");
                 cpu_physical_memory_write_rom(cpu->as, address, (uint8_t *) data, data_size);
+                
                 g_free(data);
             }
-
         }
     }
 
     /*
      * The devices stuff is just considered a hack, I want to replace everything here with a device tree parser as soon as I have the time ...
      */
-     if (qdict_haskey(conf, "devices"))
+    if (qdict_haskey(conf, "devices"))
     {
         QListEntry * entry;
         QList * devices = qobject_to_qlist(qdict_get(conf, "devices"));
@@ -462,15 +465,18 @@ static void board_init(MachineState * ms)
             g_assert(qobject_type(entry->value) == QTYPE_QDICT);
             device = qobject_to_qdict(entry->value);
 
-            g_assert(qdict_haskey(device, "address") && qobject_type(qdict_get(device, "address")) == QTYPE_QINT);
-            g_assert(qdict_haskey(device, "qemu_name") && qobject_type(qdict_get(device, "qemu_name")) == QTYPE_QSTRING);
-            g_assert(qdict_haskey(device, "bus") && qobject_type(qdict_get(device, "bus")) == QTYPE_QSTRING);
+            g_assert(qdict_haskey(device, "address") && 
+                qobject_type(qdict_get(device, "address")) == QTYPE_QINT);
+            
+            g_assert(qdict_haskey(device, "qemu_name") && 
+                qobject_type(qdict_get(device, "qemu_name")) == QTYPE_QSTRING);
+            
+            g_assert(qdict_haskey(device, "bus") &&
+                qobject_type(qdict_get(device, "bus")) == QTYPE_QSTRING);
 
             bus = qdict_get_str(device, "bus");
             qemu_name = qdict_get_str(device, "qemu_name");
             address = qdict_get_int(device, "address");
-
-
 
             if (strcmp(bus, "sysbus") == 0)
             {
@@ -491,8 +497,8 @@ static void board_init(MachineState * ms)
     // Set init state
     g_assert((qdict_haskey(conf, "entry_address") || qdict_haskey(conf, "init_state")));
     if (qdict_haskey(conf, "entry_address")) {
-	g_assert(qobject_type(qdict_get(conf, "entry_address")) == QTYPE_QINT);
-	entry_address = qdict_get_int(conf, "entry_address");
+	    g_assert(qobject_type(qdict_get(conf, "entry_address")) == QTYPE_QINT);
+	    entry_address = qdict_get_int(conf, "entry_address");
         // Just set the entry address
 #ifdef TARGET_ARM
         ((CPUARMState *) cpu)->thumb = (entry_address & 1) != 0 ? 1 : 0;
@@ -502,11 +508,11 @@ static void board_init(MachineState * ms)
 #endif
     }
     if (qdict_haskey(conf, "init_state")) {
-	// Optionally set the whole initial state
-	printf("Configurable: Setting initial state from JSON.\n");
-	machine_init_state(conf, cpu);
+	    // Optionally set the whole initial state
+	    printf("Configurable: Setting initial state from JSON.\n");
+	    machine_init_state(conf, cpu);
 #ifdef TARGET_ARM
-	entry_address = ((CPUARMState *) cpu)->regs[15] ;
+	    entry_address = ((CPUARMState *) cpu)->regs[15] ;
 #elif TARGET_I386
         entry_address = ((CPUX86State *) cpu)->eip;
 #endif
